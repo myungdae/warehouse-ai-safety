@@ -676,6 +676,16 @@
     box-shadow: 0 0 20px rgba(59, 130, 246, 0.4) !important;
 }
 
+.btn-imu {
+    background: linear-gradient(135deg, #9C27B0, #7B1FA2) !important;
+    border: 2px solid rgba(156, 39, 176, 0.3) !important;
+}
+
+.btn-imu:hover {
+    background: linear-gradient(135deg, #7B1FA2, #6A1B9A) !important;
+    box-shadow: 0 0 20px rgba(156, 39, 176, 0.4) !important;
+}
+
 /* Animation Keyframes */
 @keyframes slideDown {
     from {

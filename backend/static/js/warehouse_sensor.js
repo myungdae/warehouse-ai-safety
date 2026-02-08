@@ -27,6 +27,12 @@ const sensorData = {
         { id: 'UWB-GW-04', location: 'Aisle-D 북서', status: 'online', coverage: 200, tags: 7 },
         { id: 'UWB-GW-05', location: 'Aisle-D 북동', status: 'online', coverage: 200, tags: 9 },
         { id: 'UWB-GW-06', location: 'Aisle-D 남동', status: 'online', coverage: 200, tags: 4 }
+    ],
+    imu: [
+        { id: 'IMU-F07', forklift: 'F-07', location: '지게차 F-07', status: 'online', accelX: 0.2, accelY: 0.1, accelZ: 9.8, gyroX: 0, gyroY: 0, gyroZ: 0, tilt: 0 },
+        { id: 'IMU-F12', forklift: 'F-12', location: '지게차 F-12', status: 'online', accelX: 0.1, accelY: 0.0, accelZ: 9.8, gyroX: 0, gyroY: 0, gyroZ: 0, tilt: 0 },
+        { id: 'IMU-F03', forklift: 'F-03', location: '지게차 F-03', status: 'online', accelX: 0.0, accelY: 0.2, accelZ: 9.8, gyroX: 0, gyroY: 0, gyroZ: 0, tilt: 0 },
+        { id: 'IMU-F15', forklift: 'F-15', location: '지게차 F-15', status: 'online', accelX: 0.1, accelY: 0.1, accelZ: 9.8, gyroX: 0, gyroY: 0, gyroZ: 0, tilt: 0 }
     ]
 };
 
@@ -78,7 +84,7 @@ function showSensorType(type) {
     if (type === 'all') {
         title = '📊 전체 센서 모니터링';
         subtitle = '모든 센서 상태 확인';
-        sensors = [...sensorData.cctv, ...sensorData.lidar, ...sensorData.uwb];
+        sensors = [...sensorData.cctv, ...sensorData.lidar, ...sensorData.uwb, ...sensorData.imu];
     } else if (type === 'cctv') {
         title = '📹 CCTV 모니터링';
         subtitle = '영상 감시 센서 (8대)';
@@ -91,6 +97,10 @@ function showSensorType(type) {
         title = '📍 UWB 모니터링';
         subtitle = '정밀 위치 추적 센서 (6대)';
         sensors = sensorData.uwb;
+    } else if (type === 'imu') {
+        title = '📳 IMU 모니터링';
+        subtitle = '관성 측정 센서 (4대)';
+        sensors = sensorData.imu;
     }
     
     document.getElementById('pageTitle').innerHTML = title;
@@ -186,6 +196,23 @@ function getMetrics(sensor, type) {
                 <div class="metric-value">${sensor.tags}개</div>
             </div>
         `;
+    } else if (sensor.id.startsWith('IMU')) {
+        const accel = Math.sqrt(sensor.accelX**2 + sensor.accelY**2 + sensor.accelZ**2).toFixed(1);
+        const gyro = Math.sqrt(sensor.gyroX**2 + sensor.gyroY**2 + sensor.gyroZ**2).toFixed(1);
+        html += `
+            <div class="sensor-metric">
+                <div class="metric-label">가속도(m/s²)</div>
+                <div class="metric-value">${accel}</div>
+            </div>
+            <div class="sensor-metric">
+                <div class="metric-label">회전(°/s)</div>
+                <div class="metric-value">${gyro}</div>
+            </div>
+            <div class="sensor-metric">
+                <div class="metric-label">기울기(°)</div>
+                <div class="metric-value">${sensor.tilt}</div>
+            </div>
+        `;
     }
     
     return html;
@@ -209,6 +236,7 @@ function showDigitalTwin() {
                         <button class="btn-control btn-danger" onclick="triggerScenario1()">📍 시나리오 1</button>
                         <button class="btn-control btn-warning" onclick="triggerScenario2()">📍 시나리오 2</button>
                         <button class="btn-control btn-info" onclick="triggerScenario3()">📍 시나리오 3</button>
+                        <button class="btn-control btn-imu" onclick="triggerScenario4()">📍 시나리오 4</button>
                     </div>
                 </div>
                 <div class="map-canvas-large" id="digitalTwinMap">
@@ -727,10 +755,14 @@ function initializeFullDigitalTwin() {
 // Initialize Animated Forklifts
 function initializeAnimatedForklifts() {
     animationState.forklifts = [
-        {id:'F-07', x:200, y:100, direction:0, speed:1.5, color:'#4CAF50'},
-        {id:'F-12', x:600, y:100, direction:180, speed:1.2, color:'#4CAF50'},
-        {id:'F-03', x:400, y:230, direction:90, speed:1.0, color:'#4CAF50'},
-        {id:'F-15', x:750, y:360, direction:270, speed:1.3, color:'#4CAF50'}
+        {id:'F-07', x:200, y:100, direction:0, speed:1.5, color:'#4CAF50', 
+         prevSpeed:1.5, accel:0, gyro:0, tilt:0, lastAccelTime:Date.now()},
+        {id:'F-12', x:600, y:100, direction:180, speed:1.2, color:'#4CAF50',
+         prevSpeed:1.2, accel:0, gyro:0, tilt:0, lastAccelTime:Date.now()},
+        {id:'F-03', x:400, y:230, direction:90, speed:1.0, color:'#4CAF50',
+         prevSpeed:1.0, accel:0, gyro:0, tilt:0, lastAccelTime:Date.now()},
+        {id:'F-15', x:750, y:360, direction:270, speed:1.3, color:'#4CAF50',
+         prevSpeed:1.3, accel:0, gyro:0, tilt:0, lastAccelTime:Date.now()}
     ];
     
     const forkliftsGroup = document.getElementById('dtForklifts');
@@ -809,6 +841,9 @@ function moveForklifts() {
                 `translate(${f.x}, ${f.y}) rotate(${f.direction})`);
         }
     });
+    
+    // Update IMU data
+    updateIMUData();
     
     // Check for collisions and show warnings
     detectCollisions();
@@ -1494,3 +1529,182 @@ function toggleTTS() {
 document.addEventListener('DOMContentLoaded', function() {
     initializeTTS();
 });
+
+// ========================================
+// IMU SENSOR SYSTEM
+// ========================================
+
+// IMU Detection Thresholds
+const IMU_THRESHOLDS = {
+    HARD_ACCEL: 3.0,      // m/s² - 급가속
+    HARD_BRAKE: -3.0,     // m/s² - 급감속
+    SHARP_TURN: 45,       // °/s - 급회전
+    TILT_WARNING: 15,     // ° - 기울기 경고
+    TILT_DANGER: 25       // ° - 기울기 위험
+};
+
+// Update IMU Data for Forklifts
+function updateIMUData() {
+    const now = Date.now();
+    
+    animationState.forklifts.forEach(f => {
+        // Calculate acceleration (change in speed)
+        const deltaTime = (now - f.lastAccelTime) / 1000; // seconds
+        const deltaSpeed = f.speed - f.prevSpeed;
+        f.accel = deltaSpeed / (deltaTime || 0.05); // m/s²
+        
+        // Update previous values
+        f.prevSpeed = f.speed;
+        f.lastAccelTime = now;
+        
+        // Calculate gyro (angular velocity) - simplified
+        f.gyro = Math.abs(deltaSpeed) * 10; // Simplified rotation rate
+        
+        // Simulate tilt based on speed (higher speed = more tilt in turns)
+        f.tilt = Math.min(Math.abs(f.speed) * 2, 20);
+        
+        // Detect anomalies
+        detectIMUAnomalies(f);
+    });
+}
+
+// Detect IMU Anomalies
+function detectIMUAnomalies(forklift) {
+    // Hard Acceleration
+    if (forklift.accel > IMU_THRESHOLDS.HARD_ACCEL) {
+        handleHardAcceleration(forklift);
+    }
+    
+    // Hard Braking
+    if (forklift.accel < IMU_THRESHOLDS.HARD_BRAKE) {
+        handleHardBraking(forklift);
+    }
+    
+    // Sharp Turn
+    if (forklift.gyro > IMU_THRESHOLDS.SHARP_TURN) {
+        handleSharpTurn(forklift);
+    }
+    
+    // Dangerous Tilt
+    if (forklift.tilt > IMU_THRESHOLDS.TILT_DANGER) {
+        handleDangerousTilt(forklift);
+    }
+}
+
+// Handle Hard Acceleration
+function handleHardAcceleration(forklift) {
+    const warningId = `accel_${forklift.id}`;
+    if (!canSpeak(warningId)) return;
+    
+    const name = formatForkliftIdForSpeech(forklift.id);
+    speak(`${name} 급가속 감지! 속도를 조절하세요!`, 'high');
+    showWarningIndicator(forklift, '⚡ 급가속', '#FF9800');
+}
+
+// Handle Hard Braking
+function handleHardBraking(forklift) {
+    const warningId = `brake_${forklift.id}`;
+    if (!canSpeak(warningId)) return;
+    
+    const name = formatForkliftIdForSpeech(forklift.id);
+    speak(`${name} 급브레이크! 충격 감지!`, 'high');
+    showWarningIndicator(forklift, '🛑 급정지', '#ef4444');
+}
+
+// Handle Sharp Turn
+function handleSharpTurn(forklift) {
+    const warningId = `turn_${forklift.id}`;
+    if (!canSpeak(warningId)) return;
+    
+    const name = formatForkliftIdForSpeech(forklift.id);
+    speak(`${name} 급회전 주의!`, 'normal');
+    showWarningIndicator(forklift, '🔄 급회전', '#3b82f6');
+}
+
+// Handle Dangerous Tilt
+function handleDangerousTilt(forklift) {
+    const warningId = `tilt_${forklift.id}`;
+    if (!canSpeak(warningId)) return;
+    
+    const name = formatForkliftIdForSpeech(forklift.id);
+    speak(`${name} 기울기 위험! 과적재 확인하세요!`, 'high');
+    showWarningIndicator(forklift, '⚠️ 기울기 위험', '#f59e0b');
+}
+
+// Show Warning Indicator on Map
+function showWarningIndicator(forklift, message, color) {
+    const svg = document.getElementById('digitalTwinSvg');
+    if (!svg) return;
+    
+    const indicatorId = `warning-${forklift.id}`;
+    const existing = document.getElementById(indicatorId);
+    if (existing) existing.remove();
+    
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    g.setAttribute('id', indicatorId);
+    g.innerHTML = `
+        <circle cx="${forklift.x}" cy="${forklift.y - 30}" r="20" fill="${color}40" stroke="${color}" stroke-width="2">
+            <animate attributeName="opacity" values="0.8;0.3;0.8" dur="1s" repeatCount="indefinite"/>
+        </circle>
+        <text x="${forklift.x}" y="${forklift.y - 27}" text-anchor="middle" 
+              fill="${color}" font-size="10" font-weight="bold">${message}</text>
+    `;
+    svg.appendChild(g);
+    
+    // Remove after 3 seconds
+    setTimeout(() => {
+        const ind = document.getElementById(indicatorId);
+        if (ind) ind.remove();
+    }, 3000);
+}
+
+// Trigger Scenario 4: Emergency Braking (IMU Detection)
+function triggerScenario4() {
+    console.log('🟣 Triggering Scenario 4: Emergency Braking (IMU)');
+    
+    stopAnimation();
+    
+    // Position F-07 at high speed
+    const f07 = animationState.forklifts.find(f => f.id === 'F-07');
+    if (f07) {
+        f07.x = 300;
+        f07.y = 100;
+        f07.direction = 0;
+        f07.speed = 3.5; // Very high speed
+        f07.prevSpeed = 3.5;
+    }
+    
+    // Add obstacle
+    const svg = document.getElementById('dtForklifts');
+    const existingObs = document.getElementById('obstacle-01');
+    if (existingObs) existingObs.remove();
+    
+    const obsGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    obsGroup.setAttribute('id', 'obstacle-01');
+    obsGroup.innerHTML = `
+        <rect x="550" y="85" width="30" height="30" fill="#ef4444" stroke="#fff" stroke-width="2" rx="3"/>
+        <text x="565" y="105" text-anchor="middle" fill="#fff" font-size="16" font-weight="bold">⚠</text>
+    `;
+    svg.appendChild(obsGroup);
+    
+    // Voice announcement
+    speakScenarioStart(4, '급정지 위험. IMU 센서 작동');
+    
+    // Show notification
+    const notification = document.createElement('div');
+    notification.style.cssText = 'position:fixed;top:100px;left:50%;transform:translateX(-50%);background:#9C27B0;color:#fff;padding:20px 40px;border-radius:10px;font-size:18px;font-weight:bold;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,0.3);';
+    notification.innerHTML = '🟣 시나리오 4: 급정지 위험 (IMU) 시뮬레이션 시작!';
+    document.body.appendChild(notification);
+    
+    setTimeout(() => notification.remove(), 3000);
+    
+    // After 2 seconds, trigger emergency braking
+    setTimeout(() => {
+        if (f07) {
+            f07.speed = 0; // Emergency stop
+            handleHardBraking(f07);
+        }
+    }, 2000);
+    
+    startAnimation();
+}
