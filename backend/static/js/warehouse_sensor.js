@@ -1248,7 +1248,10 @@ function handleStopCommand(command) {
         if (forklift) {
             forklift.speed = 0;
             forklift.status = 'stopped';
+            
+            const forkliftName = formatForkliftIdForSpeech(forkliftId);
             showNotificationPopup(`✅ ${forkliftId} 정지 명령 실행`, 'success');
+            speak(`${forkliftName} 정지 명령을 실행합니다`, 'high');
         } else {
             showNotificationPopup(`❌ ${forkliftId}를 찾을 수 없습니다`, 'error');
         }
@@ -1259,6 +1262,7 @@ function handleStopCommand(command) {
             f.status = 'stopped';
         });
         showNotificationPopup('✅ 모든 지게차 정지 명령 실행', 'success');
+        speak('모든 지게차 정지 명령을 실행합니다', 'high');
     }
 }
 
@@ -1383,13 +1387,46 @@ function canSpeak(warningId) {
     return true;
 }
 
+// Convert Forklift ID to natural speech
+function formatForkliftIdForSpeech(id) {
+    // Convert "F-07" to "에프공칠"
+    // Convert "F-12" to "에프일이"
+    
+    const match = id.match(/F-?(\d+)/i);
+    if (!match) return id;
+    
+    const number = match[1];
+    const digits = {
+        '0': '공',
+        '1': '일',
+        '2': '이',
+        '3': '삼',
+        '4': '사',
+        '5': '오',
+        '6': '육',
+        '7': '칠',
+        '8': '팔',
+        '9': '구'
+    };
+    
+    let spokenNumber = '';
+    for (let digit of number) {
+        spokenNumber += digits[digit] || digit;
+    }
+    
+    return `에프${spokenNumber}`;
+}
+
 // Collision Warning Voice
 function speakCollisionWarning(forklift1, forklift2) {
     const warningId = `collision_${forklift1.id}_${forklift2.id}`;
     
     if (!canSpeak(warningId)) return;
     
-    const message = `경고! ${forklift1.id}과 ${forklift2.id} 충돌 위험! 속도를 줄이세요!`;
+    const f1Name = formatForkliftIdForSpeech(forklift1.id);
+    const f2Name = formatForkliftIdForSpeech(forklift2.id);
+    
+    const message = `경고! ${f1Name}과 ${f2Name} 충돌 위험! 속도를 줄이세요!`;
     speak(message, 'high');
 }
 
@@ -1399,7 +1436,9 @@ function speakPedestrianWarning(forkliftId) {
     
     if (!canSpeak(warningId)) return;
     
-    const message = `${forkliftId} 정지! 보행자 접근 중입니다!`;
+    const forkliftName = formatForkliftIdForSpeech(forkliftId);
+    
+    const message = `${forkliftName} 정지! 보행자 접근 중입니다!`;
     speak(message, 'high');
 }
 
@@ -1409,7 +1448,9 @@ function speakSpeedWarning(forkliftId, zone) {
     
     if (!canSpeak(warningId)) return;
     
-    const message = `${forkliftId} 과속! ${zone} 구역에서 속도를 줄이세요!`;
+    const forkliftName = formatForkliftIdForSpeech(forkliftId);
+    
+    const message = `${forkliftName} 과속! ${zone} 구역에서 속도를 줄이세요!`;
     speak(message, 'high');
 }
 
