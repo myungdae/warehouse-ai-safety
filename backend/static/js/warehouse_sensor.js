@@ -825,12 +825,32 @@ function detectCollisions() {
                 Math.pow(f1.x - f2.x, 2) + Math.pow(f1.y - f2.y, 2)
             );
             
-            // Show danger zone
+            // Show danger zone and voice warning
             if (distance < 80) {
                 showDangerZone(f1, f2, distance);
+                // Automatic voice warning
+                speakCollisionWarning(f1, f2);
             }
         }
     }
+    
+    // Check pedestrian proximity
+    const pedestrian = document.getElementById('pedestrian-P02');
+    if (pedestrian) {
+        animationState.forklifts.forEach(f => {
+            const dist = Math.sqrt(Math.pow(f.x - 520, 2) + Math.pow(f.y - 230, 2));
+            if (dist < 100) {
+                speakPedestrianWarning(f.id);
+            }
+        });
+    }
+    
+    // Check speed violations in pedestrian zone
+    animationState.forklifts.forEach(f => {
+        if (f.x >= 50 && f.x <= 150 && f.y >= 250 && f.y <= 350 && f.speed > 2.0) {
+            speakSpeedWarning(f.id, '보행자 구역');
+        }
+    });
 }
 
 // Show Danger Zone
@@ -854,6 +874,9 @@ function showDangerZone(f1, f2, distance) {
         <text x="${midX}" y="${midY}" text-anchor="middle" fill="#ff0000" font-size="14" font-weight="bold">⚠ 충돌 위험</text>
     `;
     svg.appendChild(g);
+    
+    // 🔊 Automatic voice warning
+    speakCollisionWarning(f1, f2);
     
     // Remove after 2 seconds
     setTimeout(() => {
@@ -905,6 +928,9 @@ function triggerScenario1() {
         f12.speed = 2.5; // Fast
     }
     
+    // Voice announcement
+    speakScenarioStart(1, '충돌 위험');
+    
     // Show notification
     const content = document.getElementById('dashboardContent');
     const notification = document.createElement('div');
@@ -944,6 +970,9 @@ function triggerScenario2() {
         f03.direction = 0; // Right toward pedestrian
         f03.speed = 2.0;
     }
+    
+    // Voice announcement
+    speakScenarioStart(2, '보행자 근접 경고');
     
     // Show notification
     const notification = document.createElement('div');
@@ -988,6 +1017,9 @@ function triggerScenario3() {
         f15.speed = 3.0; // Very fast
         f15.color = '#FF9800'; // Change color to orange
     }
+    
+    // Voice announcement
+    speakScenarioStart(3, '과속 감지');
     
     // Show notification
     const notification = document.createElement('div');
@@ -1291,3 +1323,133 @@ function showNotificationPopup(message, type = 'info') {
     
     setTimeout(() => notification.remove(), 3000);
 }
+
+// ========================================
+// TEXT-TO-SPEECH (TTS) SYSTEM
+// ========================================
+
+// Global TTS State
+const ttsState = {
+    enabled: true,
+    lastWarningTime: {},
+    warningCooldown: 3000 // 3 seconds between same warnings
+};
+
+// Initialize TTS
+function initializeTTS() {
+    if (!('speechSynthesis' in window)) {
+        console.error('Text-to-Speech not supported in this browser');
+        return false;
+    }
+    return true;
+}
+
+// Speak Text
+function speak(text, priority = 'normal') {
+    if (!ttsState.enabled || !window.speechSynthesis) return;
+    
+    // Cancel previous utterances if high priority
+    if (priority === 'high') {
+        window.speechSynthesis.cancel();
+    }
+    
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'ko-KR';
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+    
+    // Adjust voice settings based on priority
+    if (priority === 'high') {
+        utterance.volume = 1.0;
+        utterance.rate = 1.2; // Faster for urgent messages
+    } else {
+        utterance.volume = 0.8;
+    }
+    
+    console.log('🔊 TTS:', text);
+    window.speechSynthesis.speak(utterance);
+}
+
+// Check Warning Cooldown
+function canSpeak(warningId) {
+    const now = Date.now();
+    const lastTime = ttsState.lastWarningTime[warningId] || 0;
+    
+    if (now - lastTime < ttsState.warningCooldown) {
+        return false;
+    }
+    
+    ttsState.lastWarningTime[warningId] = now;
+    return true;
+}
+
+// Collision Warning Voice
+function speakCollisionWarning(forklift1, forklift2) {
+    const warningId = `collision_${forklift1.id}_${forklift2.id}`;
+    
+    if (!canSpeak(warningId)) return;
+    
+    const message = `경고! ${forklift1.id}과 ${forklift2.id} 충돌 위험! 속도를 줄이세요!`;
+    speak(message, 'high');
+}
+
+// Pedestrian Warning Voice
+function speakPedestrianWarning(forkliftId) {
+    const warningId = `pedestrian_${forkliftId}`;
+    
+    if (!canSpeak(warningId)) return;
+    
+    const message = `${forkliftId} 정지! 보행자 접근 중입니다!`;
+    speak(message, 'high');
+}
+
+// Speed Violation Warning Voice
+function speakSpeedWarning(forkliftId, zone) {
+    const warningId = `speed_${forkliftId}`;
+    
+    if (!canSpeak(warningId)) return;
+    
+    const message = `${forkliftId} 과속! ${zone} 구역에서 속도를 줄이세요!`;
+    speak(message, 'high');
+}
+
+// Scenario Announcement
+function speakScenarioStart(scenarioNum, description) {
+    const message = `시나리오 ${scenarioNum} 시작. ${description}`;
+    speak(message, 'normal');
+}
+
+// System Status
+function speakSystemStatus(status) {
+    speak(status, 'normal');
+}
+
+// Toggle TTS
+function toggleTTS() {
+    ttsState.enabled = !ttsState.enabled;
+    const status = ttsState.enabled ? '음성 알림 활성화' : '음성 알림 비활성화';
+    console.log(status);
+    
+    // Update button appearance
+    const btn = document.getElementById('ttsToggleBtn');
+    if (btn) {
+        if (ttsState.enabled) {
+            btn.classList.remove('disabled');
+            btn.innerHTML = '🔊 음성 알림';
+        } else {
+            btn.classList.add('disabled');
+            btn.innerHTML = '🔇 음성 알림';
+        }
+    }
+    
+    showNotificationPopup(status, 'info');
+    
+    if (ttsState.enabled) {
+        speak('음성 알림이 활성화되었습니다');
+    }
+}
+
+// Initialize TTS on load
+document.addEventListener('DOMContentLoaded', function() {
+    initializeTTS();
+});
