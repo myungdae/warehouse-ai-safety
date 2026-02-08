@@ -1,0 +1,347 @@
+@prefix : <http://example.org/warehouse#> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+# ============================================
+# WAREHOUSE TRAFFIC CONTROL - SHACL SHAPES
+# ============================================
+# These shapes validate data quality and enforce
+# operational policies
+
+# ============================================
+# FORKLIFT VALIDATION
+# ============================================
+
+:ForkliftShape a sh:NodeShape ;
+    sh:targetClass :Forklift ;
+    sh:property [
+        sh:path :speed ;
+        sh:datatype xsd:float ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 25.0 ;
+        sh:message "Forklift speed must be between 0 and 25 km/h" ;
+    ] ;
+    sh:property [
+        sh:path :hasOperator ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:class :Operator ;
+        sh:message "Every forklift must have exactly one operator" ;
+    ] ;
+    sh:property [
+        sh:path :xCoordinate ;
+        sh:datatype xsd:float ;
+        sh:minCount 1 ;
+        sh:message "Forklift must have x coordinate" ;
+    ] ;
+    sh:property [
+        sh:path :yCoordinate ;
+        sh:datatype xsd:float ;
+        sh:minCount 1 ;
+        sh:message "Forklift must have y coordinate" ;
+    ] ;
+    sh:property [
+        sh:path :heading ;
+        sh:datatype xsd:float ;
+        sh:minInclusive 0.0 ;
+        sh:maxExclusive 360.0 ;
+        sh:message "Heading must be between 0 and 360 degrees" ;
+    ] .
+
+# ============================================
+# PEDESTRIAN VALIDATION
+# ============================================
+
+:PedestrianShape a sh:NodeShape ;
+    sh:targetClass :Pedestrian ;
+    sh:property [
+        sh:path :speed ;
+        sh:datatype xsd:float ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 8.0 ;
+        sh:message "Pedestrian speed must be between 0 and 8 km/h" ;
+    ] ;
+    sh:property [
+        sh:path :xCoordinate ;
+        sh:datatype xsd:float ;
+        sh:minCount 1 ;
+    ] ;
+    sh:property [
+        sh:path :yCoordinate ;
+        sh:datatype xsd:float ;
+        sh:minCount 1 ;
+    ] .
+
+# ============================================
+# ZONE VALIDATION
+# ============================================
+
+:ZoneShape a sh:NodeShape ;
+    sh:targetClass :Zone ;
+    sh:property [
+        sh:path :speedLimit ;
+        sh:datatype xsd:float ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 25.0 ;
+        sh:message "Zone speed limit must be between 0 and 25 km/h" ;
+    ] .
+
+:PedestrianZoneShape a sh:NodeShape ;
+    sh:targetClass :PedestrianZone ;
+    sh:property [
+        sh:path :speedLimit ;
+        sh:datatype xsd:float ;
+        sh:maxInclusive 5.0 ;
+        sh:message "Pedestrian zone speed limit cannot exceed 5 km/h" ;
+        sh:severity sh:Violation ;
+    ] .
+
+# ============================================
+# COLLISION RISK EVENT VALIDATION
+# ============================================
+
+:CollisionRiskEventShape a sh:NodeShape ;
+    sh:targetClass :CollisionRiskEvent ;
+    sh:property [
+        sh:path :riskLevel ;
+        sh:datatype xsd:string ;
+        sh:in ("LOW" "MEDIUM" "HIGH" "CRITICAL") ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "Risk level must be one of: LOW, MEDIUM, HIGH, CRITICAL" ;
+    ] ;
+    sh:property [
+        sh:path :involvesEntity ;
+        sh:minCount 1 ;
+        sh:message "Collision risk event must involve at least one entity" ;
+    ] ;
+    sh:property [
+        sh:path :timestamp ;
+        sh:datatype xsd:dateTime ;
+        sh:minCount 1 ;
+        sh:message "Event must have timestamp" ;
+    ] ;
+    sh:property [
+        sh:path :triggersAction ;
+        sh:minCount 1 ;
+        sh:message "Risk event must trigger at least one action" ;
+    ] .
+
+# ============================================
+# VOICE COMMAND VALIDATION
+# ============================================
+
+:VoiceCommandShape a sh:NodeShape ;
+    sh:targetClass :VoiceCommand ;
+    sh:property [
+        sh:path :commandText ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxLength 50 ;
+        sh:message "Command text must be present and under 50 characters" ;
+    ] ;
+    sh:property [
+        sh:path :interventionLevel ;
+        sh:datatype xsd:string ;
+        sh:in ("ADVISORY" "DIRECTIVE" "ENFORCEMENT") ;
+        sh:minCount 1 ;
+        sh:message "Intervention level must be ADVISORY, DIRECTIVE, or ENFORCEMENT" ;
+    ] ;
+    sh:property [
+        sh:path :targetedAt ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "Voice command must target exactly one entity" ;
+    ] .
+
+# ============================================
+# CASE RECORD VALIDATION
+# ============================================
+
+:CaseRecordShape a sh:NodeShape ;
+    sh:targetClass :CaseRecord ;
+    sh:property [
+        sh:path :caseId ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:pattern "^CASE-[0-9]{8}-[0-9]{4}$" ;
+        sh:message "Case ID must follow format: CASE-YYYYMMDD-NNNN" ;
+    ] ;
+    sh:property [
+        sh:path :severity ;
+        sh:datatype xsd:string ;
+        sh:in ("LOW" "MEDIUM" "HIGH" "CRITICAL") ;
+        sh:minCount 1 ;
+    ] ;
+    sh:property [
+        sh:path :relatedEvent ;
+        sh:minCount 1 ;
+        sh:message "Case must reference at least one event" ;
+    ] ;
+    sh:property [
+        sh:path :actionTaken ;
+        sh:minCount 1 ;
+        sh:message "Case must record at least one action taken" ;
+    ] ;
+    sh:property [
+        sh:path :outcome ;
+        sh:datatype xsd:string ;
+        sh:in ("PREVENTED" "MITIGATED" "OCCURRED" "NEAR_MISS") ;
+        sh:message "Outcome must be one of: PREVENTED, MITIGATED, OCCURRED, NEAR_MISS" ;
+    ] .
+
+# ============================================
+# OPERATIONAL POLICY SHAPES (SHACL for Policies)
+# ============================================
+
+# Policy 1: No forklift in pedestrian zone above 5 km/h
+:ForkliftPedestrianZonePolicy a sh:NodeShape ;
+    sh:targetClass :Forklift ;
+    sh:sparql [
+        sh:message "Forklift {$this} exceeds 5 km/h in pedestrian zone" ;
+        sh:severity sh:Violation ;
+        sh:select """
+            PREFIX : <http://example.org/warehouse#>
+            SELECT $this ?speed ?zone
+            WHERE {
+                $this a :Forklift .
+                $this :inZone ?zone .
+                ?zone a :PedestrianZone .
+                $this :speed ?speed .
+                FILTER (?speed > 5.0)
+            }
+        """ ;
+    ] .
+
+# Policy 2: Forklift must not reverse in blind corner without warning
+:ReversingBlindCornerPolicy a sh:NodeShape ;
+    sh:targetClass :Forklift ;
+    sh:sparql [
+        sh:message "Forklift {$this} reversing in blind corner without active warning" ;
+        sh:severity sh:Warning ;
+        sh:select """
+            PREFIX : <http://example.org/warehouse#>
+            SELECT $this ?zone
+            WHERE {
+                $this a :Forklift .
+                $this :isReversing true .
+                $this :inZone ?zone .
+                ?zone a :BlindCorner .
+                FILTER NOT EXISTS {
+                    ?cmd a :VoiceCommand .
+                    ?cmd :targetedAt $this .
+                    ?cmd :commandText ?text .
+                    FILTER (CONTAINS(?text, "후진"))
+                }
+            }
+        """ ;
+    ] .
+
+# Policy 3: High traffic zones must have speed limit
+:HighTrafficZonePolicy a sh:NodeShape ;
+    sh:targetClass :HighTrafficZone ;
+    sh:property [
+        sh:path :speedLimit ;
+        sh:minCount 1 ;
+        sh:message "High traffic zone must have defined speed limit" ;
+        sh:severity sh:Violation ;
+    ] ;
+    sh:property [
+        sh:path :speedLimit ;
+        sh:maxInclusive 15.0 ;
+        sh:message "High traffic zone speed limit should not exceed 15 km/h" ;
+        sh:severity sh:Warning ;
+    ] .
+
+# Policy 4: Every collision risk event must generate case record
+:RiskEventCasePolicy a sh:NodeShape ;
+    sh:targetClass :CollisionRiskEvent ;
+    sh:sparql [
+        sh:message "Collision risk event {$this} has no associated case record" ;
+        sh:severity sh:Violation ;
+        sh:select """
+            PREFIX : <http://example.org/warehouse#>
+            SELECT $this
+            WHERE {
+                $this a :CollisionRiskEvent .
+                FILTER NOT EXISTS {
+                    ?case a :CaseRecord .
+                    ?case :relatedEvent $this .
+                }
+            }
+        """ ;
+    ] .
+
+# Policy 5: Critical events must have enforcement action
+:CriticalEventEnforcementPolicy a sh:NodeShape ;
+    sh:targetClass :CollisionRiskEvent ;
+    sh:sparql [
+        sh:message "Critical event {$this} lacks enforcement action" ;
+        sh:severity sh:Violation ;
+        sh:select """
+            PREFIX : <http://example.org/warehouse#>
+            SELECT $this
+            WHERE {
+                $this a :CollisionRiskEvent .
+                $this :riskLevel "CRITICAL" .
+                FILTER NOT EXISTS {
+                    $this :triggersAction ?action .
+                    ?action a :ForcedStopAction .
+                }
+            }
+        """ ;
+    ] .
+
+# Policy 6: Voice commands must be acknowledged within 5 seconds
+:CommandAcknowledgementPolicy a sh:NodeShape ;
+    sh:targetClass :VoiceCommand ;
+    sh:property [
+        sh:path :wasComplied ;
+        sh:minCount 1 ;
+        sh:message "Voice command compliance status must be recorded" ;
+        sh:severity sh:Warning ;
+    ] .
+
+# ============================================
+# DATA QUALITY SHAPES
+# ============================================
+
+# Ensure all entities have recent position updates (within 2 seconds)
+:RecentPositionShape a sh:NodeShape ;
+    sh:targetClass :MovingEntity ;
+    sh:sparql [
+        sh:message "Entity {$this} has stale position data (>2 seconds old)" ;
+        sh:severity sh:Warning ;
+        sh:select """
+            PREFIX : <http://example.org/warehouse#>
+            PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+            SELECT $this ?lastUpdate
+            WHERE {
+                $this a :MovingEntity .
+                OPTIONAL {
+                    ?event a :PositionEvent .
+                    ?event :involvesEntity $this .
+                    ?event :timestamp ?lastUpdate .
+                }
+                BIND (NOW() AS ?now)
+                FILTER (!BOUND(?lastUpdate) || 
+                        (xsd:dayTimeDuration(xsd:string(?now - ?lastUpdate)) > "PT2S"^^xsd:dayTimeDuration))
+            }
+        """ ;
+    ] .
+
+# Ensure coordinates are within warehouse bounds (example: 0-100m)
+:CoordinateBoundsShape a sh:NodeShape ;
+    sh:targetClass :MovingEntity ;
+    sh:property [
+        sh:path :xCoordinate ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 100.0 ;
+        sh:message "X coordinate must be within warehouse bounds (0-100m)" ;
+    ] ;
+    sh:property [
+        sh:path :yCoordinate ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 80.0 ;
+        sh:message "Y coordinate must be within warehouse bounds (0-80m)" ;
+    ] .

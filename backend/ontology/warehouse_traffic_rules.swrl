@@ -1,0 +1,302 @@
+# ============================================
+# WAREHOUSE TRAFFIC CONTROL - SWRL RULES
+# ============================================
+# These rules implement the reasoning layer that detects
+# collision risks and determines appropriate interventions
+
+@prefix : <http://example.org/warehouse#> .
+@prefix swrl: <http://www.w3.org/2003/11/swrl#> .
+@prefix swrlb: <http://www.w3.org/2003/11/swrlb#> .
+
+# ============================================
+# RULE 1: BLIND CORNER COLLISION RISK (HIGH)
+# ============================================
+# Two forklifts approaching same blind corner at speed
+# → HIGH risk → DIRECTIVE intervention
+
+[BlindCornerRisk:
+    (?f1 rdf:type :Forklift)
+    (?f2 rdf:type :Forklift)
+    swrlb:notEqual(?f1, ?f2)
+    (?z rdf:type :BlindCorner)
+    (?f1 :approachingZone ?z)
+    (?f2 :approachingZone ?z)
+    (?f1 :speed ?s1)
+    (?f2 :speed ?s2)
+    swrlb:greaterThan(?s1, 8.0)
+    swrlb:greaterThan(?s2, 8.0)
+    ->
+    (?event rdf:type :CollisionRiskEvent)
+    (?event :involvesEntity ?f1)
+    (?event :involvesEntity ?f2)
+    (?event :occursInZone ?z)
+    (?event :riskLevel "HIGH")
+    (?event :timestamp ?now)
+]
+
+# ============================================
+# RULE 2: INTERSECTION HEAD-ON APPROACH (MEDIUM)
+# ============================================
+# Two forklifts approaching intersection from opposite directions
+# → MEDIUM risk → ADVISORY
+
+[IntersectionHeadOn:
+    (?f1 rdf:type :Forklift)
+    (?f2 rdf:type :Forklift)
+    swrlb:notEqual(?f1, ?f2)
+    (?z rdf:type :Intersection)
+    (?f1 :approachingZone ?z)
+    (?f2 :approachingZone ?z)
+    (?f1 :heading ?h1)
+    (?f2 :heading ?h2)
+    # Heading difference ~180 degrees (opposite directions)
+    swrlb:abs(swrlb:subtract(?h1, ?h2), ?diff)
+    swrlb:greaterThan(?diff, 160.0)
+    swrlb:lessThan(?diff, 200.0)
+    ->
+    (?event rdf:type :CollisionRiskEvent)
+    (?event :involvesEntity ?f1)
+    (?event :involvesEntity ?f2)
+    (?event :occursInZone ?z)
+    (?event :riskLevel "MEDIUM")
+]
+
+# ============================================
+# RULE 3: FORKLIFT-PEDESTRIAN PROXIMITY (CRITICAL)
+# ============================================
+# Forklift within 3 meters of pedestrian
+# → CRITICAL risk → ENFORCEMENT
+
+[ForkliftPedestrianProximity:
+    (?f rdf:type :Forklift)
+    (?p rdf:type :Pedestrian)
+    (?f :xCoordinate ?fx)
+    (?f :yCoordinate ?fy)
+    (?p :xCoordinate ?px)
+    (?p :yCoordinate ?py)
+    # Calculate distance
+    swrlb:subtract(?fx, ?px, ?dx)
+    swrlb:subtract(?fy, ?py, ?dy)
+    swrlb:multiply(?dx, ?dx, ?dx2)
+    swrlb:multiply(?dy, ?dy, ?dy2)
+    swrlb:add(?dx2, ?dy2, ?distSq)
+    swrlb:sqrt(?distSq, ?distance)
+    swrlb:lessThan(?distance, 3.0)
+    (?f :speed ?speed)
+    swrlb:greaterThan(?speed, 5.0)
+    ->
+    (?event rdf:type :CollisionRiskEvent)
+    (?event :involvesEntity ?f)
+    (?event :involvesEntity ?p)
+    (?event :riskLevel "CRITICAL")
+    (?prox rdf:type :ProximityEvent)
+    (?prox :distanceBetween ?distance)
+]
+
+# ============================================
+# RULE 4: REVERSING IN BLIND ZONE (MEDIUM)
+# ============================================
+# Forklift reversing in blind corner/high traffic zone
+# → MEDIUM risk → DIRECTIVE (horn + warning)
+
+[ReversingInBlindZone:
+    (?f rdf:type :Forklift)
+    (?f :isReversing true)
+    (?f :inZone ?z)
+    (
+        (?z rdf:type :BlindCorner)
+        OR
+        (?z rdf:type :HighTrafficZone)
+    )
+    ->
+    (?event rdf:type :CollisionRiskEvent)
+    (?event :involvesEntity ?f)
+    (?event :occursInZone ?z)
+    (?event :riskLevel "MEDIUM")
+]
+
+# ============================================
+# RULE 5: PEDESTRIAN ZONE SPEEDING (HIGH)
+# ============================================
+# Forklift exceeding 5 km/h in pedestrian zone
+# → HIGH risk → DIRECTIVE
+
+[PedestrianZoneSpeeding:
+    (?f rdf:type :Forklift)
+    (?f :inZone ?z)
+    (?z rdf:type :PedestrianZone)
+    (?f :speed ?speed)
+    swrlb:greaterThan(?speed, 5.0)
+    ->
+    (?event rdf:type :ZoneViolationEvent)
+    (?event :involvesEntity ?f)
+    (?event :occursInZone ?z)
+    (?event :riskLevel "HIGH")
+]
+
+# ============================================
+# RULE 6: SPEED LIMIT VIOLATION (MEDIUM)
+# ============================================
+# Entity exceeding zone speed limit
+# → MEDIUM risk → ADVISORY
+
+[SpeedLimitViolation:
+    (?e rdf:type :MovingEntity)
+    (?e :inZone ?z)
+    (?e :speed ?actualSpeed)
+    (?z :speedLimit ?limit)
+    swrlb:greaterThan(?actualSpeed, ?limit)
+    ->
+    (?event rdf:type :ZoneViolationEvent)
+    (?event :involvesEntity ?e)
+    (?event :occursInZone ?z)
+    (?event :riskLevel "MEDIUM")
+]
+
+# ============================================
+# RULE 7: PERPENDICULAR INTERSECTION APPROACH (HIGH)
+# ============================================
+# Two forklifts approaching intersection at ~90 degrees
+# with high relative speed → HIGH risk
+
+[PerpendicularApproach:
+    (?f1 rdf:type :Forklift)
+    (?f2 rdf:type :Forklift)
+    swrlb:notEqual(?f1, ?f2)
+    (?z rdf:type :Intersection)
+    (?f1 :approachingZone ?z)
+    (?f2 :approachingZone ?z)
+    (?f1 :heading ?h1)
+    (?f2 :heading ?h2)
+    # Heading difference ~90 degrees (perpendicular)
+    swrlb:abs(swrlb:subtract(?h1, ?h2), ?diff)
+    swrlb:greaterThan(?diff, 70.0)
+    swrlb:lessThan(?diff, 110.0)
+    (?f1 :speed ?s1)
+    (?f2 :speed ?s2)
+    swrlb:add(?s1, ?s2, ?totalSpeed)
+    swrlb:greaterThan(?totalSpeed, 15.0)
+    ->
+    (?event rdf:type :CollisionRiskEvent)
+    (?event :involvesEntity ?f1)
+    (?event :involvesEntity ?f2)
+    (?event :occursInZone ?z)
+    (?event :riskLevel "HIGH")
+    (?prox rdf:type :ProximityEvent)
+    (?prox :approachAngle 90.0)
+]
+
+# ============================================
+# RULE 8: HIGH RISK → DIRECTIVE VOICE COMMAND
+# ============================================
+# Any HIGH risk event → Issue directive voice command
+
+[HighRiskDirective:
+    (?event rdf:type :CollisionRiskEvent)
+    (?event :riskLevel "HIGH")
+    (?event :involvesEntity ?entity)
+    (?event :occursInZone ?zone)
+    ->
+    (?cmd rdf:type :VoiceCommand)
+    (?cmd :targetedAt ?entity)
+    (?cmd :interventionLevel "DIRECTIVE")
+    (?cmd :commandText "정지. 교차로 확인.")
+    (?event :triggersAction ?cmd)
+]
+
+# ============================================
+# RULE 9: CRITICAL RISK → FORCED STOP
+# ============================================
+# CRITICAL risk (forklift-pedestrian) → Emergency stop
+
+[CriticalRiskStop:
+    (?event rdf:type :CollisionRiskEvent)
+    (?event :riskLevel "CRITICAL")
+    (?event :involvesEntity ?forklift)
+    (?forklift rdf:type :Forklift)
+    ->
+    (?cmd rdf:type :ForcedStopAction)
+    (?cmd :targetedAt ?forklift)
+    (?cmd :interventionLevel "ENFORCEMENT")
+    (?event :triggersAction ?cmd)
+    (?voice rdf:type :VoiceCommand)
+    (?voice :targetedAt ?forklift)
+    (?voice :commandText "긴급정지! 보행자!")
+]
+
+# ============================================
+# RULE 10: MEDIUM RISK → ADVISORY
+# ============================================
+# MEDIUM risk → Advisory voice warning
+
+[MediumRiskAdvisory:
+    (?event rdf:type :CollisionRiskEvent)
+    (?event :riskLevel "MEDIUM")
+    (?event :involvesEntity ?entity)
+    ->
+    (?cmd rdf:type :VoiceCommand)
+    (?cmd :targetedAt ?entity)
+    (?cmd :interventionLevel "ADVISORY")
+    (?cmd :commandText "주의. 교차로 접근.")
+    (?event :triggersAction ?cmd)
+]
+
+# ============================================
+# RULE 11: REVERSING → HORN WARNING
+# ============================================
+# Forklift reversing → Automatic horn sound
+
+[ReversingHorn:
+    (?f rdf:type :Forklift)
+    (?f :isReversing true)
+    ->
+    (?cmd rdf:type :VoiceCommand)
+    (?cmd :targetedAt ?f)
+    (?cmd :interventionLevel "ADVISORY")
+    (?cmd :commandText "후진 중. 경적.")
+]
+
+# ============================================
+# RULE 12: CREATE CASE RECORD
+# ============================================
+# Any collision risk event → Create case record for logging
+
+[CreateCaseRecord:
+    (?event rdf:type :CollisionRiskEvent)
+    (?event :riskLevel ?level)
+    (?event :involvesEntity ?entity)
+    (?event :timestamp ?time)
+    ->
+    (?case rdf:type :CaseRecord)
+    (?case :relatedEvent ?event)
+    (?case :severity ?level)
+    (?case :caseId ?generatedId)
+]
+
+# ============================================
+# NOTES ON IMPLEMENTATION
+# ============================================
+# 
+# 1. Distance Calculation: The Euclidean distance formula is implemented
+#    using SWRL built-ins. In production, consider pre-computing this
+#    in the sensor data pipeline.
+#
+# 2. Angle Calculations: Heading differences determine approach angles.
+#    0° = same direction, 90° = perpendicular, 180° = opposite.
+#
+# 3. Threshold Values:
+#    - Blind corner speed: > 8 km/h
+#    - Pedestrian proximity: < 3 meters
+#    - Pedestrian zone speed: > 5 km/h
+#    - High total speed: > 15 km/h combined
+#
+# 4. Intervention Escalation:
+#    - ADVISORY: Informational warning
+#    - DIRECTIVE: Clear command requiring action
+#    - ENFORCEMENT: Automatic system intervention
+#
+# 5. Voice Commands: Standard phrasebook approach with short,
+#    clear commands in Korean for operator clarity.
+#
+# 6. Case Records: Every significant event is logged for
+#    post-incident analysis and system improvement.

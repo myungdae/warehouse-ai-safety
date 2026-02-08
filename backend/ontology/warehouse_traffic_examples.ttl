@@ -1,0 +1,314 @@
+@prefix : <http://example.org/warehouse#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+# ============================================
+# EXAMPLE INSTANCES - TEST SCENARIOS
+# ============================================
+
+# ============================================
+# OPERATORS
+# ============================================
+
+:Operator_Kim a :Operator ;
+    rdfs:label "Kim Min-soo" ;
+    :employeeId "EMP-1234" .
+
+:Operator_Park a :Operator ;
+    rdfs:label "Park Ji-won" ;
+    :employeeId "EMP-5678" .
+
+:Operator_Lee a :Operator ;
+    rdfs:label "Lee Sang-ho" ;
+    :employeeId "EMP-9012" .
+
+# ============================================
+# FORKLIFTS
+# ============================================
+
+:Forklift_F07 a :Forklift ;
+    rdfs:label "Forklift F-07" ;
+    :hasOperator :Operator_Kim ;
+    :xCoordinate 25.5 ;
+    :yCoordinate 40.2 ;
+    :speed 12.0 ;
+    :heading 45.0 ;
+    :isReversing false ;
+    :inZone :Intersection_Central .
+
+:Forklift_F12 a :Forklift ;
+    rdfs:label "Forklift F-12" ;
+    :hasOperator :Operator_Park ;
+    :xCoordinate 28.3 ;
+    :yCoordinate 42.8 ;
+    :speed 10.0 ;
+    :heading 225.0 ;
+    :isReversing false ;
+    :approachingZone :Intersection_Central .
+
+:Forklift_F23 a :Forklift ;
+    rdfs:label "Forklift F-23" ;
+    :hasOperator :Operator_Lee ;
+    :xCoordinate 65.0 ;
+    :yCoordinate 30.0 ;
+    :speed 15.0 ;
+    :heading 90.0 ;
+    :isReversing false ;
+    :inZone :PedestrianZone_Break .
+
+:Forklift_F31 a :Forklift ;
+    rdfs:label "Forklift F-31" ;
+    :xCoordinate 50.0 ;
+    :yCoordinate 50.0 ;
+    :speed 8.0 ;
+    :heading 180.0 ;
+    :isReversing true ;
+    :inZone :BlindCorner_NorthEast ;
+    :approachingZone :BlindCorner_NorthEast .
+
+# ============================================
+# PEDESTRIANS
+# ============================================
+
+:Pedestrian_P23 a :Pedestrian ;
+    rdfs:label "Worker P-23" ;
+    :xCoordinate 66.5 ;
+    :yCoordinate 31.2 ;
+    :speed 4.0 ;
+    :heading 270.0 ;
+    :inZone :PedestrianZone_Break .
+
+:Pedestrian_P45 a :Pedestrian ;
+    rdfs:label "Worker P-45" ;
+    :xCoordinate 51.0 ;
+    :yCoordinate 51.5 ;
+    :speed 3.5 ;
+    :heading 90.0 ;
+    :inZone :BlindCorner_NorthEast .
+
+# ============================================
+# ZONES (Additional Examples)
+# ============================================
+
+:Aisle_North a :Aisle ;
+    rdfs:label "North Aisle" ;
+    :speedLimit 15.0 .
+
+:Aisle_South a :Aisle ;
+    rdfs:label "South Aisle" ;
+    :speedLimit 15.0 .
+
+:LoadingDock_West a :LoadingDock ;
+    rdfs:label "West Loading Dock" ;
+    :speedLimit 10.0 .
+
+# ============================================
+# TEST SCENARIO 1: BLIND CORNER COLLISION RISK
+# ============================================
+# Expected: HIGH risk event, DIRECTIVE voice command
+
+:Forklift_Test1A a :Forklift ;
+    rdfs:label "Test Forklift A" ;
+    :xCoordinate 48.0 ;
+    :yCoordinate 48.0 ;
+    :speed 12.0 ;
+    :heading 45.0 ;
+    :isReversing false ;
+    :approachingZone :BlindCorner_NorthEast .
+
+:Forklift_Test1B a :Forklift ;
+    rdfs:label "Test Forklift B" ;
+    :xCoordinate 52.0 ;
+    :yCoordinate 52.0 ;
+    :speed 10.0 ;
+    :heading 225.0 ;
+    :isReversing false ;
+    :approachingZone :BlindCorner_NorthEast .
+
+# After reasoning, this should create:
+# - :CollisionRiskEvent_Test1 with riskLevel "HIGH"
+# - :VoiceCommand targeting both forklifts
+# - :CaseRecord_Test1
+
+# ============================================
+# TEST SCENARIO 2: FORKLIFT-PEDESTRIAN PROXIMITY
+# ============================================
+# Expected: CRITICAL risk event, FORCED STOP
+
+:Forklift_Test2 a :Forklift ;
+    rdfs:label "Test Forklift (Near Pedestrian)" ;
+    :xCoordinate 65.0 ;
+    :yCoordinate 30.0 ;
+    :speed 8.0 ;
+    :heading 90.0 ;
+    :isReversing false .
+
+:Pedestrian_Test2 a :Pedestrian ;
+    rdfs:label "Test Pedestrian (In Danger)" ;
+    :xCoordinate 66.5 ;
+    :yCoordinate 30.5 ;
+    :speed 3.0 ;
+    :heading 180.0 .
+
+# Distance: √((66.5-65)² + (30.5-30)²) = √(1.5² + 0.5²) = √2.5 = 1.58m
+# Expected: CRITICAL risk (< 3m), ForcedStopAction
+
+# ============================================
+# TEST SCENARIO 3: PEDESTRIAN ZONE SPEEDING
+# ============================================
+# Expected: HIGH risk event, DIRECTIVE
+
+# Already defined above: Forklift_F23 in PedestrianZone_Break at 15 km/h
+# Should trigger: ZoneViolationEvent, Voice command "속도 5로 감속"
+
+# ============================================
+# TEST SCENARIO 4: PERPENDICULAR INTERSECTION APPROACH
+# ============================================
+# Expected: HIGH risk event
+
+:Forklift_Test4A a :Forklift ;
+    rdfs:label "Test Forklift (East Approach)" ;
+    :xCoordinate 23.0 ;
+    :yCoordinate 40.0 ;
+    :speed 10.0 ;
+    :heading 90.0 ;
+    :approachingZone :Intersection_Central .
+
+:Forklift_Test4B a :Forklift ;
+    rdfs:label "Test Forklift (South Approach)" ;
+    :xCoordinate 25.0 ;
+    :yCoordinate 37.0 ;
+    :speed 8.0 ;
+    :heading 0.0 ;
+    :approachingZone :Intersection_Central .
+
+# Heading difference: |90 - 0| = 90° (perpendicular)
+# Total speed: 10 + 8 = 18 km/h (> 15)
+# Expected: HIGH risk, DIRECTIVE
+
+# ============================================
+# TEST SCENARIO 5: REVERSING IN BLIND ZONE
+# ============================================
+# Already defined: Forklift_F31 reversing in BlindCorner_NorthEast
+# Expected: MEDIUM risk, DIRECTIVE with horn
+
+# ============================================
+# EXPECTED INFERRED EVENTS (After Reasoning)
+# ============================================
+
+# These would be automatically created by the reasoner:
+
+# From Scenario 1:
+:CollisionRiskEvent_Scenario1 a :CollisionRiskEvent ;
+    :involvesEntity :Forklift_Test1A , :Forklift_Test1B ;
+    :occursInZone :BlindCorner_NorthEast ;
+    :riskLevel "HIGH" ;
+    :timestamp "2026-02-07T10:30:00Z"^^xsd:dateTime .
+
+:VoiceCommand_Scenario1A a :VoiceCommand ;
+    :targetedAt :Forklift_Test1A ;
+    :interventionLevel "DIRECTIVE" ;
+    :commandText "정지. 교차로 확인." .
+
+:CaseRecord_Scenario1 a :CaseRecord ;
+    :caseId "CASE-20260207-0001" ;
+    :severity "HIGH" ;
+    :relatedEvent :CollisionRiskEvent_Scenario1 ;
+    :actionTaken :VoiceCommand_Scenario1A ;
+    :outcome "PREVENTED" ;
+    :notes "Two forklifts approached blind corner simultaneously. Both stopped after directive." .
+
+# From Scenario 2:
+:CollisionRiskEvent_Scenario2 a :CollisionRiskEvent ;
+    :involvesEntity :Forklift_Test2 , :Pedestrian_Test2 ;
+    :riskLevel "CRITICAL" ;
+    :timestamp "2026-02-07T10:31:00Z"^^xsd:dateTime .
+
+:ProximityEvent_Scenario2 a :ProximityEvent ;
+    :distanceBetween 1.58 .
+
+:ForcedStopAction_Scenario2 a :ForcedStopAction ;
+    :targetedAt :Forklift_Test2 ;
+    :interventionLevel "ENFORCEMENT" .
+
+:VoiceCommand_Scenario2 a :VoiceCommand ;
+    :targetedAt :Forklift_Test2 ;
+    :commandText "긴급정지! 보행자!" .
+
+:CaseRecord_Scenario2 a :CaseRecord ;
+    :caseId "CASE-20260207-0002" ;
+    :severity "CRITICAL" ;
+    :relatedEvent :CollisionRiskEvent_Scenario2 ;
+    :actionTaken :ForcedStopAction_Scenario2 ;
+    :outcome "PREVENTED" ;
+    :notes "Forklift-pedestrian near miss. Emergency stop prevented collision." .
+
+# From Scenario 3:
+:ZoneViolationEvent_Scenario3 a :ZoneViolationEvent ;
+    :involvesEntity :Forklift_F23 ;
+    :occursInZone :PedestrianZone_Break ;
+    :riskLevel "HIGH" ;
+    :timestamp "2026-02-07T10:32:00Z"^^xsd:dateTime .
+
+:VoiceCommand_Scenario3 a :VoiceCommand ;
+    :targetedAt :Forklift_F23 ;
+    :interventionLevel "DIRECTIVE" ;
+    :commandText "속도 5로 감속. 보행자 구역." .
+
+# ============================================
+# STATISTICS QUERIES (For Dashboard)
+# ============================================
+
+# Query 1: Count events by risk level (last 24h)
+# SELECT ?level (COUNT(?event) AS ?count)
+# WHERE {
+#     ?event a :CollisionRiskEvent .
+#     ?event :riskLevel ?level .
+#     ?event :timestamp ?time .
+#     FILTER (?time > NOW() - "P1D"^^xsd:duration)
+# }
+# GROUP BY ?level
+
+# Query 2: Top 5 high-risk zones
+# SELECT ?zone (COUNT(?event) AS ?eventCount)
+# WHERE {
+#     ?event a :CollisionRiskEvent .
+#     ?event :occursInZone ?zone .
+#     ?event :riskLevel "HIGH" .
+# }
+# GROUP BY ?zone
+# ORDER BY DESC(?eventCount)
+# LIMIT 5
+
+# Query 3: Operator safety scores
+# SELECT ?operator (COUNT(?event) AS ?incidents)
+# WHERE {
+#     ?forklift a :Forklift .
+#     ?forklift :hasOperator ?operator .
+#     ?event a :CollisionRiskEvent .
+#     ?event :involvesEntity ?forklift .
+# }
+# GROUP BY ?operator
+# ORDER BY DESC(?incidents)
+
+# Query 4: Compliance rate
+# SELECT 
+#     (COUNT(?cmd) AS ?totalCommands)
+#     (SUM(IF(?cmd :wasComplied true, 1, 0)) AS ?complied)
+#     ((?complied / ?totalCommands * 100) AS ?complianceRate)
+# WHERE {
+#     ?cmd a :VoiceCommand .
+#     OPTIONAL { ?cmd :wasComplied ?complied }
+# }
+
+# ============================================
+# DASHBOARD VISUALIZATION DATA POINTS
+# ============================================
+
+# Real-time metrics to display:
+# - Active forklifts: 23
+# - Active pedestrians: 47
+# - High-risk zones: 3
+# - Events (last hour): 12
+# - Prevented collisions (today): 8
+# - Compliance rate: 94.2%
+# - Average response time: 2.3 seconds

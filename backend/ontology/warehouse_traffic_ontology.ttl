@@ -1,0 +1,424 @@
+@prefix : <http://example.org/warehouse#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix time: <http://www.w3.org/2006/time#> .
+
+# ============================================
+# ONTOLOGY METADATA
+# ============================================
+
+<http://example.org/warehouse> a owl:Ontology ;
+    rdfs:label "Warehouse Traffic Control Ontology"@en ;
+    rdfs:comment "Ontology for managing forklift and pedestrian safety in warehouse environments using multi-modal sensor fusion and rule-based intervention"@en ;
+    owl:versionInfo "1.0" .
+
+# ============================================
+# TOP-LEVEL CLASSES
+# ============================================
+
+## Moving Entities (Things that move)
+:MovingEntity a owl:Class ;
+    rdfs:label "Moving Entity"@en ;
+    rdfs:comment "Any entity that can move within the warehouse"@en .
+
+:Forklift a owl:Class ;
+    rdfs:subClassOf :MovingEntity ;
+    rdfs:label "Forklift"@en ;
+    rdfs:comment "Industrial forklift vehicle"@en .
+
+:Pedestrian a owl:Class ;
+    rdfs:subClassOf :MovingEntity ;
+    rdfs:label "Pedestrian"@en ;
+    rdfs:comment "Human worker moving on foot"@en .
+
+:Equipment a owl:Class ;
+    rdfs:subClassOf :MovingEntity ;
+    rdfs:label "Equipment"@en ;
+    rdfs:comment "Other moving equipment (pallet jacks, etc.)"@en .
+
+## Zones (Physical areas)
+:Zone a owl:Class ;
+    rdfs:label "Zone"@en ;
+    rdfs:comment "Defined physical area in warehouse"@en .
+
+:Aisle a owl:Class ;
+    rdfs:subClassOf :Zone ;
+    rdfs:label "Aisle"@en ;
+    rdfs:comment "Narrow passage between racks"@en .
+
+:Intersection a owl:Class ;
+    rdfs:subClassOf :Zone ;
+    rdfs:label "Intersection"@en ;
+    rdfs:comment "Area where multiple aisles meet"@en .
+
+:BlindCorner a owl:Class ;
+    rdfs:subClassOf :Zone ;
+    rdfs:label "Blind Corner"@en ;
+    rdfs:comment "Corner with limited visibility"@en .
+
+:PedestrianZone a owl:Class ;
+    rdfs:subClassOf :Zone ;
+    rdfs:label "Pedestrian Zone"@en ;
+    rdfs:comment "Area designated for pedestrian traffic"@en .
+
+:LoadingDock a owl:Class ;
+    rdfs:subClassOf :Zone ;
+    rdfs:label "Loading Dock"@en ;
+    rdfs:comment "Area for loading/unloading trucks"@en .
+
+:HighTrafficZone a owl:Class ;
+    rdfs:subClassOf :Zone ;
+    rdfs:label "High Traffic Zone"@en ;
+    rdfs:comment "Area with frequent vehicle movement"@en .
+
+## Events (Things that happen)
+:Event a owl:Class ;
+    rdfs:label "Event"@en ;
+    rdfs:comment "Something that occurs at a specific time"@en .
+
+:PositionEvent a owl:Class ;
+    rdfs:subClassOf :Event ;
+    rdfs:label "Position Event"@en ;
+    rdfs:comment "Entity location update"@en .
+
+:SpeedEvent a owl:Class ;
+    rdfs:subClassOf :Event ;
+    rdfs:label "Speed Event"@en ;
+    rdfs:comment "Speed measurement or change"@en .
+
+:ProximityEvent a owl:Class ;
+    rdfs:subClassOf :Event ;
+    rdfs:label "Proximity Event"@en ;
+    rdfs:comment "Two entities in close proximity"@en .
+
+:CollisionRiskEvent a owl:Class ;
+    rdfs:subClassOf :Event ;
+    rdfs:label "Collision Risk Event"@en ;
+    rdfs:comment "Detected risk of collision"@en .
+
+:ZoneViolationEvent a owl:Class ;
+    rdfs:subClassOf :Event ;
+    rdfs:label "Zone Violation Event"@en ;
+    rdfs:comment "Entity violating zone rules"@en .
+
+## Actions (System responses)
+:Action a owl:Class ;
+    rdfs:label "Action"@en ;
+    rdfs:comment "Action taken by the system"@en .
+
+:VoiceCommand a owl:Class ;
+    rdfs:subClassOf :Action ;
+    rdfs:label "Voice Command"@en ;
+    rdfs:comment "Audio instruction issued to operator"@en .
+
+:SpeedLimitAction a owl:Class ;
+    rdfs:subClassOf :Action ;
+    rdfs:label "Speed Limit Action"@en ;
+    rdfs:comment "Enforced speed restriction"@en .
+
+:ForcedStopAction a owl:Class ;
+    rdfs:subClassOf :Action ;
+    rdfs:label "Forced Stop Action"@en ;
+    rdfs:comment "Emergency stop command"@en .
+
+:VisualAlert a owl:Class ;
+    rdfs:subClassOf :Action ;
+    rdfs:label "Visual Alert"@en ;
+    rdfs:comment "Warning light or display"@en .
+
+## Operators
+:Operator a owl:Class ;
+    rdfs:label "Operator"@en ;
+    rdfs:comment "Person operating a forklift"@en .
+
+## Case Records (Palantir-style event tracking)
+:CaseRecord a owl:Class ;
+    rdfs:label "Case Record"@en ;
+    rdfs:comment "Complete record of an incident or intervention"@en .
+
+## Sensors (Multi-modal sensor infrastructure)
+:Sensor a owl:Class ;
+    rdfs:label "Sensor"@en ;
+    rdfs:comment "Physical or virtual sensor that monitors warehouse"@en .
+
+:CCTVCamera a owl:Class ;
+    rdfs:subClassOf :Sensor ;
+    rdfs:label "CCTV Camera"@en ;
+    rdfs:comment "Video camera for visual monitoring and object detection"@en .
+
+:UWBBeacon a owl:Class ;
+    rdfs:subClassOf :Sensor ;
+    rdfs:label "UWB Beacon"@en ;
+    rdfs:comment "Ultra-Wideband beacon for centimeter-level positioning"@en .
+
+:LiDARSensor a owl:Class ;
+    rdfs:subClassOf :Sensor ;
+    rdfs:label "LiDAR Sensor"@en ;
+    rdfs:comment "Light Detection and Ranging sensor for 3D scanning"@en .
+
+:SpeedSensor a owl:Class ;
+    rdfs:subClassOf :Sensor ;
+    rdfs:label "Speed Sensor"@en ;
+    rdfs:comment "Sensor measuring vehicle speed"@en .
+
+:ProximitySensor a owl:Class ;
+    rdfs:subClassOf :Sensor ;
+    rdfs:label "Proximity Sensor"@en ;
+    rdfs:comment "Sensor detecting nearby objects"@en .
+
+:AudioSensor a owl:Class ;
+    rdfs:subClassOf :Sensor ;
+    rdfs:label "Audio Sensor"@en ;
+    rdfs:comment "Microphone for detecting sounds (alarms, collisions, voices)"@en .
+
+# ============================================
+# PROPERTIES - Object Properties
+# ============================================
+
+## Location & Movement
+:inZone a owl:ObjectProperty ;
+    rdfs:domain :MovingEntity ;
+    rdfs:range :Zone ;
+    rdfs:label "in zone"@en .
+
+:approachingZone a owl:ObjectProperty ;
+    rdfs:domain :MovingEntity ;
+    rdfs:range :Zone ;
+    rdfs:label "approaching zone"@en .
+
+:hasOperator a owl:ObjectProperty ;
+    rdfs:domain :Forklift ;
+    rdfs:range :Operator ;
+    rdfs:label "has operator"@en .
+
+## Event Relationships
+:involvesEntity a owl:ObjectProperty ;
+    rdfs:domain :Event ;
+    rdfs:range :MovingEntity ;
+    rdfs:label "involves entity"@en .
+
+:occursInZone a owl:ObjectProperty ;
+    rdfs:domain :Event ;
+    rdfs:range :Zone ;
+    rdfs:label "occurs in zone"@en .
+
+:triggersAction a owl:ObjectProperty ;
+    rdfs:domain :Event ;
+    rdfs:range :Action ;
+    rdfs:label "triggers action"@en .
+
+:targetedAt a owl:ObjectProperty ;
+    rdfs:domain :Action ;
+    rdfs:range :MovingEntity ;
+    rdfs:label "targeted at"@en .
+
+## Case Tracking
+:relatedEvent a owl:ObjectProperty ;
+    rdfs:domain :CaseRecord ;
+    rdfs:range :Event ;
+    rdfs:label "related event"@en .
+
+:actionTaken a owl:ObjectProperty ;
+    rdfs:domain :CaseRecord ;
+    rdfs:range :Action ;
+    rdfs:label "action taken"@en .
+
+## Sensor Relationships
+:detectedBy a owl:ObjectProperty ;
+    rdfs:domain :Event ;
+    rdfs:range :Sensor ;
+    rdfs:label "detected by"@en ;
+    rdfs:comment "Event was detected by this sensor"@en .
+
+:monitoringZone a owl:ObjectProperty ;
+    rdfs:domain :Sensor ;
+    rdfs:range :Zone ;
+    rdfs:label "monitoring zone"@en ;
+    rdfs:comment "Sensor monitors this zone"@en .
+
+:tracksEntity a owl:ObjectProperty ;
+    rdfs:domain :Sensor ;
+    rdfs:range :MovingEntity ;
+    rdfs:label "tracks entity"@en ;
+    rdfs:comment "Sensor is tracking this entity"@en .
+
+# ============================================
+# PROPERTIES - Data Properties
+# ============================================
+
+## Position & Movement
+:xCoordinate a owl:DatatypeProperty ;
+    rdfs:domain :MovingEntity ;
+    rdfs:range xsd:float ;
+    rdfs:label "x coordinate"@en .
+
+:yCoordinate a owl:DatatypeProperty ;
+    rdfs:domain :MovingEntity ;
+    rdfs:range xsd:float ;
+    rdfs:label "y coordinate"@en .
+
+:speed a owl:DatatypeProperty ;
+    rdfs:domain :MovingEntity ;
+    rdfs:range xsd:float ;
+    rdfs:label "speed (km/h)"@en .
+
+:heading a owl:DatatypeProperty ;
+    rdfs:domain :MovingEntity ;
+    rdfs:range xsd:float ;
+    rdfs:label "heading (degrees)"@en ;
+    rdfs:comment "0-360 degrees, 0=North"@en .
+
+:isReversing a owl:DatatypeProperty ;
+    rdfs:domain :Forklift ;
+    rdfs:range xsd:boolean ;
+    rdfs:label "is reversing"@en .
+
+## Zone Properties
+:speedLimit a owl:DatatypeProperty ;
+    rdfs:domain :Zone ;
+    rdfs:range xsd:float ;
+    rdfs:label "speed limit (km/h)"@en .
+
+:visibilityDistance a owl:DatatypeProperty ;
+    rdfs:domain :Zone ;
+    rdfs:range xsd:float ;
+    rdfs:label "visibility distance (meters)"@en .
+
+## Sensor Properties
+:sensorId a owl:DatatypeProperty ;
+    rdfs:domain :Sensor ;
+    rdfs:range xsd:string ;
+    rdfs:label "sensor ID"@en .
+
+:sensorStatus a owl:DatatypeProperty ;
+    rdfs:domain :Sensor ;
+    rdfs:range xsd:string ;
+    rdfs:label "sensor status"@en ;
+    rdfs:comment "online, offline, degraded, maintenance"@en .
+
+:accuracyMeters a owl:DatatypeProperty ;
+    rdfs:domain :Sensor ;
+    rdfs:range xsd:float ;
+    rdfs:label "accuracy (meters)"@en ;
+    rdfs:comment "Measurement accuracy in meters"@en .
+
+:fieldOfView a owl:DatatypeProperty ;
+    rdfs:domain :CCTVCamera ;
+    rdfs:range xsd:float ;
+    rdfs:label "field of view (degrees)"@en .
+
+:resolution a owl:DatatypeProperty ;
+    rdfs:domain :CCTVCamera ;
+    rdfs:range xsd:string ;
+    rdfs:label "video resolution"@en .
+
+:rangeMeters a owl:DatatypeProperty ;
+    rdfs:domain :LiDARSensor ;
+    rdfs:range xsd:float ;
+    rdfs:label "LiDAR range (meters)"@en .
+
+## Event Properties
+:timestamp a owl:DatatypeProperty ;
+    rdfs:domain :Event ;
+    rdfs:range xsd:dateTime ;
+    rdfs:label "timestamp"@en .
+
+:riskLevel a owl:DatatypeProperty ;
+    rdfs:domain :CollisionRiskEvent ;
+    rdfs:range xsd:string ;
+    rdfs:label "risk level"@en ;
+    rdfs:comment "LOW, MEDIUM, HIGH, CRITICAL"@en .
+
+:distanceBetween a owl:DatatypeProperty ;
+    rdfs:domain :ProximityEvent ;
+    rdfs:range xsd:float ;
+    rdfs:label "distance between (meters)"@en .
+
+:relativeSpeed a owl:DatatypeProperty ;
+    rdfs:domain :ProximityEvent ;
+    rdfs:range xsd:float ;
+    rdfs:label "relative speed (km/h)"@en .
+
+:approachAngle a owl:DatatypeProperty ;
+    rdfs:domain :ProximityEvent ;
+    rdfs:range xsd:float ;
+    rdfs:label "approach angle (degrees)"@en ;
+    rdfs:comment "0=head-on, 90=perpendicular"@en .
+
+## Action Properties
+:commandText a owl:DatatypeProperty ;
+    rdfs:domain :VoiceCommand ;
+    rdfs:range xsd:string ;
+    rdfs:label "command text"@en .
+
+:interventionLevel a owl:DatatypeProperty ;
+    rdfs:domain :Action ;
+    rdfs:range xsd:string ;
+    rdfs:label "intervention level"@en ;
+    rdfs:comment "ADVISORY, DIRECTIVE, ENFORCEMENT"@en .
+
+:wasComplied a owl:DatatypeProperty ;
+    rdfs:domain :Action ;
+    rdfs:range xsd:boolean ;
+    rdfs:label "was complied with"@en .
+
+## Case Properties
+:caseId a owl:DatatypeProperty ;
+    rdfs:domain :CaseRecord ;
+    rdfs:range xsd:string ;
+    rdfs:label "case ID"@en .
+
+:severity a owl:DatatypeProperty ;
+    rdfs:domain :CaseRecord ;
+    rdfs:range xsd:string ;
+    rdfs:label "severity"@en .
+
+:outcome a owl:DatatypeProperty ;
+    rdfs:domain :CaseRecord ;
+    rdfs:range xsd:string ;
+    rdfs:label "outcome"@en .
+
+:notes a owl:DatatypeProperty ;
+    rdfs:domain :CaseRecord ;
+    rdfs:range xsd:string ;
+    rdfs:label "notes"@en .
+
+# ============================================
+# NAMED INDIVIDUALS (Standard Zones)
+# ============================================
+
+:MainAisle_A a :Aisle ;
+    rdfs:label "Main Aisle A" ;
+    :speedLimit 15.0 .
+
+:Intersection_Central a :Intersection , :HighTrafficZone ;
+    rdfs:label "Central Intersection" ;
+    :speedLimit 10.0 ;
+    :visibilityDistance 5.0 .
+
+:BlindCorner_NorthEast a :BlindCorner ;
+    rdfs:label "North-East Blind Corner" ;
+    :speedLimit 5.0 ;
+    :visibilityDistance 2.0 .
+
+:PedestrianZone_Break a :PedestrianZone ;
+    rdfs:label "Break Room Pedestrian Zone" ;
+    :speedLimit 5.0 .
+
+# ============================================
+# INTERVENTION LEVELS (Standard Commands)
+# ============================================
+
+:AdvisoryLevel a owl:NamedIndividual ;
+    rdfs:label "Advisory Level" ;
+    rdfs:comment "Informational warning, no enforcement" .
+
+:DirectiveLevel a owl:NamedIndividual ;
+    rdfs:label "Directive Level" ;
+    rdfs:comment "Clear command, operator should comply" .
+
+:EnforcementLevel a owl:NamedIndividual ;
+    rdfs:label "Enforcement Level" ;
+    rdfs:comment "Automatic enforcement, system takes control" .

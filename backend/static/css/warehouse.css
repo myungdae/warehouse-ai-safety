@@ -1,0 +1,947 @@
+/* Warehouse Digital Twin Dashboard Styles */
+
+:root {
+    --warehouse-primary: #2196F3;
+    --warehouse-danger: #F44336;
+    --warehouse-warning: #FF9800;
+    --warehouse-success: #4CAF50;
+    --warehouse-bg: #f5f7fa;
+}
+
+/* Demo Scenario Buttons */
+.demo-scenarios {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.btn-scenario {
+    padding: 10px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    color: white;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.btn-scenario:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+}
+
+.btn-scenario:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.scenario-danger {
+    background: linear-gradient(135deg, #F44336 0%, #D32F2F 100%);
+}
+
+.scenario-danger:hover {
+    background: linear-gradient(135deg, #E53935 0%, #C62828 100%);
+}
+
+.scenario-warning {
+    background: linear-gradient(135deg, #FF9800 0%, #F57C00 100%);
+}
+
+.scenario-warning:hover {
+    background: linear-gradient(135deg, #FB8C00 0%, #EF6C00 100%);
+}
+
+.scenario-caution {
+    background: linear-gradient(135deg, #FFC107 0%, #FFA000 100%);
+}
+
+.scenario-caution:hover {
+    background: linear-gradient(135deg, #FFB300 0%, #FF8F00 100%);
+}
+
+/* Scenario Notification Banner */
+.scenario-notification {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-100px);
+    z-index: 10000;
+    padding: 16px 24px;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    opacity: 0;
+    transition: all 0.3s ease;
+}
+
+.scenario-notification.show {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+}
+
+.scenario-notification.scenario-danger {
+    background: linear-gradient(135deg, #F44336 0%, #D32F2F 100%);
+    color: white;
+}
+
+.scenario-notification.scenario-warning {
+    background: linear-gradient(135deg, #FF9800 0%, #F57C00 100%);
+    color: white;
+}
+
+.scenario-notification.scenario-caution {
+    background: linear-gradient(135deg, #FFC107 0%, #FFA000 100%);
+    color: white;
+}
+
+.notification-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.notification-icon {
+    font-size: 24px;
+}
+
+.notification-text {
+    font-size: 15px;
+    font-weight: 600;
+}
+
+/* Dashboard Grid Layout */
+.dashboard-grid-warehouse {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    grid-template-rows: auto auto auto;
+    gap: 20px;
+    padding: 20px;
+    height: calc(100vh - 120px);
+}
+
+.warehouse-map-container {
+    grid-column: 1;
+    grid-row: 1 / 4;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.voice-commands-panel {
+    grid-column: 2;
+    grid-row: 1;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    max-height: 300px;
+}
+
+.risk-events-panel {
+    grid-column: 2;
+    grid-row: 2;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    max-height: 280px;
+}
+
+.stats-panel {
+    grid-column: 2;
+    grid-row: 3;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.forklift-status-panel {
+    display: none; /* Hidden for now, can be toggled */
+}
+
+/* Panel Headers */
+.panel-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid #e0e0e0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #fafafa;
+}
+
+.panel-header h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+}
+
+.btn-small {
+    padding: 6px 12px;
+    font-size: 12px;
+    border: 1px solid #ddd;
+    background: white;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-small:hover {
+    background: #f5f5f5;
+    border-color: var(--warehouse-primary);
+}
+
+/* Map Canvas */
+.map-canvas {
+    flex: 1;
+    background: #f8f9fa;
+    position: relative;
+    overflow: hidden;
+}
+
+#mapSvg {
+    width: 100%;
+    height: 100%;
+}
+
+/* Map Legend */
+.map-legend {
+    padding: 12px 20px;
+    border-top: 1px solid #e0e0e0;
+    display: flex;
+    gap: 20px;
+    background: white;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: #666;
+}
+
+.legend-icon {
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+}
+
+.forklift-icon {
+    background: #2196F3;
+}
+
+.pedestrian-icon {
+    background: #4CAF50;
+    border-radius: 50%;
+}
+
+.danger-zone {
+    background: rgba(244, 67, 54, 0.3);
+    border: 2px solid #F44336;
+}
+
+.safe-zone {
+    background: rgba(76, 175, 80, 0.3);
+    border: 2px solid #4CAF50;
+}
+
+/* Voice Commands List */
+.commands-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+}
+
+.command-item {
+    padding: 12px;
+    margin-bottom: 8px;
+    border-radius: 8px;
+    border-left: 4px solid;
+    background: #f8f9fa;
+    animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.command-item.directive {
+    border-left-color: #FF9800;
+    background: #FFF3E0;
+}
+
+.command-item.advisory {
+    border-left-color: #2196F3;
+    background: #E3F2FD;
+}
+
+.command-item.enforcement {
+    border-left-color: #F44336;
+    background: #FFEBEE;
+}
+
+.command-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+
+.command-target {
+    font-weight: 600;
+    color: #333;
+    font-size: 14px;
+}
+
+.command-time {
+    font-size: 11px;
+    color: #999;
+}
+
+.command-text {
+    font-size: 13px;
+    color: #555;
+    font-weight: 500;
+    margin-bottom: 4px;
+}
+
+.command-reason {
+    font-size: 11px;
+    color: #777;
+}
+
+/* Events List */
+.events-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+}
+
+.event-item {
+    padding: 10px;
+    margin-bottom: 8px;
+    border-radius: 8px;
+    border-left: 3px solid;
+    background: #f8f9fa;
+    font-size: 12px;
+    animation: slideIn 0.3s ease;
+}
+
+.event-item.high {
+    border-left-color: #F44336;
+    background: #FFEBEE;
+}
+
+.event-item.medium {
+    border-left-color: #FF9800;
+    background: #FFF3E0;
+}
+
+.event-item.low {
+    border-left-color: #2196F3;
+    background: #E3F2FD;
+}
+
+.event-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 4px;
+    font-weight: 600;
+}
+
+.event-description {
+    color: #666;
+    font-size: 11px;
+}
+
+/* Risk Summary */
+.risk-summary {
+    display: flex;
+    gap: 8px;
+}
+
+.risk-count {
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: white;
+}
+
+.risk-count.high {
+    background: #F44336;
+}
+
+.risk-count.medium {
+    background: #FF9800;
+}
+
+.risk-count.low {
+    background: #2196F3;
+}
+
+/* Statistics */
+.stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    padding: 16px;
+}
+
+.stat-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 10px;
+    padding: 16px;
+    text-align: center;
+    color: white;
+}
+
+.stat-card:nth-child(2) {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+}
+
+.stat-card:nth-child(3) {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+}
+
+.stat-card:nth-child(4) {
+    background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+}
+
+.stat-icon {
+    font-size: 28px;
+    margin-bottom: 8px;
+}
+
+.stat-value {
+    font-size: 32px;
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.stat-label {
+    font-size: 11px;
+    opacity: 0.9;
+    font-weight: 500;
+}
+
+/* Recent Activity */
+.recent-activity {
+    padding: 16px;
+    border-top: 1px solid #e0e0e0;
+}
+
+.recent-activity h4 {
+    margin: 0 0 12px 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: #666;
+}
+
+/* Sensor Status Section */
+.sensor-status-section {
+    padding: 16px;
+    border-top: 1px solid #e0e0e0;
+    background: #f8f9fa;
+}
+
+.sensor-status-section h4 {
+    margin: 0 0 12px 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: #666;
+}
+
+.sensor-status-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.sensor-type-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: white;
+    border-radius: 6px;
+    border: 1px solid #e0e0e0;
+}
+
+.sensor-type-icon {
+    font-size: 18px;
+}
+
+.sensor-type-label {
+    flex: 1;
+    font-size: 12px;
+    font-weight: 500;
+    color: #555;
+}
+
+.sensor-type-count {
+    font-size: 14px;
+    font-weight: 700;
+    color: #4CAF50;
+    background: #E8F5E9;
+    padding: 2px 8px;
+    border-radius: 10px;
+}
+
+/* Sensor Details */
+.sensor-details {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.sensor-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px;
+    margin-bottom: 8px;
+    background: rgba(0, 0, 0, 0.02);
+    border-radius: 8px;
+    transition: all 0.2s;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.sensor-item:hover {
+    background: rgba(0, 0, 0, 0.05);
+    transform: translateX(3px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.sensor-item-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.sensor-icon-type {
+    font-size: 1.2rem;
+}
+
+.sensor-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.sensor-id {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: #333;
+}
+
+.sensor-location {
+    font-size: 0.75rem;
+    color: #999;
+    margin-top: 2px;
+}
+
+.sensor-status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.8rem;
+    color: #666;
+}
+
+.sensor-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    animation: pulse 2s ease-in-out infinite;
+}
+
+.sensor-status-dot.online {
+    background: #4CAF50;
+    box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+}
+
+.sensor-status-dot.offline {
+    background: #f44336;
+    box-shadow: 0 0 10px rgba(244, 67, 54, 0.5);
+}
+
+.sensor-status-dot.degraded {
+    background: #FF9800;
+    box-shadow: 0 0 10px rgba(255, 152, 0, 0.5);
+}
+
+.activity-timeline {
+    max-height: 150px;
+    overflow-y: auto;
+}
+
+.activity-item {
+    padding: 8px 0;
+    border-left: 2px solid #ddd;
+    padding-left: 12px;
+    margin-left: 6px;
+    position: relative;
+    font-size: 12px;
+    color: #666;
+}
+
+.activity-item::before {
+    content: '';
+    position: absolute;
+    left: -6px;
+    top: 12px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #2196F3;
+    border: 2px solid white;
+}
+
+.activity-item.success::before {
+    background: #4CAF50;
+}
+
+.activity-item.warning::before {
+    background: #FF9800;
+}
+
+.activity-item.danger::before {
+    background: #F44336;
+}
+
+.activity-time {
+    font-size: 10px;
+    color: #999;
+    margin-bottom: 2px;
+}
+
+.activity-text {
+    font-weight: 500;
+    color: #333;
+}
+
+/* Forklift List */
+.forklift-list {
+    padding: 12px;
+    overflow-y: auto;
+}
+
+.forklift-card {
+    padding: 12px;
+    margin-bottom: 8px;
+    border-radius: 8px;
+    background: #f8f9fa;
+    border: 1px solid #e0e0e0;
+}
+
+.forklift-card.moving {
+    border-left: 4px solid #4CAF50;
+}
+
+.forklift-card.stopped {
+    border-left: 4px solid #999;
+}
+
+.forklift-card.warning {
+    border-left: 4px solid #FF9800;
+}
+
+.forklift-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.forklift-id {
+    font-weight: 600;
+    font-size: 14px;
+    color: #333;
+}
+
+.forklift-status {
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 10px;
+    background: #ddd;
+    color: #666;
+}
+
+.forklift-status.active {
+    background: #4CAF50;
+    color: white;
+}
+
+.forklift-info {
+    font-size: 11px;
+    color: #666;
+}
+
+.forklift-info div {
+    margin-bottom: 4px;
+}
+
+/* SVG Elements */
+.warehouse-aisle {
+    fill: #e0e0e0;
+    stroke: #999;
+    stroke-width: 2;
+}
+
+/* Sensor Elements */
+.sensor-cctv, .sensor-lidar, .sensor-uwb {
+    cursor: pointer;
+    transition: opacity 0.3s ease;
+}
+
+.sensor-cctv:hover, .sensor-lidar:hover, .sensor-uwb:hover {
+    opacity: 0.8;
+}
+
+.cctv-coverage {
+    opacity: 0.6;
+    transition: opacity 0.3s ease;
+}
+
+.sensor-cctv:hover .cctv-coverage {
+    opacity: 1;
+}
+
+.cctv-icon {
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+}
+
+.lidar-scan-circle {
+    animation: lidarScan 3s linear infinite;
+}
+
+@keyframes lidarScan {
+    0%, 100% {
+        opacity: 0.3;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 1;
+        transform: scale(1.1);
+    }
+}
+
+.lidar-icon {
+    animation: lidarRotate 2s linear infinite;
+    transform-origin: center;
+}
+
+@keyframes lidarRotate {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+.uwb-coverage {
+    opacity: 0.3;
+    transition: opacity 0.3s ease;
+}
+
+.sensor-uwb:hover .uwb-coverage {
+    opacity: 0.7;
+}
+
+.uwb-icon {
+    animation: uwbPulse 2s ease-in-out infinite;
+}
+
+@keyframes uwbPulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+.sensor-status-indicator {
+    animation: sensorBlink 2s ease-in-out infinite;
+}
+
+@keyframes sensorBlink {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.3;
+    }
+}
+
+.sensor-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-anchor: middle;
+    pointer-events: none;
+}
+
+.warehouse-zone {
+    fill: rgba(33, 150, 243, 0.1);
+    stroke: #2196F3;
+    stroke-width: 1;
+    stroke-dasharray: 5, 5;
+}
+
+.warehouse-intersection {
+    fill: rgba(255, 152, 0, 0.2);
+    stroke: #FF9800;
+    stroke-width: 2;
+}
+
+.forklift-marker {
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.forklift-marker:hover {
+    filter: brightness(1.2);
+}
+
+.forklift-body {
+    fill: #2196F3;
+    stroke: #1976D2;
+    stroke-width: 1;
+}
+
+.forklift-direction {
+    fill: #FFC107;
+}
+
+.pedestrian-marker {
+    cursor: pointer;
+}
+
+.pedestrian-body {
+    fill: #4CAF50;
+    stroke: #388E3C;
+    stroke-width: 1;
+}
+
+.risk-highlight {
+    fill: rgba(244, 67, 54, 0.3);
+    stroke: #F44336;
+    stroke-width: 2;
+    stroke-dasharray: 10, 5;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 0.5;
+    }
+    50% {
+        opacity: 1;
+    }
+}
+
+.zone-label {
+    font-size: 12px;
+    font-weight: 600;
+    fill: #666;
+    text-anchor: middle;
+}
+
+.forklift-label {
+    font-size: 10px;
+    font-weight: 600;
+    fill: #1976D2;
+    text-anchor: middle;
+}
+
+/* Map Controls */
+.map-controls {
+    display: flex;
+    gap: 8px;
+}
+
+/* Status Badge */
+.status-badge {
+    padding: 8px 16px;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.status-active {
+    background: #E8F5E9;
+    color: #4CAF50;
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #4CAF50;
+    animation: blink 2s infinite;
+}
+
+@keyframes blink {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.3;
+    }
+}
+
+/* Responsive Design */
+@media (max-width: 1400px) {
+    .dashboard-grid-warehouse {
+        grid-template-columns: 1.5fr 1fr;
+    }
+}
+
+@media (max-width: 1024px) {
+    .dashboard-grid-warehouse {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto auto auto auto;
+    }
+    
+    .warehouse-map-container {
+        grid-column: 1;
+        grid-row: 1;
+        min-height: 400px;
+    }
+    
+    .voice-commands-panel {
+        grid-column: 1;
+        grid-row: 2;
+    }
+    
+    .risk-events-panel {
+        grid-column: 1;
+        grid-row: 3;
+    }
+    
+    .stats-panel {
+        grid-column: 1;
+        grid-row: 4;
+    }
+}
