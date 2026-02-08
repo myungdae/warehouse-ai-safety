@@ -198,172 +198,146 @@ function showDigitalTwin() {
     
     const content = document.getElementById('dashboardContent');
     content.innerHTML = `
-        <div class="digital-twin-container">
-            <div class="twin-controls">
-                <button class="control-btn" onclick="resetTwinView()">🔄 뷰 리셋</button>
-                <button class="control-btn" onclick="toggleTwinLabels()">🏷️ 라벨 토글</button>
-            </div>
-            <div class="twin-map" id="twinMap">
-                <svg id="warehouseSvg" viewBox="0 0 1000 600" style="width:100%; height:100%; background:#0a0e1a;">
-                    <!-- Grid Pattern -->
-                    <defs>
-                        <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
-                            <path d="M 50 0 L 0 0 0 50" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
-                        </pattern>
-                    </defs>
-                    <rect width="1000" height="600" fill="url(#grid)" />
-                    
-                    <!-- Warehouse Layout -->
-                    <g id="warehouseLayout">
-                        <!-- Aisle A -->
-                        <rect x="100" y="50" width="800" height="80" fill="rgba(59, 130, 246, 0.1)" stroke="#3b82f6" stroke-width="2" rx="5"/>
-                        <text x="500" y="95" text-anchor="middle" fill="#3b82f6" font-size="16" font-weight="600">Aisle-A</text>
-                        
-                        <!-- Aisle B -->
-                        <rect x="100" y="180" width="800" height="80" fill="rgba(16, 185, 129, 0.1)" stroke="#10b981" stroke-width="2" rx="5"/>
-                        <text x="500" y="225" text-anchor="middle" fill="#10b981" font-size="16" font-weight="600">Aisle-B</text>
-                        
-                        <!-- Aisle C -->
-                        <rect x="100" y="310" width="800" height="80" fill="rgba(245, 158, 11, 0.1)" stroke="#f59e0b" stroke-width="2" rx="5"/>
-                        <text x="500" y="355" text-anchor="middle" fill="#f59e0b" font-size="16" font-weight="600">Aisle-C</text>
-                        
-                        <!-- Aisle D -->
-                        <rect x="100" y="440" width="800" height="80" fill="rgba(139, 92, 246, 0.1)" stroke="#8b5cf6" stroke-width="2" rx="5"/>
-                        <text x="500" y="485" text-anchor="middle" fill="#8b5cf6" font-size="16" font-weight="600">Aisle-D</text>
-                    </g>
-                    
-                    <!-- Forklifts -->
-                    <g id="forklifts"></g>
-                    
-                    <!-- Sensors -->
-                    <g id="sensors"></g>
-                </svg>
-            </div>
-            <div class="twin-legend">
-                <div class="legend-item">
-                    <span class="legend-color" style="background:#3b82f6;"></span>
-                    <span>CCTV (8)</span>
+        <div class="dashboard-grid-fullmap">
+            <!-- Full Width Warehouse Map -->
+            <div class="warehouse-map-full">
+                <div class="panel-header-inline">
+                    <h3>🗺️ 물류센터 실시간 지도</h3>
+                    <div class="map-controls">
+                        <button class="btn-control" onclick="resetDigitalTwinView()">🔄 뷰 리셋</button>
+                        <button class="btn-control" onclick="toggleDigitalTwinLabels()">🏷️ 라벨</button>
+                    </div>
                 </div>
-                <div class="legend-item">
-                    <span class="legend-color" style="background:#ff9800;"></span>
-                    <span>LiDAR (6)</span>
+                <div class="map-canvas-large" id="digitalTwinMap">
+                    <svg id="digitalTwinSvg" width="100%" height="100%" viewBox="0 0 1000 600" style="background: #f5f5f5;">
+                        <defs>
+                            <pattern id="dtGrid" width="50" height="50" patternUnits="userSpaceOnUse">
+                                <path d="M 50 0 L 0 0 0 50" fill="none" stroke="#e0e0e0" stroke-width="0.5"/>
+                            </pattern>
+                        </defs>
+                        <rect width="100%" height="100%" fill="url(#dtGrid)" />
+                        <g id="dtLayout"></g>
+                        <g id="dtForklifts"></g>
+                        <g id="dtSensors"></g>
+                    </svg>
                 </div>
-                <div class="legend-item">
-                    <span class="legend-color" style="background:#9c27b0;"></span>
-                    <span>UWB (6)</span>
-                </div>
-                <div class="legend-item">
-                    <span class="legend-color" style="background:#4caf50;"></span>
-                    <span>지게차 (4)</span>
+                <div class="map-legend-bottom">
+                    <div class="legend-item"><span class="legend-dot" style="background:#2196F3;"></span> CCTV (8)</div>
+                    <div class="legend-item"><span class="legend-dot" style="background:#FF9800;"></span> LiDAR (6)</div>
+                    <div class="legend-item"><span class="legend-dot" style="background:#9C27B0;"></span> UWB (6)</div>
+                    <div class="legend-item"><span class="legend-dot" style="background:#4CAF50;"></span> 지게차 (4)</div>
                 </div>
             </div>
         </div>
     `;
     
-    // Initialize digital twin
-    initializeDigitalTwin();
+    // Initialize the digital twin map
+    setTimeout(() => {
+        initializeFullDigitalTwin();
+    }, 100);
 }
 
-// Initialize Digital Twin
-function initializeDigitalTwin() {
-    // Add CCTV sensors
-    const cctvPositions = [
-        {x: 150, y: 30, label: 'CCTV-01'},
-        {x: 500, y: 30, label: 'CCTV-02'},
-        {x: 850, y: 30, label: 'CCTV-03'},
-        {x: 150, y: 560, label: 'CCTV-04'},
-        {x: 500, y: 560, label: 'CCTV-05'},
-        {x: 850, y: 560, label: 'CCTV-06'},
-        {x: 50, y: 300, label: 'CCTV-07'},
-        {x: 950, y: 300, label: 'CCTV-08'}
+// Initialize Full Digital Twin
+function initializeFullDigitalTwin() {
+    const layout = document.getElementById('dtLayout');
+    if (!layout) return;
+    
+    // Draw 4 aisles
+    const aisles = [
+        {x: 100, y: 50, w: 800, h: 100, color: '#3b82f6', label: 'Aisle-A'},
+        {x: 100, y: 180, w: 800, h: 100, color: '#10b981', label: 'Aisle-B'},
+        {x: 100, y: 310, w: 800, h: 100, color: '#f59e0b', label: 'Aisle-C'},
+        {x: 100, y: 440, w: 800, h: 100, color: '#8b5cf6', label: 'Aisle-D'}
     ];
     
-    const sensorsGroup = document.getElementById('sensors');
-    
-    cctvPositions.forEach(cctv => {
+    aisles.forEach(aisle => {
         const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
         g.innerHTML = `
-            <circle cx="${cctv.x}" cy="${cctv.y}" r="8" fill="#2196F3" stroke="#fff" stroke-width="2"/>
-            <circle cx="${cctv.x+5}" cy="${cctv.y-5}" r="3" fill="#4CAF50" class="pulse"/>
-            <text x="${cctv.x}" y="${cctv.y-15}" text-anchor="middle" fill="#2196F3" font-size="10" class="sensor-label">${cctv.label}</text>
+            <rect x="${aisle.x}" y="${aisle.y}" width="${aisle.w}" height="${aisle.h}" 
+                  fill="${aisle.color}15" stroke="${aisle.color}" stroke-width="2" rx="5"/>
+            <text x="${aisle.x + aisle.w/2}" y="${aisle.y + aisle.h/2}" 
+                  text-anchor="middle" fill="${aisle.color}" font-size="18" font-weight="600">${aisle.label}</text>
+        `;
+        layout.appendChild(g);
+    });
+    
+    // Add sensors
+    const sensorsGroup = document.getElementById('dtSensors');
+    
+    // CCTV
+    const cctvs = [
+        {x:150,y:30},{x:500,y:30},{x:850,y:30},
+        {x:150,y:560},{x:500,y:560},{x:850,y:560},
+        {x:50,y:300},{x:950,y:300}
+    ];
+    cctvs.forEach((c, i) => {
+        const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        g.innerHTML = `
+            <circle cx="${c.x}" cy="${c.y}" r="8" fill="#2196F3" stroke="#fff" stroke-width="2"/>
+            <text x="${c.x}" y="${c.y-12}" text-anchor="middle" fill="#2196F3" font-size="10" class="dt-label">CCTV-0${i+1}</text>
         `;
         sensorsGroup.appendChild(g);
     });
     
-    // Add LiDAR sensors
-    const lidarPositions = [
-        {x: 300, y: 130, label: 'LiDAR-01'},
-        {x: 500, y: 130, label: 'LiDAR-02'},
-        {x: 700, y: 130, label: 'LiDAR-03'},
-        {x: 300, y: 390, label: 'LiDAR-04'},
-        {x: 500, y: 390, label: 'LiDAR-05'},
-        {x: 700, y: 390, label: 'LiDAR-06'}
+    // LiDAR
+    const lidars = [
+        {x:300,y:100},{x:500,y:100},{x:700,y:100},
+        {x:300,y:380},{x:500,y:380},{x:700,y:380}
     ];
-    
-    lidarPositions.forEach(lidar => {
+    lidars.forEach((l, i) => {
         const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
         g.innerHTML = `
-            <circle cx="${lidar.x}" cy="${lidar.y}" r="6" fill="#FF9800" stroke="#fff" stroke-width="2"/>
-            <text x="${lidar.x}" y="${lidar.y+20}" text-anchor="middle" fill="#FF9800" font-size="10" class="sensor-label">${lidar.label}</text>
+            <circle cx="${l.x}" cy="${l.y}" r="6" fill="#FF9800" stroke="#fff" stroke-width="2"/>
+            <text x="${l.x}" y="${l.y+20}" text-anchor="middle" fill="#FF9800" font-size="10" class="dt-label">LIDAR-0${i+1}</text>
         `;
         sensorsGroup.appendChild(g);
     });
     
-    // Add UWB gateways
-    const uwbPositions = [
-        {x: 100, y: 50, label: 'UWB-01'},
-        {x: 500, y: 50, label: 'UWB-02'},
-        {x: 900, y: 50, label: 'UWB-03'},
-        {x: 100, y: 550, label: 'UWB-04'},
-        {x: 500, y: 550, label: 'UWB-05'},
-        {x: 900, y: 550, label: 'UWB-06'}
+    // UWB
+    const uwbs = [
+        {x:100,y:50},{x:500,y:50},{x:900,y:50},
+        {x:100,y:550},{x:500,y:550},{x:900,y:550}
     ];
-    
-    uwbPositions.forEach(uwb => {
+    uwbs.forEach((u, i) => {
         const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
         g.innerHTML = `
-            <polygon points="${uwb.x},${uwb.y-6} ${uwb.x-5},${uwb.y+6} ${uwb.x+5},${uwb.y+6}" fill="#9C27B0" stroke="#fff" stroke-width="2"/>
-            <text x="${uwb.x}" y="${uwb.y+20}" text-anchor="middle" fill="#9C27B0" font-size="10" class="sensor-label">${uwb.label}</text>
+            <polygon points="${u.x},${u.y-6} ${u.x-5},${u.y+6} ${u.x+5},${u.y+6}" fill="#9C27B0" stroke="#fff" stroke-width="2"/>
+            <text x="${u.x}" y="${u.y+20}" text-anchor="middle" fill="#9C27B0" font-size="10" class="dt-label">UWB-0${i+1}</text>
         `;
         sensorsGroup.appendChild(g);
     });
     
     // Add forklifts
-    const forkliftPositions = [
-        {x: 200, y: 90, label: 'F-07'},
-        {x: 600, y: 90, label: 'F-12'},
-        {x: 400, y: 220, label: 'F-03'},
-        {x: 750, y: 350, label: 'F-15'}
+    const forkliftsGroup = document.getElementById('dtForklifts');
+    const forklifts = [
+        {x:200,y:100,id:'F-07'},{x:600,y:100,id:'F-12'},
+        {x:400,y:230,id:'F-03'},{x:750,y:360,id:'F-15'}
     ];
-    
-    const forkliftsGroup = document.getElementById('forklifts');
-    
-    forkliftPositions.forEach(forklift => {
+    forklifts.forEach(f => {
         const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
         g.innerHTML = `
-            <rect x="${forklift.x-10}" y="${forklift.y-6}" width="20" height="12" fill="#4CAF50" stroke="#fff" stroke-width="2" rx="2"/>
-            <polygon points="${forklift.x+10},${forklift.y} ${forklift.x+15},${forklift.y-3} ${forklift.x+15},${forklift.y+3}" fill="#66BB6A"/>
-            <text x="${forklift.x}" y="${forklift.y-12}" text-anchor="middle" fill="#4CAF50" font-size="11" font-weight="600">${forklift.label}</text>
+            <rect x="${f.x-12}" y="${f.y-8}" width="24" height="16" fill="#4CAF50" stroke="#fff" stroke-width="2" rx="3"/>
+            <text x="${f.x}" y="${f.y-15}" text-anchor="middle" fill="#4CAF50" font-size="12" font-weight="600">${f.id}</text>
         `;
         forkliftsGroup.appendChild(g);
     });
 }
 
-// Reset Twin View
-function resetTwinView() {
-    const svg = document.getElementById('warehouseSvg');
+// Reset Digital Twin View
+function resetDigitalTwinView() {
+    const svg = document.getElementById('digitalTwinSvg');
     if (svg) {
         svg.setAttribute('viewBox', '0 0 1000 600');
     }
 }
 
-// Toggle Twin Labels
-let labelsVisible = true;
-function toggleTwinLabels() {
-    labelsVisible = !labelsVisible;
-    const labels = document.querySelectorAll('.sensor-label');
+// Toggle Digital Twin Labels
+let dtLabelsVisible = true;
+function toggleDigitalTwinLabels() {
+    dtLabelsVisible = !dtLabelsVisible;
+    const labels = document.querySelectorAll('.dt-label');
     labels.forEach(label => {
-        label.style.display = labelsVisible ? 'block' : 'none';
+        label.style.display = dtLabelsVisible ? 'block' : 'none';
     });
 }
 
