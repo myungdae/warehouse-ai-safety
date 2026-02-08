@@ -206,6 +206,9 @@ function showDigitalTwin() {
                     <div class="map-controls">
                         <button class="btn-control" onclick="resetDigitalTwinView()">🔄 뷰 리셋</button>
                         <button class="btn-control" onclick="toggleDigitalTwinLabels()">🏷️ 라벨</button>
+                        <button class="btn-control btn-danger" onclick="triggerScenario1()">📍 시나리오 1</button>
+                        <button class="btn-control btn-warning" onclick="triggerScenario2()">📍 시나리오 2</button>
+                        <button class="btn-control btn-info" onclick="triggerScenario3()">📍 시나리오 3</button>
                     </div>
                 </div>
                 <div class="map-canvas-large" id="digitalTwinMap">
@@ -231,7 +234,7 @@ function showDigitalTwin() {
         </div>
     `;
     
-    // Initialize the digital twin map
+    // Initialize the digital twin map with animation
     setTimeout(() => {
         initializeFullDigitalTwin();
     }, 100);
@@ -576,4 +579,385 @@ function showVoiceCommands() {
 function updateClock() {
     const now = new Date();
     document.getElementById('currentTime').textContent = now.toLocaleTimeString('ko-KR');
+}
+
+// ========================================
+// DIGITAL TWIN ANIMATION SYSTEM
+// ========================================
+
+// Global Animation State
+const animationState = {
+    forklifts: [],
+    running: false,
+    intervalId: null,
+    labelsVisible: true
+};
+
+// Initialize Full Digital Twin with Animation
+function initializeFullDigitalTwin() {
+    const layout = document.getElementById('dtLayout');
+    if (!layout) return;
+    
+    // Draw 4 aisles
+    const aisles = [
+        {x: 100, y: 50, w: 800, h: 100, color: '#3b82f6', label: 'Aisle-A'},
+        {x: 100, y: 180, w: 800, h: 100, color: '#10b981', label: 'Aisle-B'},
+        {x: 100, y: 310, w: 800, h: 100, color: '#f59e0b', label: 'Aisle-C'},
+        {x: 100, y: 440, w: 800, h: 100, color: '#8b5cf6', label: 'Aisle-D'}
+    ];
+    
+    aisles.forEach(aisle => {
+        const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        g.innerHTML = `
+            <rect x="${aisle.x}" y="${aisle.y}" width="${aisle.w}" height="${aisle.h}" 
+                  fill="${aisle.color}15" stroke="${aisle.color}" stroke-width="2" rx="5"/>
+            <text x="${aisle.x + aisle.w/2}" y="${aisle.y + aisle.h/2}" 
+                  text-anchor="middle" fill="${aisle.color}" font-size="18" font-weight="600" class="dt-label">${aisle.label}</text>
+        `;
+        layout.appendChild(g);
+    });
+    
+    // Add sensors with interactive elements
+    const sensorsGroup = document.getElementById('dtSensors');
+    
+    // CCTV with coverage
+    const cctvs = [
+        {x:150,y:30},{x:500,y:30},{x:850,y:30},
+        {x:150,y:560},{x:500,y:560},{x:850,y:560},
+        {x:50,y:300},{x:950,y:300}
+    ];
+    cctvs.forEach((c, i) => {
+        const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        g.setAttribute('class', 'sensor-interactive');
+        g.innerHTML = `
+            <circle cx="${c.x}" cy="${c.y}" r="20" fill="#2196F330" stroke="#2196F3" stroke-width="1" stroke-dasharray="3,2">
+                <animate attributeName="r" values="20;25;20" dur="2s" repeatCount="indefinite"/>
+                <animate attributeName="opacity" values="0.3;0.1;0.3" dur="2s" repeatCount="indefinite"/>
+            </circle>
+            <circle cx="${c.x}" cy="${c.y}" r="8" fill="#2196F3" stroke="#fff" stroke-width="2" style="cursor:pointer;"/>
+            <text x="${c.x}" y="${c.y-12}" text-anchor="middle" fill="#2196F3" font-size="10" class="dt-label">CCTV-0${i+1}</text>
+        `;
+        sensorsGroup.appendChild(g);
+    });
+    
+    // LiDAR with scanning animation
+    const lidars = [
+        {x:300,y:100},{x:500,y:100},{x:700,y:100},
+        {x:300,y:380},{x:500,y:380},{x:700,y:380}
+    ];
+    lidars.forEach((l, i) => {
+        const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        g.setAttribute('class', 'sensor-interactive');
+        g.innerHTML = `
+            <circle cx="${l.x}" cy="${l.y}" r="30" fill="none" stroke="#FF9800" stroke-width="1" stroke-dasharray="5,5">
+                <animateTransform attributeName="transform" type="rotate" from="0 ${l.x} ${l.y}" 
+                    to="360 ${l.x} ${l.y}" dur="3s" repeatCount="indefinite"/>
+            </circle>
+            <circle cx="${l.x}" cy="${l.y}" r="6" fill="#FF9800" stroke="#fff" stroke-width="2" style="cursor:pointer;"/>
+            <text x="${l.x}" y="${l.y+20}" text-anchor="middle" fill="#FF9800" font-size="10" class="dt-label">LIDAR-0${i+1}</text>
+        `;
+        sensorsGroup.appendChild(g);
+    });
+    
+    // UWB with signal waves
+    const uwbs = [
+        {x:100,y:50},{x:500,y:50},{x:900,y:50},
+        {x:100,y:550},{x:500,y:550},{x:900,y:550}
+    ];
+    uwbs.forEach((u, i) => {
+        const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        g.setAttribute('class', 'sensor-interactive');
+        g.innerHTML = `
+            <circle cx="${u.x}" cy="${u.y}" r="15" fill="none" stroke="#9C27B0" stroke-width="1" opacity="0.5">
+                <animate attributeName="r" values="15;25;35" dur="2s" repeatCount="indefinite"/>
+                <animate attributeName="opacity" values="0.5;0.2;0" dur="2s" repeatCount="indefinite"/>
+            </circle>
+            <polygon points="${u.x},${u.y-6} ${u.x-5},${u.y+6} ${u.x+5},${u.y+6}" 
+                fill="#9C27B0" stroke="#fff" stroke-width="2" style="cursor:pointer;"/>
+            <text x="${u.x}" y="${u.y+20}" text-anchor="middle" fill="#9C27B0" font-size="10" class="dt-label">UWB-0${i+1}</text>
+        `;
+        sensorsGroup.appendChild(g);
+    });
+    
+    // Initialize animated forklifts
+    initializeAnimatedForklifts();
+    
+    // Start animation
+    startAnimation();
+}
+
+// Initialize Animated Forklifts
+function initializeAnimatedForklifts() {
+    animationState.forklifts = [
+        {id:'F-07', x:200, y:100, direction:0, speed:1.5, color:'#4CAF50'},
+        {id:'F-12', x:600, y:100, direction:180, speed:1.2, color:'#4CAF50'},
+        {id:'F-03', x:400, y:230, direction:90, speed:1.0, color:'#4CAF50'},
+        {id:'F-15', x:750, y:360, direction:270, speed:1.3, color:'#4CAF50'}
+    ];
+    
+    const forkliftsGroup = document.getElementById('dtForklifts');
+    forkliftsGroup.innerHTML = ''; // Clear existing
+    
+    animationState.forklifts.forEach(f => {
+        const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        g.setAttribute('id', `forklift-${f.id}`);
+        g.setAttribute('class', 'forklift-animated');
+        g.setAttribute('transform', `translate(${f.x}, ${f.y}) rotate(${f.direction})`);
+        
+        // Forklift body with trail effect
+        g.innerHTML = `
+            <ellipse cx="0" cy="0" rx="25" ry="15" fill="${f.color}20" opacity="0.3">
+                <animate attributeName="opacity" values="0.3;0.1;0.3" dur="1s" repeatCount="indefinite"/>
+            </ellipse>
+            <rect x="-12" y="-8" width="24" height="16" fill="${f.color}" stroke="#fff" stroke-width="2" rx="3"/>
+            <polygon points="12,0 17,3 17,-3" fill="#FFF" opacity="0.8"/>
+            <text x="0" y="-18" text-anchor="middle" fill="${f.color}" font-size="12" 
+                font-weight="600" class="dt-label">${f.id}</text>
+        `;
+        forkliftsGroup.appendChild(g);
+        f.element = g;
+    });
+}
+
+// Start Animation
+function startAnimation() {
+    if (animationState.running) return;
+    
+    animationState.running = true;
+    animationState.intervalId = setInterval(() => {
+        moveForklifts();
+    }, 50); // 50ms = ~20 FPS
+}
+
+// Stop Animation
+function stopAnimation() {
+    if (animationState.intervalId) {
+        clearInterval(animationState.intervalId);
+        animationState.intervalId = null;
+        animationState.running = false;
+    }
+}
+
+// Move Forklifts
+function moveForklifts() {
+    animationState.forklifts.forEach(f => {
+        // Calculate movement
+        const radians = (f.direction * Math.PI) / 180;
+        const dx = Math.cos(radians) * f.speed;
+        const dy = Math.sin(radians) * f.speed;
+        
+        f.x += dx;
+        f.y += dy;
+        
+        // Boundary check and bounce
+        if (f.x < 100 || f.x > 900) {
+            f.direction = 180 - f.direction;
+            f.x = Math.max(100, Math.min(900, f.x));
+        }
+        if (f.y < 50 || f.y > 550) {
+            f.direction = 360 - f.direction;
+            f.y = Math.max(50, Math.min(550, f.y));
+        }
+        
+        // Random direction changes
+        if (Math.random() < 0.01) {
+            f.direction += (Math.random() > 0.5 ? 90 : -90);
+            f.direction = (f.direction + 360) % 360;
+        }
+        
+        // Update SVG
+        if (f.element) {
+            f.element.setAttribute('transform', 
+                `translate(${f.x}, ${f.y}) rotate(${f.direction})`);
+        }
+    });
+    
+    // Check for collisions and show warnings
+    detectCollisions();
+}
+
+// Detect Collisions
+function detectCollisions() {
+    for (let i = 0; i < animationState.forklifts.length; i++) {
+        for (let j = i + 1; j < animationState.forklifts.length; j++) {
+            const f1 = animationState.forklifts[i];
+            const f2 = animationState.forklifts[j];
+            
+            const distance = Math.sqrt(
+                Math.pow(f1.x - f2.x, 2) + Math.pow(f1.y - f2.y, 2)
+            );
+            
+            // Show danger zone
+            if (distance < 80) {
+                showDangerZone(f1, f2, distance);
+            }
+        }
+    }
+}
+
+// Show Danger Zone
+function showDangerZone(f1, f2, distance) {
+    const svg = document.getElementById('digitalTwinSvg');
+    const existingZone = document.getElementById('danger-zone');
+    
+    if (existingZone) {
+        existingZone.remove();
+    }
+    
+    const midX = (f1.x + f2.x) / 2;
+    const midY = (f1.y + f2.y) / 2;
+    
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    g.setAttribute('id', 'danger-zone');
+    g.innerHTML = `
+        <circle cx="${midX}" cy="${midY}" r="50" fill="#ff000020" stroke="#ff0000" stroke-width="2">
+            <animate attributeName="opacity" values="0.5;0.2;0.5" dur="0.5s" repeatCount="indefinite"/>
+        </circle>
+        <text x="${midX}" y="${midY}" text-anchor="middle" fill="#ff0000" font-size="14" font-weight="bold">⚠ 충돌 위험</text>
+    `;
+    svg.appendChild(g);
+    
+    // Remove after 2 seconds
+    setTimeout(() => {
+        const zone = document.getElementById('danger-zone');
+        if (zone) zone.remove();
+    }, 2000);
+}
+
+// Reset Digital Twin View
+function resetDigitalTwinView() {
+    // Reset forklift positions
+    stopAnimation();
+    initializeAnimatedForklifts();
+    startAnimation();
+}
+
+// Toggle Digital Twin Labels
+function toggleDigitalTwinLabels() {
+    animationState.labelsVisible = !animationState.labelsVisible;
+    const labels = document.querySelectorAll('.dt-label');
+    labels.forEach(label => {
+        label.style.display = animationState.labelsVisible ? 'block' : 'none';
+    });
+}
+
+// ========================================
+// DEMO SCENARIO SIMULATIONS
+// ========================================
+
+// Scenario 1: Collision Risk
+function triggerScenario1() {
+    console.log('🔴 Triggering Scenario 1: Collision Risk');
+    
+    stopAnimation();
+    
+    // Position F-07 and F-12 for collision
+    const f07 = animationState.forklifts.find(f => f.id === 'F-07');
+    const f12 = animationState.forklifts.find(f => f.id === 'F-12');
+    
+    if (f07 && f12) {
+        f07.x = 450;
+        f07.y = 90;
+        f07.direction = 0; // Right
+        f07.speed = 2.5; // Fast
+        
+        f12.x = 500;
+        f12.y = 30;
+        f12.direction = 90; // Down
+        f12.speed = 2.5; // Fast
+    }
+    
+    // Show notification
+    const content = document.getElementById('dashboardContent');
+    const notification = document.createElement('div');
+    notification.style.cssText = 'position:fixed;top:100px;left:50%;transform:translateX(-50%);background:#ff0000;color:#fff;padding:20px 40px;border-radius:10px;font-size:18px;font-weight:bold;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,0.3);animation:slideDown 0.5s ease;';
+    notification.innerHTML = '🔴 시나리오 1: 충돌 위험 시뮬레이션 시작!';
+    document.body.appendChild(notification);
+    
+    setTimeout(() => notification.remove(), 3000);
+    
+    startAnimation();
+}
+
+// Scenario 2: Pedestrian Proximity
+function triggerScenario2() {
+    console.log('🟠 Triggering Scenario 2: Pedestrian Proximity');
+    
+    stopAnimation();
+    
+    // Add pedestrian
+    const svg = document.getElementById('dtForklifts');
+    const existingPed = document.getElementById('pedestrian-P02');
+    if (existingPed) existingPed.remove();
+    
+    const pedGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    pedGroup.setAttribute('id', 'pedestrian-P02');
+    pedGroup.innerHTML = `
+        <circle cx="520" cy="230" r="10" fill="#FF6B6B" stroke="#fff" stroke-width="2"/>
+        <text x="520" y="215" text-anchor="middle" fill="#FF6B6B" font-size="10" font-weight="bold">작업자</text>
+    `;
+    svg.appendChild(pedGroup);
+    
+    // Position F-03 approaching pedestrian
+    const f03 = animationState.forklifts.find(f => f.id === 'F-03');
+    if (f03) {
+        f03.x = 400;
+        f03.y = 230;
+        f03.direction = 0; // Right toward pedestrian
+        f03.speed = 2.0;
+    }
+    
+    // Show notification
+    const notification = document.createElement('div');
+    notification.style.cssText = 'position:fixed;top:100px;left:50%;transform:translateX(-50%);background:#FF9800;color:#fff;padding:20px 40px;border-radius:10px;font-size:18px;font-weight:bold;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,0.3);';
+    notification.innerHTML = '🟠 시나리오 2: 보행자 근접 시뮬레이션 시작!';
+    document.body.appendChild(notification);
+    
+    setTimeout(() => notification.remove(), 3000);
+    
+    startAnimation();
+}
+
+// Scenario 3: Speed Violation
+function triggerScenario3() {
+    console.log('🟡 Triggering Scenario 3: Speed Violation');
+    
+    stopAnimation();
+    
+    // Highlight pedestrian zone
+    const layout = document.getElementById('dtLayout');
+    const existingZone = document.getElementById('ped-zone-highlight');
+    if (existingZone) existingZone.remove();
+    
+    const zoneHighlight = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    zoneHighlight.setAttribute('id', 'ped-zone-highlight');
+    zoneHighlight.setAttribute('x', '50');
+    zoneHighlight.setAttribute('y', '250');
+    zoneHighlight.setAttribute('width', '100');
+    zoneHighlight.setAttribute('height', '100');
+    zoneHighlight.setAttribute('fill', '#4CAF5030');
+    zoneHighlight.setAttribute('stroke', '#4CAF50');
+    zoneHighlight.setAttribute('stroke-width', '3');
+    zoneHighlight.setAttribute('stroke-dasharray', '10,5');
+    layout.appendChild(zoneHighlight);
+    
+    // Position F-15 entering zone at high speed
+    const f15 = animationState.forklifts.find(f => f.id === 'F-15');
+    if (f15) {
+        f15.x = 30;
+        f15.y = 300;
+        f15.direction = 0; // Right into zone
+        f15.speed = 3.0; // Very fast
+        f15.color = '#FF9800'; // Change color to orange
+    }
+    
+    // Show notification
+    const notification = document.createElement('div');
+    notification.style.cssText = 'position:fixed;top:100px;left:50%;transform:translateX(-50%);background:#FFC107;color:#000;padding:20px 40px;border-radius:10px;font-size:18px;font-weight:bold;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,0.3);';
+    notification.innerHTML = '🟡 시나리오 3: 과속 감지 시뮬레이션 시작!';
+    document.body.appendChild(notification);
+    
+    setTimeout(() => notification.remove(), 3000);
+    
+    startAnimation();
 }

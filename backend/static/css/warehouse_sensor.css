@@ -626,3 +626,78 @@
     color: #10b981;
     border: 1px solid rgba(16, 185, 129, 0.3);
 }
+
+/* ========================================
+   DIGITAL TWIN ANIMATION STYLES
+   ======================================== */
+
+.sensor-interactive {
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.sensor-interactive:hover {
+    transform: scale(1.1);
+    filter: brightness(1.2);
+}
+
+.forklift-animated {
+    transition: transform 0.05s linear;
+}
+
+/* Scenario Buttons */
+.btn-danger {
+    background: linear-gradient(135deg, #ef4444, #dc2626) !important;
+    border: 2px solid rgba(239, 68, 68, 0.3) !important;
+}
+
+.btn-danger:hover {
+    background: linear-gradient(135deg, #dc2626, #b91c1c) !important;
+    box-shadow: 0 0 20px rgba(239, 68, 68, 0.4) !important;
+}
+
+.btn-warning {
+    background: linear-gradient(135deg, #f59e0b, #d97706) !important;
+    border: 2px solid rgba(245, 158, 11, 0.3) !important;
+}
+
+.btn-warning:hover {
+    background: linear-gradient(135deg, #d97706, #b45309) !important;
+    box-shadow: 0 0 20px rgba(245, 158, 11, 0.4) !important;
+}
+
+.btn-info {
+    background: linear-gradient(135deg, #3b82f6, #2563eb) !important;
+    border: 2px solid rgba(59, 130, 246, 0.3) !important;
+}
+
+.btn-info:hover {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8) !important;
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.4) !important;
+}
+
+/* Animation Keyframes */
+@keyframes slideDown {
+    from {
+        transform: translateX(-50%) translateY(-50px);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(-50%) translateY(0);
+        opacity: 1;
+    }
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+.dt-label {
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
