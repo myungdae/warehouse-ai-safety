@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Warehouse Digital Twin - Traffic Control Center</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/warehouse.css') }}">
+    <title>Warehouse Sensor Monitoring</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/warehouse_sensor.css">
 </head>
 <body>
     <div class="app-container">
@@ -18,59 +18,92 @@
                 </div>
             </div>
             
-            <!-- System Info Section -->
-            <div class="system-info-section">
-                <div class="system-info-header" onclick="toggleSystemInfo()">
-                    <div class="system-info-header-left">
-                        <span>🎯</span>
-                        <span class="system-info-title">시스템 특징</span>
-                    </div>
-                    <span class="system-info-toggle">▼</span>
+            <!-- System Info Button -->
+            <div class="menu-section">
+                <div class="menu-item" onclick="showSystemInfo()">
+                    <span class="menu-icon">📊</span>
+                    <span class="menu-text">시스템 정보</span>
                 </div>
-                
-                <div class="system-info-content expanded">
-                    <div class="system-level">
-                        <div class="system-level-title">🚛 Traffic Control</div>
-                        <div class="system-level-desc">실시간 지게차 위치 추적</div>
+            </div>
+
+            <!-- Sensor Monitoring Section -->
+            <div class="menu-section">
+                <div class="menu-header" onclick="toggleMenu('sensorMenu')">
+                    <span>📡 센서 모니터링</span>
+                    <span class="toggle-icon">▼</span>
+                </div>
+                <div class="menu-content expanded" id="sensorMenu">
+                    <div class="menu-item" onclick="showSensorType('cctv')">
+                        <span class="menu-icon">📹</span>
+                        <span class="menu-text">CCTV</span>
+                        <span class="menu-badge">8</span>
                     </div>
-                    
-                    <div class="system-level">
-                        <div class="system-level-title">⚠️ Collision Detection</div>
-                        <div class="system-level-desc">AI 기반 충돌 위험 예측</div>
+                    <div class="menu-item" onclick="showSensorType('lidar')">
+                        <span class="menu-icon">📡</span>
+                        <span class="menu-text">LiDAR</span>
+                        <span class="menu-badge">6</span>
                     </div>
-                    
-                    <div class="system-level highlight">
-                        <div class="system-level-title">🔊 Voice Commands</div>
-                        <div class="system-level-desc">
-                            실시간 음성 명령:<br>
-                            • 정지/감속 지시<br>
-                            • 보행자 경고<br>
-                            • 구역 제한 알림
-                        </div>
+                    <div class="menu-item" onclick="showSensorType('uwb')">
+                        <span class="menu-icon">📍</span>
+                        <span class="menu-text">UWB</span>
+                        <span class="menu-badge">6</span>
                     </div>
-                    
-                    <div class="system-warning">
-                        <strong>⚠️ Human-in-the-loop</strong><br>
-                        시스템은 조언만 제공하고,<br>
-                        최종 결정은 운전자가 합니다.
+                    <div class="menu-item" onclick="showSensorType('all')">
+                        <span class="menu-icon">📊</span>
+                        <span class="menu-text">전체 센서</span>
+                        <span class="menu-badge">20</span>
                     </div>
                 </div>
             </div>
-            
-            <nav class="sidebar-nav">
-                <div class="nav-item" onclick="location.href='/dashboard'">
-                    <span>🏠</span>
-                    <span>대시보드</span>
+
+            <!-- Forklift Control Section -->
+            <div class="menu-section">
+                <div class="menu-header" onclick="toggleMenu('forkliftMenu')">
+                    <span>🚛 지게차 관제</span>
+                    <span class="toggle-icon">▼</span>
                 </div>
-                <div class="nav-item active">
-                    <span>🏭</span>
-                    <span>물류센터 관제</span>
+                <div class="menu-content" id="forkliftMenu">
+                    <div class="menu-item" onclick="showForkliftTracking()">
+                        <span class="menu-icon">📍</span>
+                        <span class="menu-text">실시간 추적</span>
+                        <span class="menu-badge">4</span>
+                    </div>
+                    <div class="menu-item" onclick="showDigitalTwin()">
+                        <span class="menu-icon">🗺️</span>
+                        <span class="menu-text">디지털 트윈</span>
+                    </div>
                 </div>
-                <div class="nav-item" onclick="location.href='/drone'">
-                    <span>🛸</span>
-                    <span>드론 감시</span>
+            </div>
+
+            <!-- Risk Detection Section -->
+            <div class="menu-section">
+                <div class="menu-header" onclick="toggleMenu('riskMenu')">
+                    <span>⚠️ 위험 감지</span>
+                    <span class="toggle-icon">▼</span>
                 </div>
-            </nav>
+                <div class="menu-content" id="riskMenu">
+                    <div class="menu-item" onclick="showRiskEvents()">
+                        <span class="menu-icon">📋</span>
+                        <span class="menu-text">이벤트 로그</span>
+                        <span class="menu-badge warning">12</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Voice Commands Section -->
+            <div class="menu-section">
+                <div class="menu-header" onclick="toggleMenu('voiceMenu')">
+                    <span>🔊 음성 명령</span>
+                    <span class="toggle-icon">▼</span>
+                </div>
+                <div class="menu-content" id="voiceMenu">
+                    <div class="menu-item" onclick="showVoiceCommands()">
+                        <span class="menu-icon">📜</span>
+                        <span class="menu-text">명령 이력</span>
+                        <span class="menu-badge">28</span>
+                    </div>
+                </div>
+            </div>
         </aside>
 
         <!-- Main Content -->
@@ -78,21 +111,10 @@
             <!-- Header -->
             <header class="content-header">
                 <div class="header-left">
-                    <h1>🏭 Warehouse Digital Twin</h1>
-                    <p class="subtitle">실시간 물류센터 교통 관제 시스템</p>
+                    <h1 id="pageTitle">🏭 Warehouse Sensor Monitoring</h1>
+                    <p class="subtitle" id="pageSubtitle">실시간 센서 플릿 제어</p>
                 </div>
                 <div class="header-right">
-                    <div class="demo-scenarios">
-                        <button class="btn-scenario scenario-danger" onclick="triggerScenario1()">
-                            🔴 시나리오 1: 충돌 위험
-                        </button>
-                        <button class="btn-scenario scenario-warning" onclick="triggerScenario2()">
-                            🟠 시나리오 2: 보행자 근접
-                        </button>
-                        <button class="btn-scenario scenario-caution" onclick="triggerScenario3()">
-                            🟡 시나리오 3: 과속 감지
-                        </button>
-                    </div>
                     <div class="status-badge status-active">
                         <span class="status-dot"></span>
                         <span>시스템 가동 중</span>
@@ -101,171 +123,13 @@
                 </div>
             </header>
 
-            <!-- Dashboard Grid -->
-            <div class="dashboard-grid-warehouse">
-                <!-- Warehouse Map -->
-                <div class="warehouse-map-container">
-                    <div class="panel-header">
-                        <h3>🗺️ 물류센터 실시간 지도</h3>
-                        <div class="map-controls">
-                            <button class="btn-small" onclick="resetView()">🔄 뷰 리셋</button>
-                            <button class="btn-small" onclick="toggleLabels()">🏷️ 라벨</button>
-                        </div>
-                    </div>
-                    <div class="map-canvas" id="warehouseMap">
-                        <!-- SVG Canvas for Warehouse Layout -->
-                        <svg id="mapSvg" width="100%" height="100%" viewBox="0 0 1000 600">
-                            <!-- Grid Background -->
-                            <defs>
-                                <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
-                                    <path d="M 50 0 L 0 0 0 50" fill="none" stroke="#e0e0e0" stroke-width="0.5"/>
-                                </pattern>
-                            </defs>
-                            <rect width="100%" height="100%" fill="url(#grid)" />
-                            
-                            <!-- Warehouse Layout will be drawn by JavaScript -->
-                            <g id="warehouseLayout"></g>
-                            
-                            <!-- Zones (will be added dynamically) -->
-                            <g id="zones"></g>
-                            
-                            <!-- Forklifts (will be added dynamically) -->
-                            <g id="forklifts"></g>
-                            
-                            <!-- Pedestrians (will be added dynamically) -->
-                            <g id="pedestrians"></g>
-                            
-                            <!-- Risk Areas (will be highlighted dynamically) -->
-                            <g id="riskAreas"></g>
-                        </svg>
-                    </div>
-                    
-                    <!-- Map Legend -->
-                    <div class="map-legend">
-                        <div class="legend-item">
-                            <div class="legend-icon forklift-icon"></div>
-                            <span>지게차</span>
-                        </div>
-                        <div class="legend-item">
-                            <div class="legend-icon pedestrian-icon"></div>
-                            <span>보행자</span>
-                        </div>
-                        <div class="legend-item">
-                            <div class="legend-icon danger-zone"></div>
-                            <span>위험 구역</span>
-                        </div>
-                        <div class="legend-item">
-                            <div class="legend-icon safe-zone"></div>
-                            <span>안전 구역</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Voice Commands Log -->
-                <div class="voice-commands-panel">
-                    <div class="panel-header">
-                        <h3>🔊 음성 명령 로그</h3>
-                        <button class="btn-small" onclick="clearCommandLog()">🗑️ 지우기</button>
-                    </div>
-                    <div class="commands-list" id="commandsList">
-                        <!-- Commands will be added dynamically -->
-                    </div>
-                </div>
-
-                <!-- Risk Events -->
-                <div class="risk-events-panel">
-                    <div class="panel-header">
-                        <h3>⚠️ 위험 이벤트</h3>
-                        <div class="risk-summary">
-                            <span class="risk-count high" id="highRiskCount">0</span>
-                            <span class="risk-count medium" id="mediumRiskCount">0</span>
-                            <span class="risk-count low" id="lowRiskCount">0</span>
-                        </div>
-                    </div>
-                    <div class="events-list" id="eventsList">
-                        <!-- Events will be added dynamically -->
-                    </div>
-                </div>
-
-                <!-- Live Statistics -->
-                <div class="stats-panel">
-                    <div class="panel-header">
-                        <h3>📊 실시간 통계</h3>
-                    </div>
-                    <div class="stats-grid">
-                        <div class="stat-card">
-                            <div class="stat-icon">🚛</div>
-                            <div class="stat-value" id="activeForkliftCount">0</div>
-                            <div class="stat-label">활성 지게차</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-icon">👷</div>
-                            <div class="stat-value" id="pedestrianCount">0</div>
-                            <div class="stat-label">작업자</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-icon">⚠️</div>
-                            <div class="stat-value" id="todayIncidents">0</div>
-                            <div class="stat-label">오늘 위험 감지</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-icon">✅</div>
-                            <div class="stat-value" id="preventedCollisions">0</div>
-                            <div class="stat-label">충돌 방지</div>
-                        </div>
-                    </div>
-                    
-                    <!-- Recent Activity -->
-                    <div class="recent-activity">
-                        <h4>최근 활동</h4>
-                        <div class="activity-timeline" id="activityTimeline">
-                            <!-- Activity items will be added dynamically -->
-                        </div>
-                    </div>
-                    
-                    <!-- Sensor Status -->
-                    <div class="sensor-status-section">
-                        <h4>📡 센서 상태</h4>
-                        <div class="sensor-status-grid">
-                            <div class="sensor-type-status">
-                                <span class="sensor-type-icon" style="color: #2196F3;">📹</span>
-                                <span class="sensor-type-label">CCTV</span>
-                                <span class="sensor-type-count" id="cctvCount">0</span>
-                            </div>
-                            <div class="sensor-type-status">
-                                <span class="sensor-type-icon" style="color: #FF9800;">📡</span>
-                                <span class="sensor-type-label">LiDAR</span>
-                                <span class="sensor-type-count" id="lidarCount">0</span>
-                            </div>
-                            <div class="sensor-type-status">
-                                <span class="sensor-type-icon" style="color: #9C27B0;">📍</span>
-                                <span class="sensor-type-label">UWB</span>
-                                <span class="sensor-type-count" id="uwbCount">0</span>
-                            </div>
-                        </div>
-                        
-                        <!-- Detailed Sensor List -->
-                        <div class="sensor-details" id="sensorDetails">
-                            <!-- Will be populated dynamically -->
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Forklift Status -->
-                <div class="forklift-status-panel">
-                    <div class="panel-header">
-                        <h3>🚛 지게차 상태</h3>
-                    </div>
-                    <div class="forklift-list" id="forkliftList">
-                        <!-- Forklift status cards will be added dynamically -->
-                    </div>
-                </div>
+            <!-- Dashboard Content -->
+            <div class="dashboard-content" id="dashboardContent">
+                <!-- 센서 카드들이 동적으로 추가됨 -->
             </div>
         </main>
     </div>
 
-    <!-- Scripts -->
-    <script src="{{ url_for('static', filename='js/system_info.js') }}?v={{ cache_bust }}"></script>
-    <script src="{{ url_for('static', filename='js/warehouse_digital_twin.js') }}?v={{ cache_bust }}"></script>
+    <script src="/static/js/warehouse_sensor.js"></script>
 </body>
 </html>
