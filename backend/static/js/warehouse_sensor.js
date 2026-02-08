@@ -67,7 +67,7 @@ function showSystemInfo() {
             </div>
             <div class="info-section">
                 <h3>📡 센서 융합</h3>
-                <p>CCTV 8대 • LiDAR 6대 • UWB 6대 통합 모니터링</p>
+                <p>CCTV 8대 • LiDAR 6대 • UWB 6대 • IMU 4대 통합 모니터링</p>
             </div>
             <div class="info-section" style="background: rgba(245, 158, 11, 0.1); padding: 15px; border-radius: 8px; border-left: 3px solid #f59e0b;">
                 <h3>⚠️ Human-in-the-loop</h3>
