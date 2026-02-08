@@ -518,61 +518,99 @@ function showRiskEvents() {
 
 // Show Voice Commands
 function showVoiceCommands() {
-    document.getElementById('pageTitle').innerHTML = '🔊 음성 명령 이력';
-    document.getElementById('pageSubtitle').textContent = '오늘 28건 발령';
+    document.getElementById('pageTitle').innerHTML = '🎤 음성 명령';
+    document.getElementById('pageSubtitle').textContent = '실시간 음성 제어 시스템';
     
     const content = document.getElementById('dashboardContent');
     content.innerHTML = `
-        <div class="commands-container">
-            <div class="command-item">
-                <div class="command-header">
-                    <span class="command-icon">🔊</span>
-                    <span class="command-target">F-07 → 지게차 스피커</span>
-                    <span class="command-time">5분 전</span>
+        <div class="voice-control-panel">
+            <!-- Voice Input Section -->
+            <div class="voice-input-section">
+                <div class="voice-input-card">
+                    <div class="voice-header">
+                        <h3>🎤 음성 명령 입력</h3>
+                        <div class="voice-status" id="voiceStatus">
+                            <span class="status-dot"></span>
+                            <span class="status-text">준비</span>
+                        </div>
+                    </div>
+                    
+                    <div class="voice-controls">
+                        <button class="btn-voice-start" id="startVoiceBtn" onclick="startVoiceRecognition()">
+                            🎤 음성 인식 시작
+                        </button>
+                        <button class="btn-voice-stop" id="stopVoiceBtn" onclick="stopVoiceRecognition()" disabled>
+                            ⏹️ 중지
+                        </button>
+                    </div>
+                    
+                    <div class="voice-transcript-box" id="transcriptBox">
+                        <div class="transcript-placeholder">
+                            음성 명령을 말해주세요...
+                        </div>
+                    </div>
+                    
+                    <div class="voice-commands-help">
+                        <h4>📋 사용 가능한 명령어</h4>
+                        <div class="command-examples">
+                            <div class="example-item">🚛 "F-07 정지" - 지게차 F-07을 정지시킵니다</div>
+                            <div class="example-item">⚠️ "위험 알림" - 위험 경고를 발생시킵니다</div>
+                            <div class="example-item">🔄 "리셋" - 시스템을 초기화합니다</div>
+                            <div class="example-item">📍 "시나리오 1" - 충돌 위험 시뮬레이션 실행</div>
+                            <div class="example-item">🗺️ "지도 보기" - 디지털 트윈 지도로 이동</div>
+                        </div>
+                    </div>
                 </div>
-                <div class="command-body">
-                    "정지하세요! 보행자 접근 중"
-                </div>
-                <div class="command-status delivered">✓ 전달 완료</div>
             </div>
             
-            <div class="command-item">
-                <div class="command-header">
-                    <span class="command-icon">🔊</span>
-                    <span class="command-target">Aisle-A → 구역 스피커</span>
-                    <span class="command-time">8분 전</span>
+            <!-- Command History Section -->
+            <div class="voice-history-section">
+                <div class="voice-history-card">
+                    <h3>📜 명령 이력</h3>
+                    <div class="command-history" id="commandHistory">
+                        <div class="command-item">
+                            <div class="command-header">
+                                <span class="command-icon">🔊</span>
+                                <span class="command-target">Aisle-A → 구역 스피커</span>
+                                <span class="command-time">8분 전</span>
+                            </div>
+                            <div class="command-body">
+                                "Aisle-A 보행자 주의, 지게차 진입 중"
+                            </div>
+                            <div class="command-status delivered">✓ 전달 완료</div>
+                        </div>
+                        
+                        <div class="command-item">
+                            <div class="command-header">
+                                <span class="command-icon">🔊</span>
+                                <span class="command-target">F-12 → 지게차 스피커</span>
+                                <span class="command-time">12분 전</span>
+                            </div>
+                            <div class="command-body">
+                                "속도를 줄이세요. 현재 속도 18km/h"
+                            </div>
+                            <div class="command-status delivered">✓ 전달 완료</div>
+                        </div>
+                        
+                        <div class="command-item">
+                            <div class="command-header">
+                                <span class="command-icon">🔊</span>
+                                <span class="command-target">작업자-03 → 웨어러블</span>
+                                <span class="command-time">15분 전</span>
+                            </div>
+                            <div class="command-body">
+                                "지게차 접근 중, 안전 구역으로 이동하세요"
+                            </div>
+                            <div class="command-status delivered">✓ 전달 완료</div>
+                        </div>
+                    </div>
                 </div>
-                <div class="command-body">
-                    "Aisle-A 보행자 주의, 지게차 진입 중"
-                </div>
-                <div class="command-status delivered">✓ 전달 완료</div>
-            </div>
-            
-            <div class="command-item">
-                <div class="command-header">
-                    <span class="command-icon">🔊</span>
-                    <span class="command-target">F-12 → 지게차 스피커</span>
-                    <span class="command-time">12분 전</span>
-                </div>
-                <div class="command-body">
-                    "속도를 줄이세요. 현재 속도 18km/h"
-                </div>
-                <div class="command-status delivered">✓ 전달 완료</div>
-            </div>
-            
-            <div class="command-item">
-                <div class="command-header">
-                    <span class="command-icon">🔊</span>
-                    <span class="command-target">작업자-03 → 웨어러블</span>
-                    <span class="command-time">15분 전</span>
-                </div>
-                <div class="command-body">
-                    "지게차 접근 중, 안전 구역으로 이동하세요"
-                </div>
-                <div class="command-status delivered">✓ 전달 완료</div>
             </div>
         </div>
     `;
+    
+    // Initialize voice recognition
+    initializeVoiceRecognition();
 }
 
 // Update Clock
@@ -960,4 +998,296 @@ function triggerScenario3() {
     setTimeout(() => notification.remove(), 3000);
     
     startAnimation();
+}
+
+// ========================================
+// VOICE RECOGNITION SYSTEM
+// ========================================
+
+// Global Voice Recognition State
+let voiceRecognition = null;
+let isVoiceActive = false;
+
+// Initialize Voice Recognition
+function initializeVoiceRecognition() {
+    // Check browser support
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+        console.error('Speech Recognition not supported in this browser');
+        document.getElementById('startVoiceBtn').disabled = true;
+        document.getElementById('startVoiceBtn').textContent = '❌ 브라우저 미지원';
+        return;
+    }
+    
+    // Create Speech Recognition instance
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    voiceRecognition = new SpeechRecognition();
+    
+    // Configure recognition
+    voiceRecognition.lang = 'ko-KR';
+    voiceRecognition.continuous = true;
+    voiceRecognition.interimResults = true;
+    voiceRecognition.maxAlternatives = 1;
+    
+    // Event handlers
+    voiceRecognition.onstart = onVoiceStart;
+    voiceRecognition.onresult = onVoiceResult;
+    voiceRecognition.onerror = onVoiceError;
+    voiceRecognition.onend = onVoiceEnd;
+}
+
+// Start Voice Recognition
+function startVoiceRecognition() {
+    if (!voiceRecognition) {
+        alert('음성 인식이 지원되지 않는 브라우저입니다.');
+        return;
+    }
+    
+    try {
+        voiceRecognition.start();
+        isVoiceActive = true;
+        
+        // Update UI
+        document.getElementById('startVoiceBtn').disabled = true;
+        document.getElementById('stopVoiceBtn').disabled = false;
+        updateVoiceStatus('listening', '🎤 듣는 중...');
+        
+        // Clear transcript
+        const transcriptBox = document.getElementById('transcriptBox');
+        transcriptBox.innerHTML = '<div class="transcript-active">음성을 인식하고 있습니다...</div>';
+        
+    } catch (error) {
+        console.error('Failed to start voice recognition:', error);
+        alert('음성 인식을 시작할 수 없습니다: ' + error.message);
+    }
+}
+
+// Stop Voice Recognition
+function stopVoiceRecognition() {
+    if (voiceRecognition && isVoiceActive) {
+        voiceRecognition.stop();
+        isVoiceActive = false;
+        
+        // Update UI
+        document.getElementById('startVoiceBtn').disabled = false;
+        document.getElementById('stopVoiceBtn').disabled = true;
+        updateVoiceStatus('ready', '준비');
+    }
+}
+
+// Voice Recognition Event Handlers
+function onVoiceStart() {
+    console.log('🎤 Voice recognition started');
+    updateVoiceStatus('listening', '🎤 듣는 중...');
+}
+
+function onVoiceResult(event) {
+    let interimTranscript = '';
+    let finalTranscript = '';
+    
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        
+        if (event.results[i].isFinal) {
+            finalTranscript += transcript + ' ';
+        } else {
+            interimTranscript += transcript;
+        }
+    }
+    
+    // Update transcript box
+    const transcriptBox = document.getElementById('transcriptBox');
+    transcriptBox.innerHTML = `
+        <div class="transcript-final">${finalTranscript}</div>
+        <div class="transcript-interim">${interimTranscript}</div>
+    `;
+    
+    // Process final transcript
+    if (finalTranscript) {
+        processVoiceCommand(finalTranscript.trim());
+    }
+}
+
+function onVoiceError(event) {
+    console.error('Voice recognition error:', event.error);
+    
+    let errorMsg = '알 수 없는 오류';
+    switch (event.error) {
+        case 'no-speech':
+            errorMsg = '음성이 감지되지 않았습니다';
+            break;
+        case 'audio-capture':
+            errorMsg = '마이크를 찾을 수 없습니다';
+            break;
+        case 'not-allowed':
+            errorMsg = '마이크 권한이 거부되었습니다';
+            break;
+        case 'network':
+            errorMsg = '네트워크 오류';
+            break;
+    }
+    
+    updateVoiceStatus('error', '❌ ' + errorMsg);
+    
+    // Auto-restart if it wasn't a permission issue
+    if (event.error !== 'not-allowed' && isVoiceActive) {
+        setTimeout(() => {
+            if (isVoiceActive) {
+                voiceRecognition.start();
+            }
+        }, 1000);
+    }
+}
+
+function onVoiceEnd() {
+    console.log('🎤 Voice recognition ended');
+    
+    if (isVoiceActive) {
+        // Auto-restart if still active
+        setTimeout(() => {
+            if (isVoiceActive) {
+                voiceRecognition.start();
+            }
+        }, 300);
+    } else {
+        updateVoiceStatus('ready', '준비');
+    }
+}
+
+// Update Voice Status UI
+function updateVoiceStatus(state, text) {
+    const statusEl = document.getElementById('voiceStatus');
+    if (!statusEl) return;
+    
+    const statusDot = statusEl.querySelector('.status-dot');
+    const statusText = statusEl.querySelector('.status-text');
+    
+    statusDot.className = 'status-dot';
+    statusDot.classList.add('status-' + state);
+    statusText.textContent = text;
+}
+
+// Process Voice Command
+function processVoiceCommand(command) {
+    console.log('🎤 Voice command:', command);
+    
+    const commandLower = command.toLowerCase();
+    
+    // Add to command history
+    addCommandToHistory(command);
+    
+    // Command matching
+    if (commandLower.includes('정지') || commandLower.includes('멈춰')) {
+        handleStopCommand(command);
+    } else if (commandLower.includes('시나리오 1') || commandLower.includes('시나리오 일')) {
+        triggerScenario1();
+        showNotificationPopup('✅ 시나리오 1 실행', 'success');
+    } else if (commandLower.includes('시나리오 2') || commandLower.includes('시나리오 이')) {
+        triggerScenario2();
+        showNotificationPopup('✅ 시나리오 2 실행', 'success');
+    } else if (commandLower.includes('시나리오 3') || commandLower.includes('시나리오 삼')) {
+        triggerScenario3();
+        showNotificationPopup('✅ 시나리오 3 실행', 'success');
+    } else if (commandLower.includes('리셋') || commandLower.includes('초기화')) {
+        resetDigitalTwinView();
+        showNotificationPopup('✅ 시스템 초기화 완료', 'success');
+    } else if (commandLower.includes('지도') || commandLower.includes('디지털 트윈')) {
+        showDigitalTwin();
+        showNotificationPopup('✅ 디지털 트윈으로 이동', 'success');
+    } else if (commandLower.includes('센서')) {
+        showSensorType('all');
+        showNotificationPopup('✅ 센서 모니터링으로 이동', 'success');
+    } else if (commandLower.includes('위험') || commandLower.includes('경고')) {
+        showRiskEvents();
+        showNotificationPopup('⚠️ 위험 알림 활성화', 'warning');
+    } else {
+        showNotificationPopup('❓ 알 수 없는 명령: ' + command, 'info');
+    }
+}
+
+// Handle Stop Command
+function handleStopCommand(command) {
+    // Extract forklift ID if specified
+    const match = command.match(/F-?\d+/i);
+    
+    if (match) {
+        const forkliftId = match[0].toUpperCase();
+        const forklift = animationState.forklifts.find(f => f.id === forkliftId);
+        
+        if (forklift) {
+            forklift.speed = 0;
+            forklift.status = 'stopped';
+            showNotificationPopup(`✅ ${forkliftId} 정지 명령 실행`, 'success');
+        } else {
+            showNotificationPopup(`❌ ${forkliftId}를 찾을 수 없습니다`, 'error');
+        }
+    } else {
+        // Stop all forklifts
+        animationState.forklifts.forEach(f => {
+            f.speed = 0;
+            f.status = 'stopped';
+        });
+        showNotificationPopup('✅ 모든 지게차 정지 명령 실행', 'success');
+    }
+}
+
+// Add Command to History
+function addCommandToHistory(command) {
+    const historyEl = document.getElementById('commandHistory');
+    if (!historyEl) return;
+    
+    const now = new Date();
+    const timeStr = '방금 전';
+    
+    const commandItem = document.createElement('div');
+    commandItem.className = 'command-item';
+    commandItem.innerHTML = `
+        <div class="command-header">
+            <span class="command-icon">🎤</span>
+            <span class="command-target">음성 명령 → 시스템</span>
+            <span class="command-time">${timeStr}</span>
+        </div>
+        <div class="command-body">
+            "${command}"
+        </div>
+        <div class="command-status delivered">✓ 실행 완료</div>
+    `;
+    
+    // Add to top of history
+    historyEl.insertBefore(commandItem, historyEl.firstChild);
+    
+    // Keep only last 10 commands
+    while (historyEl.children.length > 10) {
+        historyEl.removeChild(historyEl.lastChild);
+    }
+}
+
+// Show Notification Popup
+function showNotificationPopup(message, type = 'info') {
+    const colors = {
+        success: '#10b981',
+        error: '#ef4444',
+        warning: '#f59e0b',
+        info: '#3b82f6'
+    };
+    
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+        position: fixed;
+        top: 100px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: ${colors[type] || colors.info};
+        color: #fff;
+        padding: 15px 30px;
+        border-radius: 10px;
+        font-size: 16px;
+        font-weight: 600;
+        z-index: 9999;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        animation: slideDown 0.5s ease;
+    `;
+    notification.textContent = message;
+    document.body.appendChild(notification);
+    
+    setTimeout(() => notification.remove(), 3000);
 }

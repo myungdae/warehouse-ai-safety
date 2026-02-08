@@ -701,3 +701,215 @@
     pointer-events: none;
     transition: opacity 0.3s ease;
 }
+
+/* ========================================
+   VOICE CONTROL PANEL STYLES
+   ======================================== */
+
+.voice-control-panel {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 30px;
+    padding: 20px;
+}
+
+.voice-input-section,
+.voice-history-section {
+    display: flex;
+    flex-direction: column;
+}
+
+.voice-input-card,
+.voice-history-card {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(139, 92, 246, 0.1));
+    border: 2px solid rgba(59, 130, 246, 0.3);
+    border-radius: 15px;
+    padding: 25px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+.voice-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.voice-header h3 {
+    margin: 0;
+    font-size: 1.3rem;
+    color: #ffffff;
+}
+
+.voice-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 15px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 20px;
+}
+
+.status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #64748b;
+}
+
+.status-dot.status-ready {
+    background: #10b981;
+}
+
+.status-dot.status-listening {
+    background: #3b82f6;
+    animation: pulse 1s infinite;
+}
+
+.status-dot.status-error {
+    background: #ef4444;
+}
+
+.status-text {
+    font-size: 0.9rem;
+    color: #ffffff;
+    font-weight: 600;
+}
+
+.voice-controls {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.btn-voice-start,
+.btn-voice-stop {
+    flex: 1;
+    padding: 15px 25px;
+    font-size: 1rem;
+    font-weight: 600;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-voice-start {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: #ffffff;
+    box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+}
+
+.btn-voice-start:hover:not(:disabled) {
+    background: linear-gradient(135deg, #059669, #047857);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+}
+
+.btn-voice-stop {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    color: #ffffff;
+    box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
+}
+
+.btn-voice-stop:hover:not(:disabled) {
+    background: linear-gradient(135deg, #dc2626, #b91c1c);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
+}
+
+.btn-voice-start:disabled,
+.btn-voice-stop:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.voice-transcript-box {
+    min-height: 150px;
+    max-height: 300px;
+    overflow-y: auto;
+    padding: 20px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 2px solid rgba(59, 130, 246, 0.3);
+    border-radius: 10px;
+    margin-bottom: 20px;
+}
+
+.transcript-placeholder {
+    color: rgba(255, 255, 255, 0.4);
+    font-style: italic;
+    text-align: center;
+    padding: 50px 20px;
+}
+
+.transcript-active {
+    color: #3b82f6;
+    font-weight: 600;
+    animation: pulse 2s infinite;
+}
+
+.transcript-final {
+    color: #ffffff;
+    font-size: 1.1rem;
+    line-height: 1.6;
+    margin-bottom: 10px;
+}
+
+.transcript-interim {
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 1rem;
+    font-style: italic;
+}
+
+.voice-commands-help {
+    margin-top: 20px;
+}
+
+.voice-commands-help h4 {
+    margin: 0 0 15px 0;
+    color: #ffffff;
+    font-size: 1.1rem;
+}
+
+.command-examples {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.example-item {
+    padding: 12px 15px;
+    background: rgba(59, 130, 246, 0.1);
+    border-left: 3px solid #3b82f6;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.8);
+    transition: all 0.3s ease;
+}
+
+.example-item:hover {
+    background: rgba(59, 130, 246, 0.2);
+    transform: translateX(5px);
+}
+
+.voice-history-card h3 {
+    margin: 0 0 20px 0;
+    font-size: 1.3rem;
+    color: #ffffff;
+}
+
+.command-history {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    max-height: 600px;
+    overflow-y: auto;
+}
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+    .voice-control-panel {
+        grid-template-columns: 1fr;
+    }
+}
