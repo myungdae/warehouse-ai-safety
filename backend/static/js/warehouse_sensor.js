@@ -256,6 +256,7 @@ function showDigitalTwin() {
                     <div class="legend-item"><span class="legend-dot" style="background:#2196F3;"></span> CCTV (8)</div>
                     <div class="legend-item"><span class="legend-dot" style="background:#FF9800;"></span> LiDAR (6)</div>
                     <div class="legend-item"><span class="legend-dot" style="background:#9C27B0;"></span> UWB (6)</div>
+                    <div class="legend-item"><span class="legend-dot" style="background:#E91E63;"></span> IMU (4)</div>
                     <div class="legend-item"><span class="legend-dot" style="background:#4CAF50;"></span> 지게차 (4)</div>
                 </div>
             </div>
