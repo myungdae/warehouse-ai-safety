@@ -52,25 +52,20 @@ function showSystemInfo() {
     content.innerHTML = `
         <div class="system-info-box">
             <div class="info-section">
-                <h3>🚛 Traffic Control</h3>
-                <p>실시간 지게차 위치 추적 및 경로 모니터링</p>
+                <h3>🚛 실시간 지게차 추적</h3>
+                <p>AI 기반 충돌 위험 예측 및 실시간 위치 모니터링</p>
             </div>
             <div class="info-section">
-                <h3>⚠️ Collision Detection</h3>
-                <p>AI 기반 충돌 위험 예측 및 실시간 경고</p>
+                <h3>🔊 3채널 음성 명령</h3>
+                <p>지게차 스피커 • 구역 스피커 • 웨어러블 기기</p>
             </div>
             <div class="info-section">
-                <h3>🔊 Voice Commands</h3>
-                <p>실시간 음성 명령 시스템</p>
-                <ul class="feature-list">
-                    <li>정지/감속 지시</li>
-                    <li>보행자 경고</li>
-                    <li>구역 제한 알림</li>
-                </ul>
+                <h3>📡 센서 융합</h3>
+                <p>CCTV 8대 • LiDAR 6대 • UWB 6대 통합 모니터링</p>
             </div>
-            <div class="info-section">
+            <div class="info-section" style="background: rgba(245, 158, 11, 0.1); padding: 15px; border-radius: 8px; border-left: 3px solid #f59e0b;">
                 <h3>⚠️ Human-in-the-loop</h3>
-                <p>시스템은 조언만 제공하고, 최종 결정은 운전자가 합니다.</p>
+                <p style="font-size: 0.95rem;">시스템은 조언만 제공하며, 최종 결정은 운전자가 합니다.</p>
             </div>
         </div>
     `;
