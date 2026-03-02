@@ -191,7 +191,7 @@ module.exports = {
     },
 
     // ─────────────────────────────────────────────
-    // 11. SEMICON (vite preview, port 5003)
+    // 11. SEMICON FRONTEND (vite preview, port 5003)
     // ─────────────────────────────────────────────
     {
       name: 'semicon-app',
@@ -204,6 +204,27 @@ module.exports = {
       max_memory_restart: '512M',
       error_file: '/home/ubuntu/.pm2/logs/semicon-app-error.log',
       out_file: '/home/ubuntu/.pm2/logs/semicon-app-out.log',
+      time: true
+    },
+
+    // ─────────────────────────────────────────────
+    // 12. SEMICON BACKEND NestJS (port 8005)
+    // ─────────────────────────────────────────────
+    {
+      name: 'semicon-backend',
+      script: 'dist/main.js',
+      cwd: '/home/ubuntu/semicon/backend',
+      instances: 1,
+      autorestart: true,
+      watch: false,
+      max_memory_restart: '1G',
+      env: {
+        NODE_ENV: 'production',
+        PORT: 8005,
+        YOLO_SERVICE_URL: 'http://localhost:8004'
+      },
+      error_file: '/home/ubuntu/.pm2/logs/semicon-backend-error.log',
+      out_file: '/home/ubuntu/.pm2/logs/semicon-backend-out.log',
       time: true
     }
 
