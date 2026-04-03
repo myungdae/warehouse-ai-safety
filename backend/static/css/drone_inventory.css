@@ -731,3 +731,296 @@
     .compare-header-row { grid-template-columns: 1fr 1fr 1fr; }
     .ontology-view { grid-template-columns: 1fr; }
 }
+
+/* ============================================================
+   RESCAN EXEC BUTTON
+   ============================================================ */
+.rescan-exec-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 18px;
+    border-radius: 8px;
+    border: 1px solid rgba(167,139,250,0.5);
+    background: linear-gradient(135deg, rgba(99,102,241,0.2), rgba(167,139,250,0.2));
+    color: #a78bfa;
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.rescan-exec-btn:hover {
+    background: linear-gradient(135deg, rgba(99,102,241,0.35), rgba(167,139,250,0.35));
+    box-shadow: 0 0 18px rgba(167,139,250,0.3);
+    transform: translateY(-1px);
+}
+
+.report-exec-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 18px;
+    border-radius: 8px;
+    border: 1px solid rgba(251,191,36,0.4);
+    background: rgba(251,191,36,0.1);
+    color: #fbbf24;
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.report-exec-btn:hover {
+    background: rgba(251,191,36,0.2);
+    box-shadow: 0 0 18px rgba(251,191,36,0.2);
+    transform: translateY(-1px);
+}
+
+/* ============================================================
+   REPORT VIEW — 파이프라인 스텝
+   ============================================================ */
+.report-view { display: flex; flex-direction: column; gap: 20px; }
+
+.report-header-card {
+    background: linear-gradient(135deg, rgba(251,191,36,0.07), rgba(99,102,241,0.07));
+    border: 1px solid rgba(251,191,36,0.2);
+    border-radius: 14px;
+    padding: 20px 24px;
+}
+
+.report-pipeline {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    background: rgba(15,23,42,0.7);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 14px;
+    overflow: hidden;
+    padding: 20px;
+}
+
+.rp-step {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    padding: 14px 16px;
+    border-radius: 10px;
+    transition: all 0.3s;
+    border: 1px solid transparent;
+}
+.rp-step.rp-active {
+    background: rgba(99,102,241,0.08);
+    border-color: rgba(99,102,241,0.3);
+}
+.rp-step.rp-done {
+    background: rgba(52,211,153,0.05);
+    border-color: rgba(52,211,153,0.2);
+}
+
+.rp-step-num {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: #64748b;
+    font-size: 0.78rem;
+    font-weight: 800;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    margin-top: 2px;
+    transition: all 0.3s;
+}
+.rp-step.rp-active .rp-step-num {
+    background: rgba(99,102,241,0.3);
+    border-color: #6366f1;
+    color: #a5b4fc;
+}
+.rp-step.rp-done .rp-step-num {
+    background: rgba(52,211,153,0.2);
+    border-color: #34d399;
+    color: #34d399;
+}
+
+.rp-step-body { flex: 1; }
+.rp-step-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+.rp-step-icon  { font-size: 1rem; }
+.rp-step-title { font-size: 0.88rem; font-weight: 700; color: #e2e8f0; flex: 1; }
+
+.rp-step-status {
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 4px;
+}
+.rp-status-running { background: rgba(99,102,241,0.2); color: #a5b4fc; animation: pulse-text 0.8s infinite; }
+.rp-status-done    { background: rgba(52,211,153,0.2); color: #34d399; }
+
+.rp-step-detail {
+    font-size: 0.76rem;
+    color: #64748b;
+    margin-bottom: 8px;
+}
+
+.rp-step-bar {
+    height: 4px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+.rp-step-bar-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #6366f1, #34d399);
+    border-radius: 2px;
+    transition: width 0.1s linear;
+}
+.rp-step.rp-done .rp-step-bar-fill { background: #34d399; }
+
+.rp-step-result { font-size: 0.78rem; margin-top: 4px; }
+.rp-result-ok   { color: #34d399; }
+.rp-result-warn { color: #fbbf24; }
+
+.rp-arrow {
+    text-align: center;
+    color: #1e293b;
+    font-size: 1.1rem;
+    padding: 2px 0 2px 14px;
+    line-height: 1;
+}
+
+/* ============================================================
+   FINAL REPORT CARD
+   ============================================================ */
+.final-report-card {
+    background: rgba(10,15,30,0.9);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 0 40px rgba(99,102,241,0.1);
+}
+
+.fr-header {
+    background: linear-gradient(135deg, rgba(99,102,241,0.15), rgba(52,211,153,0.08));
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    padding: 24px 28px;
+}
+.fr-badge {
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: #64748b;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+}
+.fr-title {
+    font-size: 1.3rem;
+    font-weight: 900;
+    color: #e2e8f0;
+    margin-bottom: 4px;
+}
+.fr-subtitle { font-size: 0.8rem; color: #64748b; }
+.fr-meta     { font-size: 0.75rem; color: #64748b; line-height: 1.8; font-family: monospace; }
+
+.fr-section { padding: 20px 28px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+.fr-section:last-of-type { border-bottom: none; }
+.fr-section-title {
+    font-size: 0.82rem;
+    font-weight: 800;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 14px;
+}
+
+.fr-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+}
+.fr-kpi {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px;
+    padding: 14px;
+    text-align: center;
+}
+.fr-kpi-val   { font-size: 2rem; font-weight: 900; margin-bottom: 4px; }
+.fr-kpi-label { font-size: 0.72rem; color: #64748b; }
+
+.fr-change-grid { display: flex; flex-direction: column; gap: 8px; }
+.fr-change-row {
+    display: grid;
+    grid-template-columns: 160px 60px 1fr;
+    gap: 12px;
+    align-items: center;
+    padding: 10px 14px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.02);
+    border-left: 3px solid;
+    font-size: 0.82rem;
+}
+.fr-change-type { font-weight: 700; }
+.fr-change-cnt  { font-weight: 900; font-size: 1rem; text-align: center; }
+.fr-change-desc { color: #64748b; }
+
+.fr-rescan-summary {
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(167,139,250,0.2);
+    border-radius: 10px;
+    padding: 14px 16px;
+}
+.fr-rescan-row {
+    display: grid;
+    grid-template-columns: 80px 200px 160px 1fr;
+    gap: 10px;
+    align-items: center;
+    padding: 7px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    font-size: 0.8rem;
+}
+.fr-rescan-row:last-of-type { border-bottom: none; }
+.fr-rescan-shelf   { font-family: monospace; font-weight: 700; color: #a5b4fc; }
+.fr-rescan-loc     { color: #64748b; font-size: 0.75rem; }
+.fr-rescan-verdict { font-weight: 700; font-size: 0.78rem; }
+.fr-rescan-note    { color: #64748b; font-size: 0.75rem; }
+
+.fr-action-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 7px;
+    background: rgba(255,255,255,0.02);
+    margin-bottom: 6px;
+    font-size: 0.82rem;
+}
+.fr-action-type  { flex-shrink: 0; }
+.fr-action-title { flex: 1; color: #e2e8f0; }
+.fr-action-time  { color: #64748b; font-family: monospace; font-size: 0.72rem; }
+
+.fr-recommendations { display: flex; flex-direction: column; gap: 8px; }
+.fr-rec {
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    border-left: 3px solid;
+}
+.fr-rec.high   { background: rgba(248,113,113,0.07); border-color: #f87171; color: #fca5a5; }
+.fr-rec.medium { background: rgba(251,191,36,0.07);  border-color: #fbbf24; color: #fde68a; }
+.fr-rec.low    { background: rgba(34,211,238,0.07);  border-color: #22d3ee; color: #67e8f9; }
+.fr-rec.info   { background: rgba(99,102,241,0.07);  border-color: #6366f1; color: #a5b4fc; }
+
+.fr-footer {
+    padding: 16px 28px;
+    background: rgba(0,0,0,0.2);
+    font-size: 0.72rem;
+    color: #374151;
+    text-align: center;
+    line-height: 1.8;
+    border-top: 1px solid rgba(255,255,255,0.05);
+}
