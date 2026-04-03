@@ -2,49 +2,80 @@
    Drone Inventory Intelligence System
    Drone → Vision AI → Barcode → Inventory DB → Daily Comparison
    + Agentic AI: 자율 판단 → 재스캔 / 보고 / 에스컬레이션
+   + 5-Layer 높이 스캔 (L1~L5 = 1m 단위, 총 5m)
+   + 양방향 / 단방향 스캔 선택
+   + 드론 시작 Layer 조절
    ============================================================ */
 
 'use strict';
 
+// ── Layer 정의 (5m 높이, 5개 Layer, 1m 간격) ─────────────────
+const LAYERS = [
+    { id: 'L1', label: 'Layer 1 (0–1m)',   height_m: 0.5,  color: '#f87171', colorAlpha: 'rgba(248,113,113,0.22)' },
+    { id: 'L2', label: 'Layer 2 (1–2m)',   height_m: 1.5,  color: '#fbbf24', colorAlpha: 'rgba(251,191,36,0.22)'  },
+    { id: 'L3', label: 'Layer 3 (2–3m)',   height_m: 2.5,  color: '#34d399', colorAlpha: 'rgba(52,211,153,0.22)'  },
+    { id: 'L4', label: 'Layer 4 (3–4m)',   height_m: 3.5,  color: '#22d3ee', colorAlpha: 'rgba(34,211,238,0.22)'  },
+    { id: 'L5', label: 'Layer 5 (4–5m)',   height_m: 4.5,  color: '#a78bfa', colorAlpha: 'rgba(167,139,250,0.22)' },
+];
+
+// ── 스캔 설정 (사용자 조절 가능) ─────────────────────────────
+const SCAN_CONFIG = {
+    scanMode:       'both',   // 'both' | 'left' | 'right'
+    startLayer:     0,        // 0~4 (LAYERS 인덱스)
+    endLayer:       4,        // 0~4
+    activeLayerIdx: 0,        // 현재 순찰 중인 layer 인덱스 (런타임)
+};
+
 // ── 상수 ──────────────────────────────────────────────────────
 const WAREHOUSE = {
-    width: 760,
-    height: 420,
+    width: 820,
+    height: 480,
     aisles: [
-        { id: 'A', x: 80,  y: 60, w: 100, h: 300, label: 'Aisle-A' },
-        { id: 'B', x: 230, y: 60, w: 100, h: 300, label: 'Aisle-B' },
-        { id: 'C', x: 380, y: 60, w: 100, h: 300, label: 'Aisle-C' },
-        { id: 'D', x: 530, y: 60, w: 100, h: 300, label: 'Aisle-D' },
+        { id: 'A', x: 80,  y: 50, w: 110, h: 340, label: 'Aisle-A' },
+        { id: 'B', x: 240, y: 50, w: 110, h: 340, label: 'Aisle-B' },
+        { id: 'C', x: 400, y: 50, w: 110, h: 340, label: 'Aisle-C' },
+        { id: 'D', x: 560, y: 50, w: 110, h: 340, label: 'Aisle-D' },
     ],
     shelves: [] // 자동 생성
 };
 
-const DRONE = { size: 14, speed: 1.8, scanRadius: 45 };
+const DRONE = { size: 14, speed: 1.8, scanRadius: 50 };
 
-// 통로별 선반 위치 자동 생성
+// ── 통로별 선반 자동 생성 (Row × Layer) ──────────────────────
+//   Row: 통로 따라 가로 방향 (6 rows)
+//   Layer: 높이 방향 (5 layers, L1=바닥~L5=5m)
+//   shelf ID = {aisle}{side}{row}-{layerId}  예: AL1-L3
 WAREHOUSE.aisles.forEach(aisle => {
-    const shelfCount = 6;
-    for (let i = 0; i < shelfCount; i++) {
-        const y = aisle.y + 20 + i * 45;
-        // 좌측 선반
-        WAREHOUSE.shelves.push({
-            id: `${aisle.id}L${i+1}`,
-            aisle: aisle.id,
-            side: 'L',
-            x: aisle.x - 30,
-            y: y,
-            w: 28, h: 30,
-            row: i + 1
-        });
-        // 우측 선반
-        WAREHOUSE.shelves.push({
-            id: `${aisle.id}R${i+1}`,
-            aisle: aisle.id,
-            side: 'R',
-            x: aisle.x + aisle.w + 2,
-            y: y,
-            w: 28, h: 30,
-            row: i + 1
+    const rowCount = 6; // 통로 방향 6개 위치
+    for (let row = 0; row < rowCount; row++) {
+        const y = aisle.y + 20 + row * 52;
+        LAYERS.forEach((layer, li) => {
+            // 좌측 선반
+            WAREHOUSE.shelves.push({
+                id:    `${aisle.id}L${row+1}-${layer.id}`,
+                aisle: aisle.id,
+                side:  'L',
+                layer: layer.id,
+                layerIdx: li,
+                x: aisle.x - 34,
+                y: y,
+                w: 30, h: 28,
+                row: row + 1,
+                height_m: layer.height_m,
+            });
+            // 우측 선반
+            WAREHOUSE.shelves.push({
+                id:    `${aisle.id}R${row+1}-${layer.id}`,
+                aisle: aisle.id,
+                side:  'R',
+                layer: layer.id,
+                layerIdx: li,
+                x: aisle.x + aisle.w + 4,
+                y: y,
+                w: 30, h: 28,
+                row: row + 1,
+                height_m: layer.height_m,
+            });
         });
     }
 });
@@ -137,7 +168,7 @@ let state = {
     patrolDone:   false,
     day2PatrolDone: false,
 
-    drone: { x: 30, y: 210, angle: 0, battery: 100 },
+    drone: { x: 28, y: 240, angle: 0, battery: 100 },
     droneTarget: null,
     patrolPath: [],      // 방문할 선반 순서
     pathIndex: 0,
@@ -205,59 +236,194 @@ function selectDay(day) {
     if (state.currentView === 'scanlog') showView('scanlog');
 }
 
+// ── Layer 인디케이터 업데이트 ─────────────────────────────────
+function updateLayerIndicator(layerIdx) {
+    const lyr = LAYERS[layerIdx];
+    const el = document.getElementById('ms-layer');
+    if (el) {
+        el.textContent = lyr.id;
+        el.style.color = lyr.color;
+    }
+    // 사이드바
+    const sbLayer = document.getElementById('sb-layer');
+    if (sbLayer) {
+        sbLayer.textContent = `${lyr.id} (${lyr.height_m}m)`;
+        sbLayer.style.color = lyr.color;
+    }
+    // Layer 스트립 하이라이트
+    document.querySelectorAll('.layer-strip').forEach((s, i) => {
+        s.classList.toggle('active-layer', i === layerIdx);
+    });
+}
+
+// ── 스캔 대상 선반 수 계산 ─────────────────────────────────
+function calcTargetShelves() {
+    const totalLayers = SCAN_CONFIG.endLayer - SCAN_CONFIG.startLayer + 1;
+    const sidesCount  = SCAN_CONFIG.scanMode === 'both' ? 2 : 1;
+    return WAREHOUSE.aisles.length * 6 * totalLayers * sidesCount;
+}
+
 // ============================================================
 // PATROL VIEW
 // ============================================================
 function renderPatrolView(content) {
     const svgW = WAREHOUSE.width;
     const svgH = WAREHOUSE.height;
+    const totalLayers = SCAN_CONFIG.endLayer - SCAN_CONFIG.startLayer + 1;
+    const targetShelves = calcTargetShelves();
+
+    // Layer 색상 범례 HTML
+    const layerLegend = LAYERS.map((l, i) => {
+        const active = (i >= SCAN_CONFIG.startLayer && i <= SCAN_CONFIG.endLayer);
+        return `<div class="layer-badge-legend ${active ? 'active' : 'inactive'}"
+            style="border-color:${l.color};color:${active?l.color:'#475569'};
+                   background:${active?l.colorAlpha:'rgba(255,255,255,0.02)'}">
+            ${l.id}<span style="font-size:0.62rem;margin-left:3px;opacity:0.7">${l.height_m}m</span>
+        </div>`;
+    }).join('');
 
     content.innerHTML = `
     <div class="patrol-layout">
+        <!-- ── 설정 패널 (위쪽) ── -->
+        <div class="config-panel" style="grid-column:1/-1">
+            <div class="config-row">
+                <!-- 스캔 방향 -->
+                <div class="config-group">
+                    <div class="config-label">📡 스캔 방향 (Scan Direction)</div>
+                    <div class="scan-mode-toggle">
+                        <button class="smt-btn ${SCAN_CONFIG.scanMode==='both'?'active':''}"
+                            onclick="setScanMode('both')" id="smtBoth">
+                            ◄ 양방향 ► <span class="smt-sub">Both Sides</span>
+                        </button>
+                        <button class="smt-btn ${SCAN_CONFIG.scanMode==='left'?'active':''}"
+                            onclick="setScanMode('left')" id="smtLeft">
+                            ◄ 좌측만 <span class="smt-sub">Left Only</span>
+                        </button>
+                        <button class="smt-btn ${SCAN_CONFIG.scanMode==='right'?'active':''}"
+                            onclick="setScanMode('right')" id="smtRight">
+                            우측만 ► <span class="smt-sub">Right Only</span>
+                        </button>
+                    </div>
+                    <div class="config-hint" id="scanModeHint">${getScanModeHint()}</div>
+                </div>
+
+                <!-- Layer 범위 -->
+                <div class="config-group">
+                    <div class="config-label">📐 스캔 Layer 범위 (5m 높이)</div>
+                    <div class="layer-range-row">
+                        <div style="font-size:0.75rem;color:#64748b;margin-bottom:6px">
+                            시작 Layer (드론 출발 높이)
+                        </div>
+                        <div class="layer-range-ctrl">
+                            <label class="layer-range-label">시작:</label>
+                            <select id="startLayerSel" onchange="setLayerRange()"
+                                style="background:#0f172a;border:1px solid rgba(255,255,255,0.12);
+                                       color:#e2e8f0;border-radius:6px;padding:4px 8px;font-size:0.8rem">
+                                ${LAYERS.map((l,i)=>`<option value="${i}" ${i===SCAN_CONFIG.startLayer?'selected':''}>
+                                    ${l.id} — ${l.label}</option>`).join('')}
+                            </select>
+                            <label class="layer-range-label">종료:</label>
+                            <select id="endLayerSel" onchange="setLayerRange()"
+                                style="background:#0f172a;border:1px solid rgba(255,255,255,0.12);
+                                       color:#e2e8f0;border-radius:6px;padding:4px 8px;font-size:0.8rem">
+                                ${LAYERS.map((l,i)=>`<option value="${i}" ${i===SCAN_CONFIG.endLayer?'selected':''}>
+                                    ${l.id} — ${l.label}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap">
+                            ${layerLegend}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 미션 요약 -->
+                <div class="config-group config-summary">
+                    <div class="config-label">🎯 미션 요약</div>
+                    <div class="summary-stats">
+                        <div class="ss-row"><span>스캔 Layer</span>
+                            <b id="cfgLayers" style="color:#a5b4fc">${totalLayers}개
+                            (${LAYERS[SCAN_CONFIG.startLayer].id}~${LAYERS[SCAN_CONFIG.endLayer].id})</b>
+                        </div>
+                        <div class="ss-row"><span>스캔 방향</span>
+                            <b id="cfgMode" style="color:#34d399">${getScanModeName()}</b>
+                        </div>
+                        <div class="ss-row"><span>예상 스캔 수</span>
+                            <b id="cfgTotal" style="color:#fbbf24">${targetShelves}개</b>
+                        </div>
+                        <div class="ss-row"><span>정확도 예상</span>
+                            <b id="cfgAccuracy" style="color:${SCAN_CONFIG.scanMode!=='both'?'#34d399':'#fbbf24'}">
+                            ${SCAN_CONFIG.scanMode !== 'both' ? '↑ 단방향 고정밀' : '↔ 양방향 표준'}</b>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── 지도 패널 ── -->
         <div class="map-panel">
             <div class="map-header">
-                <span class="map-title">🗺️ 창고 디지털 트윈 — Drone Patrol View</span>
+                <span class="map-title">🗺️ 창고 디지털 트윈 — 5-Layer Drone Patrol</span>
+                <div style="display:flex;align-items:center;gap:6px;margin-right:8px">
+                    <div class="layer-indicator-chip" id="currentLayerChip">
+                        <span style="font-size:0.65rem;color:#64748b">현재 Layer</span>
+                        <span id="ms-layer" style="font-weight:800;color:${LAYERS[SCAN_CONFIG.startLayer].color}">
+                            ${LAYERS[SCAN_CONFIG.startLayer].id}
+                        </span>
+                    </div>
+                </div>
                 <div class="map-controls">
                     <button class="btn-start reset-btn" onclick="resetPatrol()">↺ 초기화</button>
                     <button class="btn-start go" id="patrolBtn" onclick="togglePatrol()">▶ 순찰 시작</button>
                 </div>
             </div>
-            <svg id="warehouseMap" viewBox="0 0 ${svgW} ${svgH}" xmlns="http://www.w3.org/2000/svg">
-                <!-- 배경 격자 -->
-                <defs>
-                    <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
-                        <path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="0.5"/>
-                    </pattern>
-                    <filter id="glow">
-                        <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
-                        <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
-                    </filter>
-                    <filter id="scanGlow">
-                        <feGaussianBlur stdDeviation="5" result="coloredBlur"/>
-                        <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
-                    </filter>
-                    <radialGradient id="scanBeamGrad" cx="50%" cy="50%" r="50%">
-                        <stop offset="0%" stop-color="#6366f1" stop-opacity="0.35"/>
-                        <stop offset="100%" stop-color="#6366f1" stop-opacity="0"/>
-                    </radialGradient>
-                </defs>
-                <rect width="${svgW}" height="${svgH}" fill="#0d1424"/>
-                <rect width="${svgW}" height="${svgH}" fill="url(#grid)"/>
-                <!-- 창고 외곽 -->
-                <rect x="10" y="10" width="${svgW-20}" height="${svgH-20}"
-                      fill="none" stroke="rgba(99,102,241,0.25)" stroke-width="1.5" rx="4"/>
-                <!-- 도킹 스테이션 -->
-                <rect x="12" y="185" width="30" height="50" rx="4"
-                      fill="rgba(34,211,238,0.08)" stroke="rgba(34,211,238,0.4)" stroke-width="1"/>
-                <text x="27" y="205" fill="#22d3ee" font-size="7" text-anchor="middle" font-family="monospace">DOCK</text>
-                <text x="27" y="215" fill="#22d3ee" font-size="6" text-anchor="middle" font-family="monospace">⚡</text>
-                <!-- SVG 동적 요소들은 JS로 추가 -->
-                <g id="shelvesGroup"></g>
-                <g id="pathGroup"></g>
-                <g id="scanBeamGroup"></g>
-                <g id="droneGroup"></g>
-                <g id="labelsGroup"></g>
-            </svg>
+
+            <!-- Layer 스트립 (좌측) -->
+            <div style="display:flex">
+                <div class="layer-strip-panel">
+                    ${LAYERS.map((l,i) => `
+                    <div class="layer-strip ${i>=SCAN_CONFIG.startLayer&&i<=SCAN_CONFIG.endLayer?'in-range':''}"
+                         id="lstrip-${l.id}" style="border-left:3px solid ${l.color}">
+                        <span class="ls-id" style="color:${l.color}">${l.id}</span>
+                        <span class="ls-h">${l.height_m}m</span>
+                    </div>`).join('')}
+                </div>
+
+                <svg id="warehouseMap" viewBox="0 0 ${svgW} ${svgH}" xmlns="http://www.w3.org/2000/svg"
+                     style="flex:1">
+                    <defs>
+                        <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+                            <path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="0.5"/>
+                        </pattern>
+                        <filter id="glow">
+                            <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                            <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                        </filter>
+                        <filter id="scanGlow">
+                            <feGaussianBlur stdDeviation="5" result="coloredBlur"/>
+                            <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                        </filter>
+                        <radialGradient id="scanBeamGrad" cx="50%" cy="50%" r="50%">
+                            <stop offset="0%" stop-color="#6366f1" stop-opacity="0.35"/>
+                            <stop offset="100%" stop-color="#6366f1" stop-opacity="0"/>
+                        </radialGradient>
+                    </defs>
+                    <rect width="${svgW}" height="${svgH}" fill="#0d1424"/>
+                    <rect width="${svgW}" height="${svgH}" fill="url(#grid)"/>
+                    <rect x="10" y="10" width="${svgW-20}" height="${svgH-20}"
+                          fill="none" stroke="rgba(99,102,241,0.25)" stroke-width="1.5" rx="4"/>
+                    <!-- 도킹 스테이션 -->
+                    <rect x="12" y="215" width="32" height="55" rx="4"
+                          fill="rgba(34,211,238,0.08)" stroke="rgba(34,211,238,0.4)" stroke-width="1"/>
+                    <text x="28" y="236" fill="#22d3ee" font-size="7" text-anchor="middle" font-family="monospace">DOCK</text>
+                    <text x="28" y="248" fill="#22d3ee" font-size="6" text-anchor="middle" font-family="monospace">⚡</text>
+                    <text x="28" y="260" fill="#22d3ee" font-size="5.5" text-anchor="middle" font-family="monospace">5-Layer</text>
+                    <g id="shelvesGroup"></g>
+                    <g id="pathGroup"></g>
+                    <g id="scanBeamGroup"></g>
+                    <g id="droneGroup"></g>
+                    <g id="labelsGroup"></g>
+                </svg>
+            </div>
         </div>
 
         <div class="right-panel">
@@ -267,14 +433,14 @@ function renderPatrolView(content) {
                 <div class="progress-bar-wrap">
                     <div class="progress-bar-fill" id="missionProgress" style="width:0%"></div>
                 </div>
-                <div class="mission-stats-grid">
+                <div class="mission-stats-grid" style="grid-template-columns:1fr 1fr 1fr;">
                     <div class="ms-item">
                         <div class="ms-val" id="ms-scanned">0</div>
                         <div class="ms-label">스캔 완료</div>
                     </div>
                     <div class="ms-item">
-                        <div class="ms-val" id="ms-total">${WAREHOUSE.shelves.length}</div>
-                        <div class="ms-label">전체 선반</div>
+                        <div class="ms-val" id="ms-total">${targetShelves}</div>
+                        <div class="ms-label">목표 선반</div>
                     </div>
                     <div class="ms-item">
                         <div class="ms-val" id="ms-battery">100%</div>
@@ -283,6 +449,39 @@ function renderPatrolView(content) {
                     <div class="ms-item">
                         <div class="ms-val" id="ms-aisle">—</div>
                         <div class="ms-label">현재 통로</div>
+                    </div>
+                    <div class="ms-item">
+                        <div class="ms-val" id="ms-layer" style="color:${LAYERS[SCAN_CONFIG.startLayer].color}">
+                            ${LAYERS[SCAN_CONFIG.startLayer].id}
+                        </div>
+                        <div class="ms-label">현재 Layer</div>
+                    </div>
+                    <div class="ms-item">
+                        <div class="ms-val" id="ms-layerpct">0%</div>
+                        <div class="ms-label">Layer 진행</div>
+                    </div>
+                </div>
+
+                <!-- Layer 진행 바 -->
+                <div style="margin-top:10px">
+                    <div style="font-size:0.7rem;color:#475569;margin-bottom:5px;font-weight:700;letter-spacing:0.05em">
+                        LAYER PROGRESS
+                    </div>
+                    <div style="display:flex;gap:3px">
+                        ${LAYERS.map((l,i) => `
+                        <div class="layer-prog-bar" id="lpb-${l.id}"
+                            title="${l.label}"
+                            style="flex:1;height:8px;border-radius:3px;
+                                   background:${i>=SCAN_CONFIG.startLayer&&i<=SCAN_CONFIG.endLayer
+                                       ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.02)'};
+                                   border:1px solid ${i>=SCAN_CONFIG.startLayer&&i<=SCAN_CONFIG.endLayer
+                                       ? l.color+'44' : 'transparent'}">
+                            <div id="lpbfill-${l.id}" style="width:0%;height:100%;border-radius:2px;
+                                 background:${l.color};transition:width 0.3s"></div>
+                        </div>`).join('')}
+                    </div>
+                    <div style="display:flex;justify-content:space-between;margin-top:3px">
+                        ${LAYERS.map(l=>`<span style="font-size:0.6rem;color:#475569">${l.id}</span>`).join('')}
                     </div>
                 </div>
             </div>
@@ -311,6 +510,49 @@ function renderPatrolView(content) {
     }
 }
 
+// ── 스캔 모드 헬퍼 ────────────────────────────────────────────
+function getScanModeName() {
+    const m = { both: '양방향 (Both)', left: '좌측만 (Left)', right: '우측만 (Right)' };
+    return m[SCAN_CONFIG.scanMode] || '양방향';
+}
+function getScanModeHint() {
+    const hints = {
+        both:  '⚡ 양방향: 통로 이동 1회로 좌우 동시 스캔 — 속도 우선. 일부 angle 오차 가능.',
+        left:  '🎯 좌측 단방향: 드론이 좌측 선반에 집중 — <b style="color:#34d399">더 높은 정확도</b>. 좌측 선반 전용.',
+        right: '🎯 우측 단방향: 드론이 우측 선반에 집중 — <b style="color:#34d399">더 높은 정확도</b>. 우측 선반 전용.',
+    };
+    return hints[SCAN_CONFIG.scanMode] || '';
+}
+
+function setScanMode(mode) {
+    if (state.patrolActive) {
+        addFeed('⚠️ 순찰 중에는 스캔 방향을 변경할 수 없습니다.', 'alert-item');
+        return;
+    }
+    SCAN_CONFIG.scanMode = mode;
+    // 단방향이면 confidence 부스트 효과 안내
+    renderPatrolView(document.getElementById('dashboardContent'));
+}
+
+function setLayerRange() {
+    if (state.patrolActive) {
+        addFeed('⚠️ 순찰 중에는 Layer 범위를 변경할 수 없습니다.', 'alert-item');
+        return;
+    }
+    const s = parseInt(document.getElementById('startLayerSel').value);
+    const e = parseInt(document.getElementById('endLayerSel').value);
+    if (s > e) {
+        addFeed('⚠️ 시작 Layer가 종료 Layer보다 클 수 없습니다.', 'alert-item');
+        document.getElementById('startLayerSel').value = SCAN_CONFIG.startLayer;
+        document.getElementById('endLayerSel').value   = SCAN_CONFIG.endLayer;
+        return;
+    }
+    SCAN_CONFIG.startLayer = s;
+    SCAN_CONFIG.endLayer   = e;
+    SCAN_CONFIG.activeLayerIdx = s;
+    renderPatrolView(document.getElementById('dashboardContent'));
+}
+
 function renderWarehouseElements() {
     const shelvesG = document.getElementById('shelvesGroup');
     const labelsG  = document.getElementById('labelsGroup');
@@ -318,91 +560,112 @@ function renderWarehouseElements() {
 
     // 통로 배경 + 레이블
     WAREHOUSE.aisles.forEach(aisle => {
-        // 통로 바닥
         const rect = createSVG('rect', {
             x: aisle.x, y: aisle.y, width: aisle.w, height: aisle.h,
             fill: 'rgba(99,102,241,0.04)',
             stroke: 'rgba(99,102,241,0.15)', 'stroke-width': '1', rx: '3'
         });
         shelvesG.appendChild(rect);
-        // 레이블
         const lbl = createSVG('text', {
             x: aisle.x + aisle.w / 2,
             y: aisle.y + aisle.h + 18,
-            fill: '#4b5563',
-            'font-size': '10',
-            'text-anchor': 'middle',
-            'font-family': 'monospace'
+            fill: '#4b5563', 'font-size': '10',
+            'text-anchor': 'middle', 'font-family': 'monospace'
         });
         lbl.textContent = aisle.label;
         labelsG.appendChild(lbl);
     });
 
-    // 선반 렌더링
+    // 선반 렌더링 — 현재 activeLayer(startLayer)만 기본 표시
+    // 스캔 범위 내 Layer: Layer 색상으로, 범위 밖: 어둡게
+    const inv = getCurrentInventory();
+    const startL = SCAN_CONFIG.startLayer;
+    const endL   = SCAN_CONFIG.endLayer;
+
     WAREHOUSE.shelves.forEach(shelf => {
-        const inv = getCurrentInventory();
         const item = inv[shelf.id];
         const hasItem = item && item.qty > 0;
+        const inRange = (shelf.layerIdx >= startL && shelf.layerIdx <= endL);
+        const layerColor = LAYERS[shelf.layerIdx].color;
+        const layerAlpha = LAYERS[shelf.layerIdx].colorAlpha;
+
+        // 스캔 모드에 따라 표시 여부 결정
+        const mode = SCAN_CONFIG.scanMode;
+        const sideVisible = (mode === 'both') ||
+                            (mode === 'left'  && shelf.side === 'L') ||
+                            (mode === 'right' && shelf.side === 'R');
+
+        let fillColor, strokeColor, opacity;
+        if (!inRange || !sideVisible) {
+            fillColor   = 'rgba(255,255,255,0.02)';
+            strokeColor = 'rgba(255,255,255,0.05)';
+            opacity     = '0.4';
+        } else if (hasItem) {
+            fillColor   = layerAlpha;
+            strokeColor = layerColor + '88';
+            opacity     = '1';
+        } else {
+            fillColor   = 'rgba(255,255,255,0.03)';
+            strokeColor = layerColor + '33';
+            opacity     = '1';
+        }
 
         const rect = createSVG('rect', {
             id: `shelf-${shelf.id}`,
             x: shelf.x, y: shelf.y,
             width: shelf.w, height: shelf.h,
-            fill: hasItem ? 'rgba(99,102,241,0.18)' : 'rgba(255,255,255,0.03)',
-            stroke: hasItem ? 'rgba(99,102,241,0.5)' : 'rgba(255,255,255,0.08)',
-            'stroke-width': '1', rx: '2'
+            fill: fillColor, stroke: strokeColor,
+            'stroke-width': '1', rx: '2', opacity
         });
         shelvesG.appendChild(rect);
+
+        // Layer ID 미니 라벨 (첫 row만)
+        if (shelf.row === 1 && sideVisible && inRange) {
+            const ltxt = createSVG('text', {
+                x: shelf.x + shelf.w / 2,
+                y: shelf.y + shelf.h - 3,
+                fill: layerColor,
+                'font-size': '4.5',
+                'text-anchor': 'middle',
+                'font-family': 'monospace',
+                opacity: '0.7'
+            });
+            ltxt.textContent = shelf.layer;
+            shelvesG.appendChild(ltxt);
+        }
     });
 
     // 드론 엘리먼트 생성
     const droneG = document.getElementById('droneGroup');
     droneG.innerHTML = '';
 
-    // 스캔 빔
     const scanBeam = createSVG('circle', {
         id: 'scanBeam',
         cx: state.drone.x, cy: state.drone.y,
         r: DRONE.scanRadius,
-        fill: 'url(#scanBeamGrad)',
-        opacity: '0'
+        fill: 'url(#scanBeamGrad)', opacity: '0'
     });
     droneG.appendChild(scanBeam);
     state.scanBeamEl = scanBeam;
 
-    // 드론 본체
     const droneBody = createSVG('g', { id: 'droneBody' });
-
-    // 프로펠러 4개
     [[-8,-8],[8,-8],[-8,8],[8,8]].forEach(([dx,dy]) => {
         const prop = createSVG('ellipse', {
-            cx: state.drone.x + dx,
-            cy: state.drone.y + dy,
+            cx: state.drone.x + dx, cy: state.drone.y + dy,
             rx: '5', ry: '2',
-            fill: 'rgba(34,211,238,0.4)',
-            stroke: '#22d3ee', 'stroke-width': '0.5'
+            fill: 'rgba(34,211,238,0.4)', stroke: '#22d3ee', 'stroke-width': '0.5'
         });
         droneBody.appendChild(prop);
     });
-
-    // 드론 중심
     const center = createSVG('circle', {
-        cx: state.drone.x, cy: state.drone.y,
-        r: '6',
-        fill: '#1e3a5f',
-        stroke: '#6366f1', 'stroke-width': '2',
-        filter: 'url(#glow)'
+        cx: state.drone.x, cy: state.drone.y, r: '6',
+        fill: '#1e3a5f', stroke: '#6366f1', 'stroke-width': '2', filter: 'url(#glow)'
     });
     droneBody.appendChild(center);
-
-    // 드론 LED
     const led = createSVG('circle', {
-        cx: state.drone.x, cy: state.drone.y,
-        r: '2.5',
-        fill: '#22d3ee'
+        cx: state.drone.x, cy: state.drone.y, r: '2.5', fill: '#22d3ee'
     });
     droneBody.appendChild(led);
-
     droneG.appendChild(droneBody);
     state.droneEl = droneBody;
 }
@@ -418,45 +681,74 @@ function createSVG(tag, attrs) {
 }
 
 // ── Patrol Control ─────────────────────────────────────────────
+// Layer-by-Layer 순찰:
+//   시작 Layer부터 끝 Layer까지 각 Layer를 순서대로 완주
+//   각 Layer 내에서 모든 Aisle을 지그재그로 순찰
 function buildPatrolPath() {
     const path = [];
-    // 각 통로를 순서대로 순찰 (지그재그)
-    WAREHOUSE.aisles.forEach((aisle, ai) => {
-        const aisleShelvesL = WAREHOUSE.shelves
-            .filter(s => s.aisle === aisle.id && s.side === 'L')
-            .sort((a,b) => (ai % 2 === 0 ? a.y - b.y : b.y - a.y));
-        const aisleShelvesR = WAREHOUSE.shelves
-            .filter(s => s.aisle === aisle.id && s.side === 'R')
-            .sort((a,b) => (ai % 2 === 0 ? a.y - b.y : b.y - a.y));
+    const startL = SCAN_CONFIG.startLayer;
+    const endL   = SCAN_CONFIG.endLayer;
+    const mode   = SCAN_CONFIG.scanMode; // 'both' | 'left' | 'right'
 
-        // 통로 진입점
-        path.push({
-            type: 'move',
-            x: aisle.x + aisle.w / 2,
-            y: ai % 2 === 0 ? aisle.y + 10 : aisle.y + aisle.h - 10,
-            aisle: aisle.id
-        });
+    for (let li = startL; li <= endL; li++) {
+        const layer = LAYERS[li];
 
-        // 선반 순서대로 스캔 포인트
-        const count = Math.max(aisleShelvesL.length, aisleShelvesR.length);
-        for (let i = 0; i < count; i++) {
-            const shelfY = ai % 2 === 0
-                ? aisleShelvesL[i]?.y ?? aisleShelvesR[i]?.y
-                : aisleShelvesL[count-1-i]?.y ?? aisleShelvesR[count-1-i]?.y;
-
+        // Layer 전환 알림 포인트 (도킹 스테이션 경유)
+        if (li > startL) {
             path.push({
-                type: 'scan',
-                x: aisle.x + aisle.w / 2,
-                y: (shelfY ?? 0) + 15,
-                aisle: aisle.id,
-                shelfL: aisleShelvesL[ai%2===0 ? i : count-1-i],
-                shelfR: aisleShelvesR[ai%2===0 ? i : count-1-i],
+                type: 'layer_change',
+                x: 27, y: 240,
+                layerIdx: li,
+                layerId: layer.id,
+                label: layer.label,
+                aisle: null
             });
         }
-    });
+
+        WAREHOUSE.aisles.forEach((aisle, ai) => {
+            // 해당 aisle + 해당 layer의 선반만 필터
+            const shelvesL = WAREHOUSE.shelves
+                .filter(s => s.aisle === aisle.id && s.side === 'L' && s.layerIdx === li)
+                .sort((a,b) => ai % 2 === 0 ? a.y - b.y : b.y - a.y);
+            const shelvesR = WAREHOUSE.shelves
+                .filter(s => s.aisle === aisle.id && s.side === 'R' && s.layerIdx === li)
+                .sort((a,b) => ai % 2 === 0 ? a.y - b.y : b.y - a.y);
+
+            // 통로 진입
+            path.push({
+                type: 'move',
+                x: aisle.x + aisle.w / 2,
+                y: ai % 2 === 0 ? aisle.y + 10 : aisle.y + aisle.h - 10,
+                aisle: aisle.id,
+                layerIdx: li,
+                layerId: layer.id
+            });
+
+            const count = Math.max(shelvesL.length, shelvesR.length);
+            for (let i = 0; i < count; i++) {
+                const ri = ai % 2 === 0 ? i : count - 1 - i;
+                const sl = shelvesL[ri];
+                const sr = shelvesR[ri];
+                const refShelf = sl || sr;
+                if (!refShelf) continue;
+
+                path.push({
+                    type: 'scan',
+                    x: aisle.x + aisle.w / 2,
+                    y: refShelf.y + 14,
+                    aisle: aisle.id,
+                    layerIdx: li,
+                    layerId: layer.id,
+                    // scanMode에 따라 어느 선반을 스캔할지 결정
+                    shelfL: (mode === 'right') ? null : sl,
+                    shelfR: (mode === 'left')  ? null : sr,
+                });
+            }
+        });
+    }
 
     // 도킹 귀환
-    path.push({ type: 'dock', x: 27, y: 210, aisle: null });
+    path.push({ type: 'dock', x: 27, y: 240, aisle: null });
     return path;
 }
 
@@ -480,12 +772,26 @@ function startPatrol() {
     state.pathIndex    = 0;
     state.scannedShelves = new Set();
     state.scanCooldown = 0;
+    SCAN_CONFIG.activeLayerIdx = SCAN_CONFIG.startLayer;
 
     const btn = document.getElementById('patrolBtn');
     if (btn) { btn.textContent = '⏸ 순찰 중지'; btn.className = 'btn-start stop'; }
 
     updateSidebarDroneState('비행 중', 'status-flying');
-    addFeed(`🚁 DRONE-01 순찰 시작 — Day ${state.currentDay} (${DAY_DATES[state.currentDay]})`, 'agent-action');
+    updateLayerIndicator(SCAN_CONFIG.startLayer);
+
+    const startLyr = LAYERS[SCAN_CONFIG.startLayer];
+    const endLyr   = LAYERS[SCAN_CONFIG.endLayer];
+    const totalLayers = SCAN_CONFIG.endLayer - SCAN_CONFIG.startLayer + 1;
+    const modeStr  = getScanModeName();
+    addFeed(
+        `🚁 DRONE-01 순찰 시작 — Day ${state.currentDay} (${DAY_DATES[state.currentDay]})<br>` +
+        `<span style="font-size:0.75rem;color:#94a3b8">` +
+        `Layer: <b style="color:${startLyr.color}">${startLyr.id}</b> ~ ` +
+        `<b style="color:${endLyr.color}">${endLyr.id}</b> (${totalLayers}개 Layer) · ` +
+        `방향: <b style="color:#34d399">${modeStr}</b></span>`,
+        'agent-action'
+    );
 
     state.animFrame = requestAnimationFrame(droneLoop);
 }
@@ -502,7 +808,7 @@ function stopPatrol() {
 
 function resetPatrol() {
     stopPatrol();
-    state.drone = { x: 27, y: 210, angle: 0, battery: 100 };
+    state.drone = { x: 27, y: 240, angle: 0, battery: 100 };
     state.pathIndex = 0;
     state.scannedShelves = new Set();
     state.scanEvents = [];
@@ -512,8 +818,10 @@ function resetPatrol() {
     state.agentActionCount = 0;
     state.patrolDone = false;
     state.day2PatrolDone = false;
+    state.reportGenerated = false;
     inventoryDay1 = buildInventoryDay(1);
     inventoryDay2 = buildDay2(inventoryDay1);
+    SCAN_CONFIG.activeLayerIdx = SCAN_CONFIG.startLayer;
 
     updateBadges(0, 0, 0);
     document.getElementById('totalScanned').textContent = '0';
@@ -545,6 +853,14 @@ function droneLoop() {
         // 목표 도달
         if (target.type === 'scan') {
             processScanPoint(target);
+        } else if (target.type === 'layer_change') {
+            // Layer 전환: 드론이 도킹 스테이션으로 돌아와 높이 재조정 후 재출발
+            SCAN_CONFIG.activeLayerIdx = target.layerIdx;
+            updateLayerIndicator(target.layerIdx);
+            addFeed(
+                `🔼 <b>Layer 전환</b>: ${LAYERS[target.layerIdx - 1]?.id || ''} → <span style="color:${LAYERS[target.layerIdx].color}">${target.layerId}</span> (${target.label})`,
+                'agent-action'
+            );
         } else if (target.type === 'dock') {
             updateSidebarDroneState('충전 중', 'status-charging');
         }
@@ -552,6 +868,12 @@ function droneLoop() {
         if (target.aisle) {
             updateSidebarAisle(target.aisle);
             document.getElementById('ms-aisle').textContent = `Aisle-${target.aisle}`;
+        }
+        if (target.layerId) {
+            const li = target.layerIdx;
+            const lyr = LAYERS[li];
+            const layerEl = document.getElementById('ms-layer');
+            if (layerEl) layerEl.textContent = `${lyr.id}`;
         }
     } else {
         // 이동
@@ -597,11 +919,26 @@ function processScanPoint(target) {
     const scanTime = new Date().toLocaleTimeString('ko-KR');
     const scanned = [];
 
+    // 단방향 스캔 시 confidence 부스트
+    const singleSide = SCAN_CONFIG.scanMode !== 'both';
+    const confidenceBoost = singleSide ? 0.04 : 0;
+
+    // 현재 Layer 활성화 색상
+    const layerIdx  = target.layerIdx ?? SCAN_CONFIG.startLayer;
+    const layerInfo = LAYERS[layerIdx];
+
+    // Layer 인디케이터 업데이트
+    SCAN_CONFIG.activeLayerIdx = layerIdx;
+    updateLayerIndicator(layerIdx);
+
     [target.shelfL, target.shelfR].forEach(shelf => {
         if (!shelf || state.scannedShelves.has(shelf.id)) return;
         state.scannedShelves.add(shelf.id);
 
         const item = inv[shelf.id];
+        const rawConf = item?.confidence || 0;
+        const finalConf = Math.min(1.0, rawConf + confidenceBoost);
+
         const event = {
             id: `SE-${Date.now()}-${shelf.id}`,
             timestamp: scanTime,
@@ -609,10 +946,13 @@ function processScanPoint(target) {
             shelfId: shelf.id,
             aisle: shelf.aisle,
             side: shelf.side,
+            layer: shelf.layer,
+            layerIdx: shelf.layerIdx,
+            height_m: shelf.height_m,
             sku: item?.sku || null,
             qty: item?.qty || 0,
-            confidence: item?.confidence || 0,
-            location: `Aisle-${shelf.aisle} / Row-${shelf.row} / ${shelf.side === 'L' ? '좌측' : '우측'}`
+            confidence: finalConf,
+            location: `Aisle-${shelf.aisle} / Row-${shelf.row} / ${shelf.side === 'L' ? '좌측' : '우측'} / ${shelf.layer} (${shelf.height_m}m)`
         };
 
         if (state.currentDay === 1) {
@@ -622,32 +962,70 @@ function processScanPoint(target) {
         }
         scanned.push(event);
 
-        // 선반 색상 업데이트
+        // 선반 색상 업데이트 (스캔 완료 → 녹색/적색)
         const shelfEl = document.getElementById(`shelf-${shelf.id}`);
         if (shelfEl) {
             shelfEl.setAttribute('fill', event.sku
-                ? 'rgba(52,211,153,0.2)' : 'rgba(248,113,113,0.1)');
+                ? 'rgba(52,211,153,0.25)' : 'rgba(248,113,113,0.12)');
             shelfEl.setAttribute('stroke', event.sku
-                ? 'rgba(52,211,153,0.6)' : 'rgba(248,113,113,0.4)');
+                ? 'rgba(52,211,153,0.7)' : 'rgba(248,113,113,0.5)');
+            shelfEl.setAttribute('opacity', '1');
         }
 
-        // 피드 업데이트
+        // 피드 업데이트 — Layer 정보 포함
         const skuText = event.sku ? `${event.sku} × ${event.qty}` : '빈 선반';
         const dirClass = shelf.side === 'L' ? 'left-scan' : 'right-scan';
         const dirBadge = shelf.side === 'L'
             ? '<span class="scan-dir dir-L">◄ 좌</span>'
             : '<span class="scan-dir dir-R">우 ►</span>';
+        const layerBadge = `<span class="layer-badge" style="background:${layerInfo.colorAlpha};
+            color:${layerInfo.color};border:1px solid ${layerInfo.color}44;
+            font-size:0.62rem;padding:1px 5px;border-radius:3px;font-weight:700;margin-left:3px">
+            ${shelf.layer} ${shelf.height_m}m</span>`;
+        const confBoostMark = singleSide ? ' <span style="color:#34d399;font-size:0.68rem">↑정밀</span>' : '';
 
-        addFeed(`${dirBadge}<span class="scan-barcode">${shelf.id}</span>
-            <br><span class="scan-meta">${skuText} · 신뢰도 ${((event.confidence||0)*100).toFixed(1)}%</span>`,
+        addFeed(`${dirBadge}${layerBadge}<span class="scan-barcode" style="margin-left:5px">${shelf.id}</span>
+            <br><span class="scan-meta">${skuText} · 신뢰도 ${(finalConf*100).toFixed(1)}%${confBoostMark}</span>`,
             dirClass, scanTime);
     });
 
-    // 스캔 빔 효과
+    // 스캔 빔 색상을 현재 Layer 색상으로
+    if (state.scanBeamEl) {
+        state.scanBeamEl.setAttribute('fill', `url(#scanBeamGrad)`);
+    }
+
+    // Layer 진행 바 업데이트
+    updateLayerProgressBar(layerIdx);
+
     if (scanned.length > 0) {
         flashScanBeam();
         updateTotalScanned();
     }
+}
+
+function updateLayerProgressBar(currentLayerIdx) {
+    const startL = SCAN_CONFIG.startLayer;
+    const endL   = SCAN_CONFIG.endLayer;
+    const mode   = SCAN_CONFIG.scanMode;
+    const sidesCount = mode === 'both' ? 2 : 1;
+
+    for (let li = startL; li <= endL; li++) {
+        const layer = LAYERS[li];
+        const shelvesInLayer = WAREHOUSE.shelves.filter(s =>
+            s.layerIdx === li &&
+            (mode === 'both' || (mode === 'left' && s.side === 'L') || (mode === 'right' && s.side === 'R'))
+        );
+        const scannedInLayer = shelvesInLayer.filter(s => state.scannedShelves.has(s.id)).length;
+        const pct = shelvesInLayer.length > 0 ? (scannedInLayer / shelvesInLayer.length) * 100 : 0;
+        const fillEl = document.getElementById(`lpbfill-${layer.id}`);
+        if (fillEl) fillEl.style.width = pct + '%';
+    }
+
+    // ms-layerpct 업데이트
+    const totalTarget = calcTargetShelves();
+    const totalScanned = state.scannedShelves.size;
+    const lpctEl = document.getElementById('ms-layerpct');
+    if (lpctEl) lpctEl.textContent = Math.round(totalScanned / Math.max(1, totalTarget) * 100) + '%';
 }
 
 function flashScanBeam() {
@@ -661,20 +1039,26 @@ function flashScanBeam() {
 function updateTotalScanned() {
     const total = state.currentDay === 1
         ? state.scanEvents.length : state.scanEventsDay2.length;
-    document.getElementById('totalScanned').textContent = total;
-    document.getElementById('ms-scanned').textContent = state.scannedShelves.size;
-    document.getElementById('scanBadge').textContent = total;
+    const totalEl = document.getElementById('totalScanned');
+    if (totalEl) totalEl.textContent = total;
+    const msScanned = document.getElementById('ms-scanned');
+    if (msScanned) msScanned.textContent = state.scannedShelves.size;
+    const scanBadge = document.getElementById('scanBadge');
+    if (scanBadge) scanBadge.textContent = total;
 }
 
 function updateMissionStats() {
-    const pct = Math.min(100, Math.round(state.scannedShelves.size / WAREHOUSE.shelves.length * 100));
+    const targetShelves = calcTargetShelves();
+    const pct = Math.min(100, Math.round(state.scannedShelves.size / Math.max(1, targetShelves) * 100));
     const pb = document.getElementById('missionProgress');
     if (pb) pb.style.width = pct + '%';
 
     const bat = document.getElementById('ms-battery');
     if (bat) bat.textContent = state.drone.battery.toFixed(0) + '%';
-    document.getElementById('sb-battery').textContent = state.drone.battery.toFixed(0) + '%';
-    document.getElementById('sb-scanCount').textContent = state.scannedShelves.size;
+    const sbBat = document.getElementById('sb-battery');
+    if (sbBat) sbBat.textContent = state.drone.battery.toFixed(0) + '%';
+    const sbScan = document.getElementById('sb-scanCount');
+    if (sbScan) sbScan.textContent = state.scannedShelves.size;
 }
 
 function updateSidebarDroneState(text, cls) {
@@ -717,10 +1101,25 @@ function finishPatrol() {
     else state.day2PatrolDone = true;
 
     updateSidebarDroneState('귀환 완료', 'status-standby');
-    addFeed(`✅ DRONE-01 순찰 완료 — ${state.scannedShelves.size}개 선반 스캔 완료`, 'agent-action');
+
+    const totalLayers = SCAN_CONFIG.endLayer - SCAN_CONFIG.startLayer + 1;
+    const modeStr     = getScanModeName();
+    addFeed(
+        `✅ DRONE-01 순찰 완료 — ${state.scannedShelves.size}개 선반 스캔<br>` +
+        `<span style="font-size:0.75rem;color:#64748b">${totalLayers}개 Layer · ${modeStr}</span>`,
+        'agent-action'
+    );
 
     const btn = document.getElementById('patrolBtn');
     if (btn) { btn.textContent = '✅ 순찰 완료'; btn.className = 'btn-start reset-btn'; }
+
+    // 모든 Layer 진행바를 100%로
+    LAYERS.forEach((l, li) => {
+        if (li >= SCAN_CONFIG.startLayer && li <= SCAN_CONFIG.endLayer) {
+            const fillEl = document.getElementById(`lpbfill-${l.id}`);
+            if (fillEl) fillEl.style.width = '100%';
+        }
+    });
 
     // Day2 완료 시 자동 비교 + Agentic AI 실행
     if (!isDay1) {
@@ -740,15 +1139,24 @@ function finishPatrol() {
 function renderScanlogView(content) {
     const events = state.currentDay === 1 ? state.scanEvents : state.scanEventsDay2;
 
+    const layerCounts = {};
+    LAYERS.forEach(l => { layerCounts[l.id] = events.filter(e => e.layer === l.id).length; });
+
     content.innerHTML = `
     <div class="scanlog-view">
         <div class="log-filter-bar">
             <span style="font-size:0.82rem;color:#64748b;margin-right:4px;">필터:</span>
             <div class="filter-chip active" onclick="filterScanlog(this,'all')">전체 (${events.length})</div>
-            <div class="filter-chip" onclick="filterScanlog(this,'L')">◄ 좌측 선반</div>
-            <div class="filter-chip" onclick="filterScanlog(this,'R')">우측 선반 ►</div>
-            <div class="filter-chip" onclick="filterScanlog(this,'item')">아이템 있음</div>
+            <div class="filter-chip" onclick="filterScanlog(this,'L')">◄ 좌측</div>
+            <div class="filter-chip" onclick="filterScanlog(this,'R')">우측 ►</div>
+            <div class="filter-chip" onclick="filterScanlog(this,'item')">재고 있음</div>
             <div class="filter-chip" onclick="filterScanlog(this,'empty')">빈 선반</div>
+            <span style="width:1px;background:rgba(255,255,255,0.08);height:18px;display:inline-block;margin:0 4px"></span>
+            ${LAYERS.map(l => `
+            <div class="filter-chip layer-filter-chip" onclick="filterScanlog(this,'layer-${l.id}')"
+                 style="border-color:${l.color}55;color:${layerCounts[l.id]>0?l.color:'#374151'}">
+                ${l.id} <span style="opacity:0.6">(${layerCounts[l.id]})</span>
+            </div>`).join('')}
         </div>
         <div class="events-table-wrap">
             <table class="events-table" id="scanlogTable">
@@ -757,7 +1165,7 @@ function renderScanlogView(content) {
                         <th>이벤트 ID</th>
                         <th>시간</th>
                         <th>위치</th>
-                        <th>방향</th>
+                        <th>방향 / Layer</th>
                         <th>SKU</th>
                         <th>수량</th>
                         <th>신뢰도</th>
@@ -776,13 +1184,21 @@ function renderScanlogView(content) {
 }
 
 function renderScanlogRows(events) {
-    return events.map(ev => `
-        <tr data-side="${ev.side}" data-has="${ev.sku ? 'item' : 'empty'}">
+    return events.map(ev => {
+        const li = ev.layerIdx ?? 0;
+        const lyr = LAYERS[li] || LAYERS[0];
+        return `
+        <tr data-side="${ev.side}" data-has="${ev.sku ? 'item' : 'empty'}" data-layer="${ev.layer||''}">
             <td><span class="badge-scan">${ev.id.substring(0,14)}…</span></td>
             <td style="font-family:monospace;font-size:0.78rem;color:#64748b">${ev.timestamp}</td>
-            <td>${ev.location}</td>
-            <td><span class="badge-scan ${ev.side === 'L' ? 'badge-left' : 'badge-right'}">
-                ${ev.side === 'L' ? '◄ 좌측' : '우측 ►'}</span></td>
+            <td style="font-size:0.78rem">${ev.location}</td>
+            <td>
+                <span class="badge-scan ${ev.side === 'L' ? 'badge-left' : 'badge-right'}">
+                    ${ev.side === 'L' ? '◄ 좌' : '우 ►'}</span>
+                <span style="margin-left:4px;background:${lyr.colorAlpha};color:${lyr.color};
+                    border:1px solid ${lyr.color}44;border-radius:3px;font-size:0.68rem;
+                    padding:1px 5px;font-weight:700">${ev.layer||'—'} ${ev.height_m!=null?ev.height_m+'m':''}</span>
+            </td>
             <td style="font-family:monospace;font-weight:700">${ev.sku || '<span style="color:#374151">—</span>'}</td>
             <td style="font-weight:700;color:${ev.qty > 0 ? '#a5b4fc' : '#374151'}">${ev.qty}</td>
             <td>
@@ -793,7 +1209,8 @@ function renderScanlogRows(events) {
                     <span style="font-size:0.72rem;color:#64748b">${(ev.confidence*100).toFixed(1)}%</span>
                 </div>
             </td>
-        </tr>`).join('');
+        </tr>`;
+    }).join('');
 }
 
 function filterScanlog(el, filter) {
@@ -802,10 +1219,14 @@ function filterScanlog(el, filter) {
 
     const events = state.currentDay === 1 ? state.scanEvents : state.scanEventsDay2;
     let filtered = events;
-    if (filter === 'L')     filtered = events.filter(e => e.side === 'L');
-    if (filter === 'R')     filtered = events.filter(e => e.side === 'R');
-    if (filter === 'item')  filtered = events.filter(e => e.sku);
-    if (filter === 'empty') filtered = events.filter(e => !e.sku);
+    if (filter === 'L')         filtered = events.filter(e => e.side === 'L');
+    if (filter === 'R')         filtered = events.filter(e => e.side === 'R');
+    if (filter === 'item')      filtered = events.filter(e => e.sku);
+    if (filter === 'empty')     filtered = events.filter(e => !e.sku);
+    if (filter.startsWith('layer-')) {
+        const lid = filter.replace('layer-', '');
+        filtered = events.filter(e => e.layer === lid);
+    }
 
     const tbody = document.getElementById('scanlogBody');
     if (tbody) tbody.innerHTML = renderScanlogRows(filtered);
@@ -1192,9 +1613,11 @@ function renderOntologyView(content) {
   │
   ├─ <span class="class">StorageUnit</span>
   │    └─ <span class="class">ShelfLocation</span>
-  │         ├─ <span class="prop">hasAisle</span>    : <span class="val">xsd:string</span>
-  │         ├─ <span class="prop">hasRow</span>     : <span class="val">xsd:int</span>
-  │         └─ <span class="prop">hasSide</span>    : <span class="val">{LEFT, RIGHT}</span>
+  │         ├─ <span class="prop">hasAisle</span>    : <span class="val">xsd:string</span>  <span class="comment">// A, B, C, D</span>
+  │         ├─ <span class="prop">hasRow</span>     : <span class="val">xsd:int</span>     <span class="comment">// 1–6 (통로 방향)</span>
+  │         ├─ <span class="prop">hasSide</span>    : <span class="val">{LEFT, RIGHT}</span>
+  │         ├─ <span class="prop">hasLayer</span>   : <span class="val">{L1, L2, L3, L4, L5}</span>  <span class="comment">// 높이 Layer</span>
+  │         └─ <span class="prop">hasHeight</span>  : <span class="val">xsd:float</span>   <span class="comment">// 0.5m, 1.5m … 4.5m</span>
   │
   ├─ <span class="class">InventoryItem</span>
   │    ├─ <span class="prop">hasSKU</span>      : <span class="val">xsd:string</span>
@@ -1356,10 +1779,10 @@ function launchRescan(shelfIds) {
                 shelf: shelf
             });
         });
-        path.push({ type: 'rescan_dock', x: 27, y: 210 });
+        path.push({ type: 'rescan_dock', x: 27, y: 240 });
 
         state.drone.x = 27;
-        state.drone.y = 210;
+        state.drone.y = 240;
 
         // 드론 엘리먼트가 없으면 재생성
         if (!state.droneEl) renderWarehouseElements();
@@ -1770,7 +2193,8 @@ function renderFinalReport() {
                 <div style="text-align:right">
                     <div class="fr-meta">생성일시: ${dateStr} ${timeStr}</div>
                     <div class="fr-meta">드론 ID: DRONE-01</div>
-                    <div class="fr-meta">대상 창고: Warehouse-A (4 Aisles)</div>
+                    <div class="fr-meta">대상 창고: Warehouse-A (4 Aisles × 6 Rows × ${SCAN_CONFIG.endLayer - SCAN_CONFIG.startLayer + 1} Layers)</div>
+                <div class="fr-meta">스캔 설정: ${LAYERS[SCAN_CONFIG.startLayer].id}~${LAYERS[SCAN_CONFIG.endLayer].id} · ${getScanModeName()}</div>
                     <div class="fr-meta">보고서 ID: RPT-${Date.now().toString(36).toUpperCase()}</div>
                 </div>
             </div>

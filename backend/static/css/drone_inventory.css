@@ -1453,3 +1453,211 @@
         size: A4 portrait;
     }
 }
+
+/* ============================================================
+   5-LAYER SCAN SYSTEM — NEW STYLES
+   ============================================================ */
+
+/* Config Panel (설정 패널) */
+.config-panel {
+    background: rgba(15,23,42,0.85);
+    border: 1px solid rgba(99,102,241,0.2);
+    border-radius: 14px;
+    padding: 14px 20px;
+    margin-bottom: 4px;
+}
+.config-row {
+    display: grid;
+    grid-template-columns: 1fr 1.2fr 0.9fr;
+    gap: 20px;
+    align-items: start;
+}
+.config-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.config-label {
+    font-size: 0.72rem;
+    font-weight: 800;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    margin-bottom: 2px;
+}
+.config-hint {
+    font-size: 0.72rem;
+    color: #64748b;
+    line-height: 1.5;
+    padding: 6px 10px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 6px;
+    border-left: 2px solid rgba(99,102,241,0.3);
+}
+
+/* Scan Mode Toggle */
+.scan-mode-toggle {
+    display: flex;
+    gap: 6px;
+}
+.smt-btn {
+    flex: 1;
+    padding: 7px 8px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.04);
+    color: #94a3b8;
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+    white-space: nowrap;
+}
+.smt-btn .smt-sub {
+    display: block;
+    font-size: 0.6rem;
+    font-weight: 400;
+    color: #475569;
+    margin-top: 1px;
+}
+.smt-btn:hover {
+    background: rgba(255,255,255,0.08);
+    color: #e2e8f0;
+}
+.smt-btn.active {
+    background: rgba(99,102,241,0.2);
+    border-color: #6366f1;
+    color: #a5b4fc;
+}
+.smt-btn.active .smt-sub { color: #6366f1; }
+
+/* Layer Range */
+.layer-range-row { display: flex; flex-direction: column; gap: 6px; }
+.layer-range-ctrl {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.layer-range-label {
+    font-size: 0.75rem;
+    color: #64748b;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+/* Layer Badge Legend */
+.layer-badge-legend {
+    padding: 3px 9px;
+    border-radius: 5px;
+    border: 1px solid;
+    font-size: 0.7rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    cursor: default;
+}
+.layer-badge-legend.inactive {
+    opacity: 0.35;
+}
+
+/* Config Summary */
+.config-summary {
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px;
+    padding: 12px 14px;
+}
+.summary-stats { display: flex; flex-direction: column; gap: 7px; }
+.ss-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.78rem;
+}
+.ss-row span { color: #64748b; }
+
+/* Layer Strip Panel (SVG 왼쪽) */
+.layer-strip-panel {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    background: rgba(0,0,0,0.15);
+    border-right: 1px solid rgba(255,255,255,0.05);
+    padding: 8px 6px;
+    width: 52px;
+    gap: 4px;
+    flex-shrink: 0;
+}
+.layer-strip {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 5px 3px;
+    border-radius: 5px;
+    border-left: 3px solid transparent;
+    background: rgba(255,255,255,0.02);
+    transition: all 0.3s;
+    cursor: default;
+}
+.layer-strip.in-range {
+    background: rgba(255,255,255,0.04);
+}
+.layer-strip.active-layer {
+    background: rgba(99,102,241,0.12) !important;
+    box-shadow: 0 0 8px rgba(99,102,241,0.3);
+    transform: scaleX(1.05);
+}
+.ls-id {
+    font-size: 0.65rem;
+    font-weight: 800;
+    font-family: monospace;
+}
+.ls-h {
+    font-size: 0.58rem;
+    color: #475569;
+    margin-top: 1px;
+}
+
+/* Layer Indicator Chip (map header) */
+.layer-indicator-chip {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: rgba(15,23,42,0.9);
+    border: 1px solid rgba(99,102,241,0.3);
+    border-radius: 8px;
+    padding: 4px 10px;
+    min-width: 70px;
+    text-align: center;
+}
+.layer-indicator-chip span:last-child {
+    font-size: 1rem;
+}
+
+/* Layer progress bars */
+.layer-prog-bar { cursor: default; }
+
+/* patrol-layout 업데이트 (config panel 포함) */
+.patrol-layout {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    grid-template-rows: auto 1fr;
+    gap: 16px;
+}
+
+/* Sidebar Layer 표시 */
+#sb-layer {
+    font-family: monospace;
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+
+/* Layer filter chips in scanlog */
+.layer-filter-chip {
+    font-size: 0.72rem;
+    padding: 4px 10px;
+}
+
