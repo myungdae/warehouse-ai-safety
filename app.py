@@ -8,6 +8,8 @@ from flask import Flask, render_template, send_from_directory, request, jsonify
 import os
 import smtplib
 import json
+import sqlite3
+import contextlib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from datetime import datetime
@@ -24,25 +26,82 @@ app = Flask(__name__,
             template_folder='backend/templates',
             static_folder='backend/static')
 
-# ── Report Archive DB (JSON file) ─────────────────────────────
-REPORT_ARCHIVE_DIR  = os.path.join(os.path.dirname(__file__), 'backend', 'data')
-REPORT_ARCHIVE_FILE = os.path.join(REPORT_ARCHIVE_DIR, 'report_archive.json')
+# ── Report Archive DB (SQLite — persistent across restarts) ───
+REPORT_ARCHIVE_DIR = os.path.join(os.path.dirname(__file__), 'backend', 'data')
+REPORT_DB_FILE     = os.path.join(REPORT_ARCHIVE_DIR, 'reports.db')
 
-def load_archive():
-    """JSON 파일에서 보고서 목록 로드"""
-    if not os.path.exists(REPORT_ARCHIVE_FILE):
-        return []
-    try:
-        with open(REPORT_ARCHIVE_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except Exception:
-        return []
-
-def save_archive(records):
-    """JSON 파일에 보고서 목록 저장"""
+def get_db():
+    """SQLite 연결 (Row factory → dict-like)"""
     os.makedirs(REPORT_ARCHIVE_DIR, exist_ok=True)
-    with open(REPORT_ARCHIVE_FILE, 'w', encoding='utf-8') as f:
-        json.dump(records, f, ensure_ascii=False, indent=2)
+    conn = sqlite3.connect(REPORT_DB_FILE)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+def init_db():
+    """테이블 초기화 (최초 1회)"""
+    with get_db() as conn:
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS reports (
+                id          TEXT PRIMARY KEY,
+                saved_at    TEXT NOT NULL,
+                date_label  TEXT,
+                time_label  TEXT,
+                drone_id    TEXT DEFAULT 'DRONE-01',
+                warehouse   TEXT DEFAULT 'Warehouse-A',
+                total_scanned INTEGER DEFAULT 0,
+                accuracy    REAL DEFAULT 0,
+                total_changes INTEGER DEFAULT 0,
+                agent_actions INTEGER DEFAULT 0,
+                missing     INTEGER DEFAULT 0,
+                new_items   INTEGER DEFAULT 0,
+                changed     INTEGER DEFAULT 0,
+                moved       INTEGER DEFAULT 0,
+                payload     TEXT,
+                note        TEXT DEFAULT ''
+            )
+        ''')
+        conn.commit()
+
+# 앱 시작 시 DB 초기화
+init_db()
+
+# ── JSON → SQLite 마이그레이션 (기존 데이터 보존) ─────────────
+def migrate_json_to_sqlite():
+    """기존 report_archive.json이 있으면 SQLite로 이전"""
+    old_file = os.path.join(REPORT_ARCHIVE_DIR, 'report_archive.json')
+    if not os.path.exists(old_file):
+        return
+    try:
+        with open(old_file, 'r', encoding='utf-8') as f:
+            records = json.load(f)
+        with get_db() as conn:
+            for r in records:
+                try:
+                    d = r.get('data', {})
+                    conn.execute('''
+                        INSERT OR IGNORE INTO reports
+                        (id, saved_at, date_label, time_label, drone_id,
+                         total_scanned, accuracy, total_changes, agent_actions,
+                         missing, new_items, changed, moved, payload)
+                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    ''', (
+                        r.get('id'), r.get('saved_at'), r.get('date'), r.get('time'),
+                        d.get('drone_id','DRONE-01'),
+                        d.get('total_scanned',0), float(d.get('accuracy',0)),
+                        d.get('total_changes',0), d.get('agent_actions',0),
+                        d.get('missing',0), d.get('new_items',0),
+                        d.get('changed',0), d.get('moved',0),
+                        json.dumps(d, ensure_ascii=False)
+                    ))
+                except Exception:
+                    pass
+            conn.commit()
+        os.rename(old_file, old_file + '.migrated')
+        print(f"[MIGRATE] JSON → SQLite 완료 ({len(records)}건)")
+    except Exception as e:
+        print(f"[MIGRATE ERROR] {e}")
+
+migrate_json_to_sqlite()
 
 # ── Email Config (from .env) ───────────────────────────────────
 MAIL_SERVER   = os.getenv('MAIL_SERVER',   'smtp.gmail.com')
@@ -61,6 +120,10 @@ def index():
 @app.route('/drone')
 def drone_inventory():
     return render_template('drone_inventory.html')
+
+@app.route('/admin/reports')
+def admin_reports():
+    return render_template('admin_reports.html')
 
 @app.route('/static/<path:filename>')
 def serve_static(filename):
@@ -459,40 +522,46 @@ def build_html_email(d, recipient):
 </html>"""
 
 
-# ── Report Archive API ────────────────────────────────────────
+# ── Report Archive API (SQLite) ───────────────────────────────
 @app.route('/api/archive_report', methods=['POST'])
 def archive_report():
-    """
-    보고서 아카이브 저장 API
-    POST /api/archive_report
-    Body: { report_data: {...} }
-    """
+    """POST /api/archive_report — 보고서 SQLite 저장"""
     try:
-        body = request.get_json(force=True) or {}
+        body        = request.get_json(force=True) or {}
         report_data = body.get('report_data', {})
-
         if not report_data:
             return jsonify({'ok': False, 'error': '보고서 데이터 없음'}), 400
 
-        # 고유 ID 및 저장 시각 추가
+        rid      = report_data.get('report_id', f"RPT-{uuid.uuid4().hex[:8].upper()}")
         saved_at = datetime.now().isoformat()
-        record = {
-            'id':       report_data.get('report_id', f"RPT-{uuid.uuid4().hex[:8].upper()}"),
-            'saved_at': saved_at,
-            'date':     report_data.get('date', datetime.now().strftime('%Y-%m-%d')),
-            'time':     report_data.get('time', datetime.now().strftime('%H:%M:%S')),
-            'data':     report_data
-        }
 
-        archive = load_archive()
-        # 동일 report_id 중복 방지
-        archive = [r for r in archive if r['id'] != record['id']]
-        archive.insert(0, record)          # 최신이 앞에
-        archive = archive[:365]            # 최대 365건 보관
-        save_archive(archive)
+        with get_db() as conn:
+            conn.execute('''
+                INSERT OR REPLACE INTO reports
+                (id, saved_at, date_label, time_label, drone_id, warehouse,
+                 total_scanned, accuracy, total_changes, agent_actions,
+                 missing, new_items, changed, moved, payload)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            ''', (
+                rid, saved_at,
+                report_data.get('date', ''),
+                report_data.get('time', ''),
+                report_data.get('drone_id', 'DRONE-01'),
+                report_data.get('warehouse', 'Warehouse-A'),
+                int(report_data.get('total_scanned', 0)),
+                float(report_data.get('accuracy', 0)),
+                int(report_data.get('total_changes', 0)),
+                int(report_data.get('agent_actions', 0)),
+                int(report_data.get('missing', 0)),
+                int(report_data.get('new_items', 0)),
+                int(report_data.get('changed', 0)),
+                int(report_data.get('moved', 0)),
+                json.dumps(report_data, ensure_ascii=False)
+            ))
+            conn.commit()
 
-        print(f"[ARCHIVE] 보고서 저장 → {record['id']} ({saved_at})")
-        return jsonify({'ok': True, 'id': record['id'], 'saved_at': saved_at})
+        print(f"[ARCHIVE] 저장 → {rid} ({saved_at})")
+        return jsonify({'ok': True, 'id': rid, 'saved_at': saved_at})
 
     except Exception as e:
         print(f"[ARCHIVE ERROR] {e}")
@@ -501,61 +570,172 @@ def archive_report():
 
 @app.route('/api/reports', methods=['GET'])
 def list_reports():
-    """
-    보고서 목록 조회 API
-    GET /api/reports?limit=50
-    """
+    """GET /api/reports — 목록 조회 (검색·필터·정렬 지원)"""
     try:
-        limit   = int(request.args.get('limit', 50))
-        archive = load_archive()
-        summary = [{
-            'id':       r['id'],
-            'saved_at': r['saved_at'],
-            'date':     r['date'],
-            'time':     r['time'],
-            'total_scanned':  r['data'].get('total_scanned', 0),
-            'accuracy':       r['data'].get('accuracy', 0),
-            'total_changes':  r['data'].get('total_changes', 0),
-            'agent_actions':  r['data'].get('agent_actions', 0),
-            'missing':        r['data'].get('missing', 0),
-            'new_items':      r['data'].get('new_items', 0),
-            'changed':        r['data'].get('changed', 0),
-            'moved':          r['data'].get('moved', 0),
-        } for r in archive[:limit]]
-        return jsonify({'ok': True, 'reports': summary, 'total': len(archive)})
+        limit    = min(int(request.args.get('limit', 100)), 500)
+        offset   = int(request.args.get('offset', 0))
+        search   = request.args.get('search', '').strip()
+        drone    = request.args.get('drone', '').strip()
+        date_from= request.args.get('date_from', '').strip()
+        date_to  = request.args.get('date_to', '').strip()
+        sort     = request.args.get('sort', 'saved_at')
+        order    = 'DESC' if request.args.get('order','desc').lower() == 'desc' else 'ASC'
+
+        safe_cols = {'saved_at','accuracy','total_changes','missing','agent_actions'}
+        if sort not in safe_cols: sort = 'saved_at'
+
+        where, params = [], []
+        if search:
+            where.append("(id LIKE ? OR date_label LIKE ? OR drone_id LIKE ?)")
+            params += [f'%{search}%']*3
+        if drone:
+            where.append("drone_id = ?"); params.append(drone)
+        if date_from:
+            where.append("saved_at >= ?"); params.append(date_from)
+        if date_to:
+            where.append("saved_at <= ?"); params.append(date_to + 'T23:59:59')
+
+        where_sql = ('WHERE ' + ' AND '.join(where)) if where else ''
+
+        with get_db() as conn:
+            total = conn.execute(
+                f'SELECT COUNT(*) FROM reports {where_sql}', params).fetchone()[0]
+            rows = conn.execute(
+                f'''SELECT id, saved_at, date_label, time_label, drone_id, warehouse,
+                           total_scanned, accuracy, total_changes, agent_actions,
+                           missing, new_items, changed, moved, note
+                    FROM reports {where_sql}
+                    ORDER BY {sort} {order}
+                    LIMIT ? OFFSET ?''',
+                params + [limit, offset]
+            ).fetchall()
+
+        reports = [dict(r) for r in rows]
+        return jsonify({'ok': True, 'reports': reports, 'total': total,
+                        'limit': limit, 'offset': offset})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@app.route('/api/reports/stats', methods=['GET'])
+def reports_stats():
+    """GET /api/reports/stats — 관리자 대시보드용 통계"""
+    try:
+        with get_db() as conn:
+            total = conn.execute('SELECT COUNT(*) FROM reports').fetchone()[0]
+            avg_acc = conn.execute(
+                'SELECT AVG(accuracy) FROM reports').fetchone()[0] or 0
+            total_missing = conn.execute(
+                'SELECT SUM(missing) FROM reports').fetchone()[0] or 0
+            total_changes = conn.execute(
+                'SELECT SUM(total_changes) FROM reports').fetchone()[0] or 0
+            # 최근 7일 일별 통계
+            daily = conn.execute('''
+                SELECT DATE(saved_at) as day,
+                       COUNT(*) as cnt,
+                       AVG(accuracy) as avg_acc,
+                       SUM(total_changes) as sum_chg,
+                       SUM(missing) as sum_miss
+                FROM reports
+                WHERE saved_at >= DATE('now','-7 days')
+                GROUP BY day ORDER BY day ASC
+            ''').fetchall()
+            # 드론별 통계
+            by_drone = conn.execute('''
+                SELECT drone_id, COUNT(*) as cnt, AVG(accuracy) as avg_acc
+                FROM reports GROUP BY drone_id
+            ''').fetchall()
+            # 최근 10건
+            recent = conn.execute('''
+                SELECT id, saved_at, date_label, accuracy, total_changes, missing
+                FROM reports ORDER BY saved_at DESC LIMIT 10
+            ''').fetchall()
+
+        return jsonify({
+            'ok': True,
+            'total_reports': total,
+            'avg_accuracy': round(avg_acc, 2),
+            'total_missing_events': int(total_missing),
+            'total_change_events':  int(total_changes),
+            'daily_7d': [dict(r) for r in daily],
+            'by_drone':  [dict(r) for r in by_drone],
+            'recent':    [dict(r) for r in recent],
+        })
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)}), 500
 
 
 @app.route('/api/reports/<report_id>', methods=['GET'])
 def get_report(report_id):
-    """
-    특정 보고서 전체 데이터 조회
-    GET /api/reports/{report_id}
-    """
+    """GET /api/reports/<id> — 특정 보고서 전체 조회"""
     try:
-        archive = load_archive()
-        record  = next((r for r in archive if r['id'] == report_id), None)
-        if not record:
+        with get_db() as conn:
+            row = conn.execute(
+                'SELECT * FROM reports WHERE id = ?', (report_id,)).fetchone()
+        if not row:
             return jsonify({'ok': False, 'error': '보고서를 찾을 수 없습니다'}), 404
-        return jsonify({'ok': True, 'report': record})
+        r = dict(row)
+        try:
+            r['data'] = json.loads(r.get('payload') or '{}')
+        except Exception:
+            r['data'] = {}
+        return jsonify({'ok': True, 'report': r})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@app.route('/api/reports/<report_id>', methods=['PATCH'])
+def update_report_note(report_id):
+    """PATCH /api/reports/<id> — 메모(note) 수정"""
+    try:
+        body = request.get_json(force=True) or {}
+        note = body.get('note', '')
+        with get_db() as conn:
+            res = conn.execute(
+                'UPDATE reports SET note=? WHERE id=?', (note, report_id))
+            conn.commit()
+            if res.rowcount == 0:
+                return jsonify({'ok': False, 'error': '보고서를 찾을 수 없습니다'}), 404
+        return jsonify({'ok': True, 'id': report_id})
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)}), 500
 
 
 @app.route('/api/reports/<report_id>', methods=['DELETE'])
 def delete_report(report_id):
-    """
-    특정 보고서 삭제
-    DELETE /api/reports/{report_id}
-    """
+    """DELETE /api/reports/<id> — 보고서 삭제"""
     try:
-        archive = load_archive()
-        new_archive = [r for r in archive if r['id'] != report_id]
-        if len(new_archive) == len(archive):
-            return jsonify({'ok': False, 'error': '보고서를 찾을 수 없습니다'}), 404
-        save_archive(new_archive)
+        with get_db() as conn:
+            res = conn.execute('DELETE FROM reports WHERE id=?', (report_id,))
+            conn.commit()
+            if res.rowcount == 0:
+                return jsonify({'ok': False, 'error': '보고서를 찾을 수 없습니다'}), 404
         return jsonify({'ok': True, 'deleted': report_id})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@app.route('/api/reports/export', methods=['GET'])
+def export_reports():
+    """GET /api/reports/export — 전체 보고서 JSON 다운로드"""
+    try:
+        with get_db() as conn:
+            rows = conn.execute(
+                'SELECT * FROM reports ORDER BY saved_at DESC').fetchall()
+        data = []
+        for row in rows:
+            r = dict(row)
+            try: r['data'] = json.loads(r.get('payload') or '{}')
+            except: r['data'] = {}
+            del r['payload']
+            data.append(r)
+        from flask import Response
+        return Response(
+            json.dumps(data, ensure_ascii=False, indent=2),
+            mimetype='application/json',
+            headers={'Content-Disposition':
+                     f'attachment;filename=report_archive_{datetime.now().strftime("%Y%m%d")}.json'}
+        )
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)}), 500
 
