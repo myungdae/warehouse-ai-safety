@@ -81,35 +81,35 @@
                     <span>🎯 미션 제어</span>
                 </div>
                 <div class="menu-content expanded">
-                    <div class="menu-item active" onclick="showView('patrol')">
+                    <div class="menu-item active" data-view="patrol" onclick="showView('patrol')">
                         <span class="menu-icon">🗺️</span>
                         <span class="menu-text">순찰 지도</span>
                     </div>
-                    <div class="menu-item" onclick="showView('scanlog')">
+                    <div class="menu-item" data-view="scanlog" onclick="showView('scanlog')">
                         <span class="menu-icon">📋</span>
                         <span class="menu-text">스캔 이벤트</span>
                         <span class="menu-badge" id="scanBadge">0</span>
                     </div>
-                    <div class="menu-item" onclick="showView('compare')">
+                    <div class="menu-item" data-view="compare" onclick="showView('compare')">
                         <span class="menu-icon">📊</span>
                         <span class="menu-text">재고 비교</span>
                         <span class="menu-badge warning" id="changeBadge" style="display:none">0</span>
                     </div>
-                    <div class="menu-item" onclick="showView('agent')">
+                    <div class="menu-item" data-view="agent" onclick="showView('agent')">
                         <span class="menu-icon">🤖</span>
                         <span class="menu-text">Agentic AI</span>
                         <span class="menu-badge ai" id="agentBadge" style="display:none">0</span>
                     </div>
-                    <div class="menu-item" onclick="showView('ontology')">
+                    <div class="menu-item" data-view="ontology" onclick="showView('ontology')">
                         <span class="menu-icon">🧠</span>
                         <span class="menu-text">Ontology</span>
                     </div>
-                    <div class="menu-item" onclick="showView('report')">
+                    <div class="menu-item" data-view="report" onclick="showView('report')">
                         <span class="menu-icon">📊</span>
                         <span class="menu-text">일일 보고서</span>
                         <span class="menu-badge" id="reportBadge" style="display:none;background:rgba(251,191,36,0.2);color:#fbbf24;border:1px solid rgba(251,191,36,0.4)">NEW</span>
                     </div>
-                    <div class="menu-item" onclick="showView('archive')">
+                    <div class="menu-item" data-view="archive" onclick="showView('archive')">
                         <span class="menu-icon">🗂️</span>
                         <span class="menu-text">보고서 기록</span>
                         <span class="menu-badge" id="archiveBadge" style="background:rgba(99,102,241,0.2);color:#a5b4fc;border:1px solid rgba(99,102,241,0.3)">0</span>
