@@ -1,0 +1,1200 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🧠 보고서 아카이브 인텔리전스 — Warehouse AI</title>
+  <style>
+/* ── 기본 ─────────────────────────────────────────────── */
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:'Segoe UI','Noto Sans KR',sans-serif;
+  background:linear-gradient(135deg,#030712 0%,#0a0f1e 60%,#0d1424 100%);
+  color:#e2e8f0;min-height:100vh;
+}
+a{text-decoration:none;color:inherit}
+
+/* ── 레이아웃 ─────────────────────────────────────────── */
+.page-wrap{display:flex;min-height:100vh}
+
+/* ── 사이드바 ─────────────────────────────────────────── */
+.sidebar{
+  width:240px;min-height:100vh;flex-shrink:0;
+  background:linear-gradient(180deg,#1e293b,#0f172a);
+  border-right:1px solid rgba(255,255,255,0.07);
+  display:flex;flex-direction:column;
+}
+.sb-logo{padding:20px 18px 14px;border-bottom:1px solid rgba(255,255,255,0.06)}
+.sb-logo-row{display:flex;align-items:center;gap:10px}
+.sb-logo-icon{font-size:1.7rem}
+.sb-logo-text{font-size:0.9rem;font-weight:800;color:#e2e8f0}
+.sb-logo-sub{font-size:0.65rem;color:#475569;margin-top:1px}
+
+.sb-nav{padding:10px 0;flex:1}
+.sb-sec{padding:8px 16px 4px;font-size:0.63rem;color:#334155;
+  text-transform:uppercase;letter-spacing:0.1em;font-weight:700}
+.sb-item{
+  display:flex;align-items:center;gap:9px;
+  padding:9px 18px;font-size:0.82rem;color:#64748b;
+  cursor:pointer;transition:all 0.15s;border-left:2px solid transparent;
+}
+.sb-item:hover{color:#e2e8f0;background:rgba(255,255,255,0.04)}
+.sb-item.active{color:#a5b4fc;background:rgba(99,102,241,0.1);border-left-color:#6366f1}
+.sb-item-icon{width:18px;text-align:center;font-size:0.95rem}
+.sb-badge{
+  margin-left:auto;background:rgba(99,102,241,0.2);
+  border:1px solid rgba(99,102,241,0.3);border-radius:10px;
+  padding:1px 7px;font-size:0.66rem;font-weight:700;color:#a5b4fc
+}
+
+/* ── 메인 콘텐츠 ──────────────────────────────────────── */
+.main{flex:1;padding:24px 28px;overflow-y:auto}
+.page-title{font-size:1.4rem;font-weight:900;color:#e2e8f0;margin-bottom:4px}
+.page-sub{font-size:0.78rem;color:#475569;margin-bottom:22px}
+
+/* ── 뷰 탭 ────────────────────────────────────────────── */
+.tab-bar{display:flex;gap:6px;margin-bottom:20px;flex-wrap:wrap}
+.tab-btn{
+  padding:8px 18px;border-radius:8px;font-size:0.8rem;font-weight:700;
+  cursor:pointer;border:1px solid rgba(255,255,255,0.1);background:transparent;
+  color:#64748b;transition:all 0.15s
+}
+.tab-btn:hover{color:#e2e8f0;background:rgba(255,255,255,0.05)}
+.tab-btn.active{
+  color:#a5b4fc;background:rgba(99,102,241,0.12);
+  border-color:rgba(99,102,241,0.4)
+}
+
+/* ── 카드 공통 ────────────────────────────────────────── */
+.card{
+  background:rgba(255,255,255,0.025);
+  border:1px solid rgba(255,255,255,0.07);
+  border-radius:14px;padding:18px 20px;margin-bottom:16px
+}
+.card-title{
+  font-size:0.7rem;font-weight:800;text-transform:uppercase;
+  letter-spacing:0.07em;margin-bottom:12px
+}
+
+/* ── KPI 그리드 ───────────────────────────────────────── */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px;margin-bottom:20px}
+.kpi-card{
+  background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);
+  border-radius:12px;padding:14px;text-align:center
+}
+.kpi-val{font-size:1.8rem;font-weight:900;margin-bottom:4px}
+.kpi-lbl{font-size:0.68rem;color:#64748b}
+
+/* ── 테이블 ────────────────────────────────────────────── */
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:0.8rem}
+th{padding:9px 12px;text-align:left;background:rgba(255,255,255,0.03);
+   color:#475569;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.06em;
+   border-bottom:1px solid rgba(255,255,255,0.07)}
+td{padding:9px 12px;border-bottom:1px solid rgba(255,255,255,0.04);vertical-align:middle}
+tr:hover td{background:rgba(255,255,255,0.025);cursor:pointer}
+
+.acc-bar-wrap{width:80px;background:rgba(255,255,255,0.06);border-radius:3px;height:6px;display:inline-block;vertical-align:middle;margin-right:6px}
+.acc-bar{height:6px;border-radius:3px}
+.badge-tag{display:inline-block;padding:2px 8px;border-radius:5px;font-size:0.66rem;font-weight:700}
+
+/* ── 필터 바 ───────────────────────────────────────────── */
+.filter-bar{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+.filter-bar input,.filter-bar select{
+  background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);
+  border-radius:8px;color:#e2e8f0;padding:7px 12px;font-size:0.8rem;outline:none;
+  transition:border-color 0.15s
+}
+.filter-bar input:focus,.filter-bar select:focus{border-color:rgba(99,102,241,0.5)}
+.filter-bar input::placeholder{color:#475569}
+
+/* ── 차트 바 ───────────────────────────────────────────── */
+.chart-bars{display:flex;gap:8px;align-items:flex-end;height:100px;margin:10px 0 4px}
+.chart-col{display:flex;flex-direction:column;align-items:center;gap:4px;flex:1}
+.chart-bar{width:100%;border-radius:4px 4px 0 0;min-height:4px;transition:height 0.3s}
+.chart-lbl{font-size:0.6rem;color:#475569;text-align:center}
+
+/* ── Ontology 트리 ─────────────────────────────────────── */
+.ont-tree{font-family:monospace;font-size:0.75rem;color:#94a3b8;line-height:1.8}
+.ont-class{color:#22d3ee}
+.ont-sub{color:#a5b4fc}
+.ont-instance{color:#86efac}
+.ont-prop{color:#fbbf24}
+
+/* ── MCP 패널 ──────────────────────────────────────────── */
+.mcp-tool{
+  background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.18);
+  border-radius:10px;padding:14px;margin-bottom:10px
+}
+.mcp-name{font-family:monospace;font-size:0.8rem;color:#818cf8;font-weight:700;margin-bottom:4px}
+.mcp-desc{font-size:0.75rem;color:#64748b;margin-bottom:8px}
+.mcp-schema{
+  background:rgba(0,0,0,0.3);border-radius:6px;padding:10px;
+  font-family:monospace;font-size:0.7rem;color:#94a3b8;white-space:pre-wrap
+}
+.mcp-run-btn{
+  margin-top:8px;padding:5px 14px;border-radius:6px;font-size:0.72rem;font-weight:700;
+  cursor:pointer;border:1px solid rgba(99,102,241,0.4);
+  background:rgba(99,102,241,0.1);color:#a5b4fc;transition:all 0.15s
+}
+.mcp-run-btn:hover{background:rgba(99,102,241,0.2)}
+.mcp-output{
+  margin-top:8px;background:rgba(0,0,0,0.35);border:1px solid rgba(99,102,241,0.15);
+  border-radius:6px;padding:10px;font-family:monospace;font-size:0.7rem;color:#86efac;
+  white-space:pre-wrap;display:none
+}
+
+/* ── 상세 모달 ─────────────────────────────────────────── */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;
+  display:none;align-items:center;justify-content:center;padding:20px
+}
+.modal-box{
+  background:linear-gradient(135deg,#1e293b,#0f172a);
+  border:1px solid rgba(255,255,255,0.1);border-radius:16px;
+  width:min(700px,95vw);max-height:88vh;overflow-y:auto
+}
+.modal-hdr{
+  display:flex;align-items:center;gap:10px;padding:18px 20px;
+  border-bottom:1px solid rgba(255,255,255,0.07);position:sticky;top:0;
+  background:linear-gradient(135deg,#1e293b,#0f172a);z-index:1
+}
+.modal-hdr h3{flex:1;font-size:0.95rem;font-weight:800;color:#e2e8f0}
+.modal-close{
+  background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);
+  border-radius:6px;color:#94a3b8;padding:4px 10px;cursor:pointer;font-size:0.9rem
+}
+.modal-close:hover{color:#e2e8f0}
+.modal-body{padding:20px}
+
+/* ── 토스트 ────────────────────────────────────────────── */
+#toast{
+  position:fixed;bottom:24px;right:24px;z-index:9999;
+  background:rgba(52,211,153,0.15);border:1px solid rgba(52,211,153,0.4);
+  border-radius:10px;padding:10px 18px;font-size:0.82rem;color:#6ee7b7;
+  display:none;max-width:320px
+}
+#toast.error{background:rgba(248,113,113,0.15);border-color:rgba(248,113,113,0.4);color:#fca5a5}
+
+/* ── 반응형 ────────────────────────────────────────────── */
+@media(max-width:900px){
+  .sidebar{display:none}
+  .main{padding:16px}
+}
+
+/* ── 인쇄 ──────────────────────────────────────────────── */
+@media print{
+  .sidebar,.tab-bar,.filter-bar,.mcp-run-btn,.modal-overlay{display:none!important}
+  body{background:#fff;color:#000}
+  .card{border:1px solid #ddd;page-break-inside:avoid}
+}
+  </style>
+</head>
+<body>
+<div class="page-wrap">
+
+  <!-- ── 사이드바 ── -->
+  <aside class="sidebar">
+    <div class="sb-logo">
+      <div class="sb-logo-row">
+        <span class="sb-logo-icon">🧠</span>
+        <div>
+          <div class="sb-logo-text">Archive Intelligence</div>
+          <div class="sb-logo-sub">Warehouse AI · Drone Inventory</div>
+        </div>
+      </div>
+    </div>
+    <nav class="sb-nav">
+      <div class="sb-sec">탐색</div>
+      <a href="/drone"><div class="sb-item">
+        <span class="sb-item-icon">🚁</span> 드론 시스템
+      </div></a>
+      <a href="/admin/reports"><div class="sb-item">
+        <span class="sb-item-icon">📋</span> 보고서 관리 Admin
+      </div></a>
+      <a href="/archive"><div class="sb-item active">
+        <span class="sb-item-icon">🧠</span> 아카이브 인텔리전스
+      </div></a>
+      <a href="/"><div class="sb-item">
+        <span class="sb-item-icon">🏭</span> Warehouse ATC
+      </div></a>
+
+      <div class="sb-sec" style="margin-top:12px">인텔리전스 레이어</div>
+      <div class="sb-item" onclick="switchTab('archive')">
+        <span class="sb-item-icon">🗂️</span> 보고서 목록
+        <span class="sb-badge" id="sbBadgeTotal">—</span>
+      </div>
+      <div class="sb-item" onclick="switchTab('ontology')">
+        <span class="sb-item-icon">🧠</span> Operational Ontology
+      </div>
+      <div class="sb-item" onclick="switchTab('agentic')">
+        <span class="sb-item-icon">🤖</span> Agentic AI 분석
+      </div>
+      <div class="sb-item" onclick="switchTab('mcp')">
+        <span class="sb-item-icon">🔌</span> MCP 도구
+      </div>
+      <div class="sb-item" onclick="switchTab('stats')">
+        <span class="sb-item-icon">📊</span> 통계 대시보드
+      </div>
+
+      <div class="sb-sec" style="margin-top:12px">관리</div>
+      <div class="sb-item" onclick="exportReports()">
+        <span class="sb-item-icon">⬇️</span> JSON 내보내기
+      </div>
+      <div class="sb-item" onclick="window.print()">
+        <span class="sb-item-icon">🖨️</span> 인쇄
+      </div>
+    </nav>
+  </aside>
+
+  <!-- ── 메인 ── -->
+  <main class="main">
+    <div class="page-title">🧠 보고서 아카이브 인텔리전스 센터</div>
+    <div class="page-sub">
+      Operational Ontology · Agentic AI · MCP (Model Context Protocol) 통합 플랫폼
+    </div>
+
+    <!-- 탭 바 -->
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('archive')" data-tab="archive">🗂️ 보고서 목록</button>
+      <button class="tab-btn" onclick="switchTab('ontology')" data-tab="ontology">🧠 Ontology</button>
+      <button class="tab-btn" onclick="switchTab('agentic')" data-tab="agentic">🤖 Agentic AI</button>
+      <button class="tab-btn" onclick="switchTab('mcp')" data-tab="mcp">🔌 MCP 도구</button>
+      <button class="tab-btn" onclick="switchTab('stats')" data-tab="stats">📊 통계</button>
+    </div>
+
+    <!-- 뷰 컨테이너 -->
+    <div id="viewContainer"></div>
+  </main>
+</div>
+
+<!-- 상세 모달 -->
+<div class="modal-overlay" id="detailModal">
+  <div class="modal-box">
+    <div class="modal-hdr">
+      <span>🗂️</span>
+      <h3 id="modalTitle">보고서 상세</h3>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<!-- 토스트 -->
+<div id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// 전역 상태
+// ═══════════════════════════════════════════════════════════════
+let allReports  = [];
+let statsData   = null;
+let currentTab  = 'archive';
+let filteredRep = [];
+
+// 초기 로드
+(async () => {
+  await loadData();
+  switchTab(location.hash ? location.hash.slice(1).includes('-') ? 'archive' : location.hash.slice(1) : 'archive');
+})();
+
+async function loadData() {
+  try {
+    const [rRes, sRes] = await Promise.all([
+      fetch('/api/reports?limit=500'),
+      fetch('/api/reports/stats')
+    ]);
+    const rJson = await rRes.json();
+    const sJson = await sRes.json();
+    if (rJson.ok) {
+      allReports = rJson.reports;
+      filteredRep = [...allReports];
+      document.getElementById('sbBadgeTotal').textContent = rJson.total;
+    }
+    if (sJson.ok) statsData = sJson;
+  } catch (e) {
+    showToast('데이터 로드 실패: ' + e.message, true);
+  }
+}
+
+// ── 탭 전환 ────────────────────────────────────────────────────
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.tab === tab);
+  });
+  const vc = document.getElementById('viewContainer');
+  if (tab === 'archive')  renderArchiveTab(vc);
+  if (tab === 'ontology') renderOntologyTab(vc);
+  if (tab === 'agentic')  renderAgenticTab(vc);
+  if (tab === 'mcp')      renderMcpTab(vc);
+  if (tab === 'stats')    renderStatsTab(vc);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TAB 1 — 보고서 목록
+// ═══════════════════════════════════════════════════════════════
+function renderArchiveTab(vc) {
+  vc.innerHTML = `
+  <div class="card" style="margin-bottom:12px">
+    <div class="filter-bar">
+      <input id="fSearch" placeholder="🔍 ID / 날짜 / 드론 검색…" oninput="applyFilter()" style="flex:1;min-width:160px">
+      <select id="fRisk" onchange="applyFilter()">
+        <option value="">전체 리스크</option>
+        <option value="HIGH">🔴 HIGH</option>
+        <option value="MEDIUM">🟡 MEDIUM</option>
+        <option value="LOW">🟢 LOW / OPTIMAL</option>
+      </select>
+      <select id="fSort" onchange="applyFilter()">
+        <option value="saved_at_desc">최신순</option>
+        <option value="saved_at_asc">오래된순</option>
+        <option value="accuracy_desc">정확도 높은순</option>
+        <option value="missing_desc">소진 많은순</option>
+      </select>
+      <button onclick="exportReports()"
+        style="padding:7px 14px;border-radius:8px;font-size:0.78rem;font-weight:700;
+               cursor:pointer;border:1px solid rgba(52,211,153,0.3);
+               background:rgba(52,211,153,0.08);color:#34d399">⬇️ JSON</button>
+    </div>
+    <div id="arcCount" style="font-size:0.72rem;color:#475569;margin-bottom:12px"></div>
+  </div>
+  <div id="arcTableWrap"></div>`;
+
+  applyFilter();
+
+  // URL hash에 reportId 있으면 자동으로 모달 열기
+  if (location.hash && location.hash.slice(1).includes('-')) {
+    setTimeout(() => openReportModal(location.hash.slice(1)), 400);
+  }
+}
+
+function applyFilter() {
+  const q    = (document.getElementById('fSearch')?.value || '').toLowerCase();
+  const risk = document.getElementById('fRisk')?.value || '';
+  const sort = document.getElementById('fSort')?.value || 'saved_at_desc';
+
+  filteredRep = allReports.filter(r => {
+    const dl = (r.date_label || '').toLowerCase();
+    const matchQ = !q || r.id.toLowerCase().includes(q) || dl.includes(q) || (r.drone_id||'').toLowerCase().includes(q);
+    const rsk = getRiskLevel(r);
+    const matchR = !risk || rsk === risk;
+    return matchQ && matchR;
+  });
+
+  // 정렬
+  const [sf, sd] = sort.split('_').slice(0, -1).join('_') ? [sort.replace(/_desc|_asc/,''), sort.endsWith('_desc')?-1:1] : ['saved_at', -1];
+  filteredRep.sort((a, b) => {
+    let av = a[sf] || 0, bv = b[sf] || 0;
+    if (sf === 'saved_at') { av = a.saved_at; bv = b.saved_at; }
+    return (av > bv ? 1 : av < bv ? -1 : 0) * sd;
+  });
+
+  const countEl = document.getElementById('arcCount');
+  if (countEl) countEl.textContent = `${filteredRep.length}건 표시 / 전체 ${allReports.length}건`;
+
+  renderArchiveTable();
+}
+
+// 정렬 파싱 헬퍼 재구성
+(function patchApplyFilter() {
+  const orig = applyFilter;
+  window.applyFilter = function() {
+    const q    = (document.getElementById('fSearch')?.value || '').toLowerCase();
+    const risk = document.getElementById('fRisk')?.value || '';
+    const sortVal = document.getElementById('fSort')?.value || 'saved_at_desc';
+
+    filteredRep = allReports.filter(r => {
+      const dl = (r.date_label || '').toLowerCase();
+      const matchQ = !q || r.id.toLowerCase().includes(q) || dl.includes(q) || (r.drone_id||'').toLowerCase().includes(q);
+      const rsk = getRiskLevel(r);
+      const matchR = !risk || rsk === risk;
+      return matchQ && matchR;
+    });
+
+    const sortMap = {
+      'saved_at_desc':   (a,b) => b.saved_at.localeCompare(a.saved_at),
+      'saved_at_asc':    (a,b) => a.saved_at.localeCompare(b.saved_at),
+      'accuracy_desc':   (a,b) => parseFloat(b.accuracy)-parseFloat(a.accuracy),
+      'missing_desc':    (a,b) => (b.missing||0)-(a.missing||0),
+    };
+    if (sortMap[sortVal]) filteredRep.sort(sortMap[sortVal]);
+
+    const countEl = document.getElementById('arcCount');
+    if (countEl) countEl.textContent = `${filteredRep.length}건 표시 / 전체 ${allReports.length}건`;
+    renderArchiveTable();
+  };
+})();
+
+function getRiskLevel(r) {
+  const acc = parseFloat(r.accuracy||0);
+  if (acc < 95 || (r.missing||0) >= 5) return 'HIGH';
+  if ((r.missing||0) >= 3 || (r.total_changes||0) >= 15) return 'MEDIUM';
+  return 'LOW';
+}
+
+function getRiskBadge(r) {
+  const lvl = getRiskLevel(r);
+  const map = {
+    HIGH:   ['🔴 HIGH',   'rgba(248,113,113,0.15)','#f87171','rgba(248,113,113,0.3)'],
+    MEDIUM: ['🟡 MED',    'rgba(251,191,36,0.15)', '#fbbf24','rgba(251,191,36,0.3)'],
+    LOW:    ['🟢 OK',     'rgba(52,211,153,0.12)', '#34d399','rgba(52,211,153,0.3)'],
+  };
+  const [txt,bg,c,bc] = map[lvl];
+  return `<span class="badge-tag" style="background:${bg};color:${c};border:1px solid ${bc}">${txt}</span>`;
+}
+
+function renderArchiveTable() {
+  const wrap = document.getElementById('arcTableWrap');
+  if (!wrap) return;
+  if (filteredRep.length === 0) {
+    wrap.innerHTML = `<div style="text-align:center;padding:50px;color:#475569">📭 보고서 없음</div>`;
+    return;
+  }
+  wrap.innerHTML = `
+  <div class="card" style="padding:0;overflow:hidden">
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th>#</th><th>보고서 ID</th><th>날짜</th><th>시간</th>
+          <th>정확도</th><th>변화</th><th>소진</th><th>신규</th><th>AI조치</th><th>리스크</th><th></th>
+        </tr></thead>
+        <tbody>
+          ${filteredRep.map((r,i) => {
+            const acc = parseFloat(r.accuracy||0);
+            const accColor = acc>=98?'#34d399':acc>=95?'#fbbf24':'#f87171';
+            const barW = Math.min(acc,100);
+            return `<tr onclick="openReportModal('${r.id}')">
+              <td style="color:#475569">${i+1}</td>
+              <td style="font-family:monospace;font-size:0.78rem;color:#a5b4fc">${r.id}</td>
+              <td style="font-size:0.78rem">${r.date_label||r.date||'—'}</td>
+              <td style="font-family:monospace;font-size:0.75rem;color:#64748b">${r.time_label||r.time||'—'}</td>
+              <td>
+                <div style="display:flex;align-items:center;gap:6px">
+                  <div class="acc-bar-wrap"><div class="acc-bar" style="width:${barW}%;background:${accColor}"></div></div>
+                  <span style="color:${accColor};font-weight:700;font-size:0.78rem">${acc.toFixed(1)}%</span>
+                </div>
+              </td>
+              <td style="color:#fbbf24;font-weight:700">${r.total_changes||0}</td>
+              <td style="color:#f87171;font-weight:700">${r.missing||0}</td>
+              <td style="color:#34d399;font-weight:700">${r.new_items||0}</td>
+              <td style="color:#a78bfa;font-weight:700">${r.agent_actions||0}</td>
+              <td>${getRiskBadge(r)}</td>
+              <td onclick="event.stopPropagation()">
+                <button onclick="deleteReport('${r.id}')"
+                  style="padding:3px 8px;border-radius:5px;font-size:0.68rem;cursor:pointer;
+                         border:1px solid rgba(248,113,113,0.3);background:rgba(248,113,113,0.06);color:#f87171">
+                  🗑
+                </button>
+              </td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TAB 2 — Operational Ontology
+// ═══════════════════════════════════════════════════════════════
+function renderOntologyTab(vc) {
+  // 전체 이벤트 집계
+  const totMissing = allReports.reduce((s,r)=>s+(r.missing||0),0);
+  const totNew     = allReports.reduce((s,r)=>s+(r.new_items||0),0);
+  const totChanged = allReports.reduce((s,r)=>s+(r.changed||0),0);
+  const totMoved   = allReports.reduce((s,r)=>s+(r.moved||0),0);
+  const total      = totMissing+totNew+totChanged+totMoved;
+
+  const cls = [
+    ['StockDepletionEvent',  totMissing, '#f87171', 'owl:Class — 선반 재고 완전 소진 이벤트'],
+    ['NewStockArrivalEvent', totNew,     '#34d399', 'owl:Class — 신규 SKU 입고 감지 이벤트'],
+    ['QuantityChangeEvent',  totChanged, '#fbbf24', 'owl:Class — 수량 증감 변화 이벤트'],
+    ['LocationMismatchEvent',totMoved,   '#22d3ee', 'owl:Class — SKU 위치 불일치 이벤트'],
+  ];
+
+  vc.innerHTML = `
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+
+    <!-- OWL 클래스 계층 -->
+    <div class="card">
+      <div class="card-title" style="color:#22d3ee">🧠 Operational Ontology — OWL 클래스 계층</div>
+      <div class="ont-tree">
+<span class="ont-class">owl:Thing</span>
+└── <span class="ont-class">WarehouseEntity</span>
+    ├── <span class="ont-sub">Warehouse</span> <span class="ont-prop">(id:"Warehouse-A")</span>
+    │   └── <span class="ont-sub">Aisle</span> <span class="ont-prop">(A,B,C,D)</span>
+    │       └── <span class="ont-sub">Shelf</span> <span class="ont-prop">(L/R × 6)</span>
+    ├── <span class="ont-sub">Drone</span> <span class="ont-prop">(id:"DRONE-01")</span>
+    │   └── <span class="ont-sub">DronePatrol</span>
+    └── <span class="ont-class">InventoryEvent</span>
+        ├── <span class="ont-instance">StockDepletionEvent</span>   <span class="ont-prop">(${totMissing}건)</span>
+        ├── <span class="ont-instance">NewStockArrivalEvent</span>  <span class="ont-prop">(${totNew}건)</span>
+        ├── <span class="ont-instance">QuantityChangeEvent</span>   <span class="ont-prop">(${totChanged}건)</span>
+        └── <span class="ont-instance">LocationMismatchEvent</span> <span class="ont-prop">(${totMoved}건)</span>
+      </div>
+      <div style="margin-top:14px;padding:10px;background:rgba(255,255,255,0.02);border-radius:8px;
+                  font-size:0.7rem;color:#475569">
+        📌 owl:imports &lt;WarehouseOntology v2.1&gt;<br>
+        📌 드론 순찰 결과 → RDF 트리플로 자동 변환<br>
+        📌 SPARQL 쿼리를 통한 의미 기반 재고 분석 지원
+      </div>
+    </div>
+
+    <!-- 이벤트 분류 현황 -->
+    <div class="card">
+      <div class="card-title" style="color:#22d3ee">📊 누적 이벤트 분류 현황 (${allReports.length}건 순찰)</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        ${cls.map(([name,cnt,c,desc]) => {
+          const pct = total > 0 ? Math.round(cnt/total*100) : 0;
+          return `<div style="background:rgba(255,255,255,0.02);border-radius:9px;padding:12px;
+                              border-left:3px solid ${c}">
+            <div style="display:flex;justify-content:space-between;margin-bottom:5px">
+              <span style="font-family:monospace;font-size:0.75rem;color:${c};font-weight:700">${name}</span>
+              <span style="color:${c};font-weight:900">${cnt}건 (${pct}%)</span>
+            </div>
+            <div style="background:rgba(255,255,255,0.06);border-radius:4px;height:6px;margin-bottom:5px">
+              <div style="height:6px;border-radius:4px;background:${c};width:${pct}%"></div>
+            </div>
+            <div style="font-size:0.68rem;color:#475569">${desc}</div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+
+    <!-- SPARQL 예시 쿼리 -->
+    <div class="card" style="grid-column:1/-1">
+      <div class="card-title" style="color:#22d3ee">🔍 SPARQL 예시 쿼리 (Ontology 기반 재고 분석)</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        ${[
+          ['소진 품목 조회', `PREFIX wh: <http://warehouse.ai/ontology#>
+SELECT ?shelf ?sku ?date
+WHERE {
+  ?event a wh:StockDepletionEvent ;
+         wh:shelf ?shelf ;
+         wh:sku   ?sku ;
+         wh:date  ?date .
+}
+ORDER BY DESC(?date)`],
+          ['위치 불일치 탐지', `PREFIX wh: <http://warehouse.ai/ontology#>
+SELECT ?shelf ?expected ?actual ?patrol
+WHERE {
+  ?event a wh:LocationMismatchEvent ;
+         wh:shelf    ?shelf ;
+         wh:expected ?expected ;
+         wh:actual   ?actual ;
+         wh:patrol   ?patrol .
+}`],
+        ].map(([title, q]) => `
+        <div>
+          <div style="font-size:0.7rem;color:#475569;margin-bottom:6px">${title}</div>
+          <pre style="background:rgba(0,0,0,0.35);border:1px solid rgba(34,211,238,0.15);
+                      border-radius:8px;padding:10px;font-size:0.67rem;color:#a5f3fc;
+                      white-space:pre-wrap;overflow-x:auto">${q}</pre>
+        </div>`).join('')}
+      </div>
+    </div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TAB 3 — Agentic AI 분석
+// ═══════════════════════════════════════════════════════════════
+function renderAgenticTab(vc) {
+  const total       = allReports.length;
+  if (total === 0) {
+    vc.innerHTML = `<div class="card" style="text-align:center;padding:50px;color:#475569">📭 보고서 없음</div>`;
+    return;
+  }
+
+  const avgAcc      = allReports.reduce((s,r)=>s+parseFloat(r.accuracy||0),0)/total;
+  const totalAI     = allReports.reduce((s,r)=>s+(r.agent_actions||0),0);
+  const highRisk    = allReports.filter(r=>parseFloat(r.accuracy||0)<95||(r.missing||0)>=5);
+  const bestReport  = [...allReports].sort((a,b)=>parseFloat(b.accuracy)-parseFloat(a.accuracy))[0];
+  const worstReport = [...allReports].sort((a,b)=>parseFloat(a.accuracy)-parseFloat(b.accuracy))[0];
+
+  // 트렌드 (최근 5건)
+  const recent5 = [...allReports].sort((a,b)=>b.saved_at.localeCompare(a.saved_at)).slice(0,5);
+  const trendUp = recent5.length >= 2 &&
+    parseFloat(recent5[0].accuracy) > parseFloat(recent5[recent5.length-1].accuracy);
+
+  // AI 의사결정 시뮬레이션
+  const aiDecisions = [];
+  if (highRisk.length > 0) {
+    aiDecisions.push({
+      type:'ALERT', priority:'HIGH',
+      title:`${highRisk.length}건 고위험 순찰 감지`,
+      detail:'정확도 95% 미만 또는 소진 5건 이상 — 창고 관리자 즉시 통보 권고',
+      action:'에스컬레이션 트리거'
+    });
+  }
+  const highMissing = allReports.filter(r=>(r.missing||0)>=3);
+  if (highMissing.length > 0) {
+    aiDecisions.push({
+      type:'REORDER', priority:'HIGH',
+      title:`${highMissing.length}회 순찰에서 다량 소진 감지`,
+      detail:'3건 이상 소진이 반복되는 SKU — 자동 재주문 요청 생성 권고',
+      action:'WMS 재주문 API 호출'
+    });
+  }
+  if (!trendUp && total >= 3) {
+    aiDecisions.push({
+      type:'OPTIMIZE', priority:'MEDIUM',
+      title:'정확도 트렌드 하락 감지',
+      detail:'최근 순찰 정확도 하락세 — 드론 캘리브레이션 점검 권고',
+      action:'유지보수 스케줄 생성'
+    });
+  }
+  aiDecisions.push({
+    type:'SCHEDULE', priority:'INFO',
+    title:'다음 정기 순찰 예약',
+    detail:`다음 순찰: ${new Date(Date.now()+86400000).toLocaleDateString('ko-KR')} 22:00`,
+    action:'자동 예약 확정'
+  });
+
+  const priorColor = {HIGH:'#f87171',MEDIUM:'#fbbf24',INFO:'#a5b4fc'};
+  const typeColor  = {ALERT:'#f87171',REORDER:'#fbbf24',OPTIMIZE:'#22d3ee',SCHEDULE:'#34d399',CONFIRM:'#a78bfa'};
+
+  vc.innerHTML = `
+  <!-- KPI -->
+  <div class="kpi-grid" style="grid-template-columns:repeat(5,1fr)">
+    ${[
+      ['순찰 횟수', total, '#a5b4fc'],
+      ['평균 정확도', avgAcc.toFixed(1)+'%', avgAcc>=98?'#34d399':avgAcc>=95?'#fbbf24':'#f87171'],
+      ['총 AI 조치', totalAI, '#a78bfa'],
+      ['고위험 이상', highRisk.length, highRisk.length>0?'#f87171':'#34d399'],
+      ['트렌드', trendUp?'▲ 개선':'▼ 주의', trendUp?'#34d399':'#fbbf24'],
+    ].map(([l,v,c])=>`
+    <div class="kpi-card">
+      <div class="kpi-val" style="color:${c}">${v}</div>
+      <div class="kpi-lbl">${l}</div>
+    </div>`).join('')}
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+
+    <!-- AI 의사결정 -->
+    <div class="card">
+      <div class="card-title" style="color:#a78bfa">🤖 Agentic AI 크로스-리포트 의사결정</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        ${aiDecisions.map(d=>`
+        <div style="background:rgba(255,255,255,0.02);border-radius:10px;padding:12px;
+                    border-left:3px solid ${priorColor[d.priority]||'#64748b'}">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+            <span style="padding:2px 8px;border-radius:4px;font-size:0.68rem;font-weight:700;
+                         background:${(typeColor[d.type]||'#94a3b8')}22;color:${typeColor[d.type]||'#94a3b8'};
+                         border:1px solid ${(typeColor[d.type]||'#94a3b8')}44">${d.type}</span>
+            <span style="font-size:0.78rem;font-weight:700;color:#e2e8f0;flex:1">${d.title}</span>
+            <span style="font-size:0.64rem;padding:2px 6px;border-radius:4px;
+                         background:${priorColor[d.priority]||'#64748b'}18;
+                         color:${priorColor[d.priority]||'#94a3b8'}">${d.priority}</span>
+          </div>
+          <div style="font-size:0.75rem;color:#94a3b8;margin-bottom:6px">${d.detail}</div>
+          <div style="font-size:0.7rem;color:#64748b">
+            → 권고 액션: <span style="color:#a5b4fc">${d.action}</span>
+          </div>
+        </div>`).join('')}
+      </div>
+    </div>
+
+    <!-- 베스트 / 워스트 -->
+    <div style="display:flex;flex-direction:column;gap:12px">
+      ${[
+        ['🏆 최고 성능 순찰', bestReport, '#34d399'],
+        ['⚠️ 주의 필요 순찰', worstReport, '#f87171'],
+      ].map(([title, r, c]) => r ? `
+      <div class="card" style="border-color:${c}33">
+        <div class="card-title" style="color:${c}">${title}</div>
+        <div style="font-family:monospace;font-size:0.82rem;color:${c};margin-bottom:6px">${r.id}</div>
+        <div style="font-size:0.75rem;color:#94a3b8;margin-bottom:8px">
+          ${r.date_label||r.date||'—'} · ${r.time_label||r.time||'—'}
+        </div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap">
+          ${[
+            ['정확도', parseFloat(r.accuracy||0).toFixed(1)+'%', c],
+            ['변화', r.total_changes||0, '#fbbf24'],
+            ['소진', r.missing||0, '#f87171'],
+          ].map(([l,v,vc2])=>`
+          <div style="text-align:center">
+            <div style="font-size:1.1rem;font-weight:900;color:${vc2}">${v}</div>
+            <div style="font-size:0.66rem;color:#64748b">${l}</div>
+          </div>`).join('')}
+        </div>
+        <button onclick="openReportModal('${r.id}')"
+          style="margin-top:10px;padding:5px 12px;border-radius:6px;font-size:0.72rem;
+                 font-weight:700;cursor:pointer;border:1px solid ${c}44;
+                 background:${c}11;color:${c}">👁 상세 보기</button>
+      </div>` : '').join('')}
+    </div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TAB 4 — MCP 도구
+// ═══════════════════════════════════════════════════════════════
+function renderMcpTab(vc) {
+  const tools = [
+    {
+      name: 'query_report_archive',
+      desc: '날짜 범위, 드론 ID, 리스크 레벨로 보고서 아카이브를 쿼리합니다.',
+      schema: `{
+  "name": "query_report_archive",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "limit":    {"type":"integer","default":50},
+      "date_from":{"type":"string","description":"YYYY-MM-DD"},
+      "date_to":  {"type":"string","description":"YYYY-MM-DD"},
+      "drone_id": {"type":"string","example":"DRONE-01"},
+      "risk":     {"type":"string","enum":["HIGH","MEDIUM","LOW"]}
+    }
+  }
+}`,
+      demoFn: () => {
+        const sample = allReports.slice(0,3).map(r=>({
+          id:r.id, date:r.date_label||r.date, accuracy:r.accuracy,
+          risk:getRiskLevel(r), total_changes:r.total_changes
+        }));
+        return JSON.stringify({ok:true, total:allReports.length, reports:sample}, null, 2);
+      }
+    },
+    {
+      name: 'detect_anomalies',
+      desc: '아카이브 전체를 분석하여 이상 순찰(정확도 <95% 또는 소진 ≥5)을 반환합니다.',
+      schema: `{
+  "name": "detect_anomalies",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "accuracy_threshold": {"type":"number","default":95},
+      "missing_threshold":  {"type":"integer","default":5}
+    }
+  }
+}`,
+      demoFn: () => {
+        const anomalies = allReports.filter(r=>
+          parseFloat(r.accuracy||0)<95||(r.missing||0)>=5
+        ).map(r=>({id:r.id, accuracy:r.accuracy, missing:r.missing, risk:'HIGH'}));
+        return JSON.stringify({ok:true, anomaly_count:anomalies.length, anomalies}, null, 2);
+      }
+    },
+    {
+      name: 'classify_ontology_events',
+      desc: '보고서 데이터를 Operational Ontology OWL 클래스로 분류하여 반환합니다.',
+      schema: `{
+  "name": "classify_ontology_events",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "report_id": {"type":"string","description":"특정 보고서 ID (빈 값 = 전체 집계)"}
+    }
+  }
+}`,
+      demoFn: () => {
+        const totM = allReports.reduce((s,r)=>s+(r.missing||0),0);
+        const totN = allReports.reduce((s,r)=>s+(r.new_items||0),0);
+        const totC = allReports.reduce((s,r)=>s+(r.changed||0),0);
+        const totV = allReports.reduce((s,r)=>s+(r.moved||0),0);
+        return JSON.stringify({ok:true,ontology:'WarehouseOntology v2.1',events:{
+          StockDepletionEvent:totM, NewStockArrivalEvent:totN,
+          QuantityChangeEvent:totC, LocationMismatchEvent:totV
+        }}, null, 2);
+      }
+    },
+    {
+      name: 'generate_intelligence_summary',
+      desc: '아카이브 전체 데이터로 Agentic AI 크로스-리포트 인텔리전스 요약을 생성합니다.',
+      schema: `{
+  "name": "generate_intelligence_summary",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "period_days": {"type":"integer","default":7,"description":"최근 N일 분석"}
+    }
+  }
+}`,
+      demoFn: () => {
+        const n = allReports.length;
+        const avg = n > 0 ? (allReports.reduce((s,r)=>s+parseFloat(r.accuracy||0),0)/n).toFixed(2) : 0;
+        const high = allReports.filter(r=>parseFloat(r.accuracy||0)<95||(r.missing||0)>=5).length;
+        return JSON.stringify({ok:true,summary:{
+          total_patrols:n, avg_accuracy:avg,
+          high_risk_patrols:high,
+          trend: n>=2 ? (parseFloat(allReports[0]?.accuracy||0)>parseFloat(allReports[n-1]?.accuracy||0)?'IMPROVING':'DECLINING') : 'INSUFFICIENT_DATA',
+          recommendations:[
+            high>0?`[HIGH] ${high}건 고위험 순찰 즉시 점검`:`[INFO] 정상 범위 운영 중`,
+            `[INFO] 다음 순찰: ${new Date(Date.now()+86400000).toLocaleDateString('ko-KR')} 22:00`
+          ]
+        }}, null, 2);
+      }
+    },
+  ];
+
+  vc.innerHTML = `
+  <div class="card" style="margin-bottom:16px;border-color:rgba(99,102,241,0.3)">
+    <div class="card-title" style="color:#818cf8">🔌 MCP (Model Context Protocol) — warehouse-drone-mcp v1.0</div>
+    <div style="font-size:0.78rem;color:#475569;line-height:1.7">
+      MCP 서버를 통해 LLM 에이전트(Claude, GPT 등)가 아래 도구를 직접 호출할 수 있습니다.<br>
+      각 도구의 "▶ 실행 (데모)" 버튼으로 현재 아카이브 데이터 기반 결과를 미리 확인할 수 있습니다.
+    </div>
+    <div style="margin-top:10px;padding:10px 14px;background:rgba(0,0,0,0.3);border-radius:8px;
+                font-family:monospace;font-size:0.72rem;color:#94a3b8">
+      서버 설정: <span style="color:#818cf8">warehouse-drone-mcp://localhost:5002/mcp</span><br>
+      인증: Bearer token (환경 변수 MCP_SECRET)<br>
+      프로토콜: MCP 2024-11 (JSON-RPC 2.0)
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+    ${tools.map((t,i) => `
+    <div class="mcp-tool">
+      <div class="mcp-name">${t.name}()</div>
+      <div class="mcp-desc">${t.desc}</div>
+      <div style="font-size:0.67rem;color:#475569;margin-bottom:5px">inputSchema:</div>
+      <div class="mcp-schema">${t.schema}</div>
+      <button class="mcp-run-btn" onclick="runMcpTool(${i})">▶ 실행 (데모)</button>
+      <div class="mcp-output" id="mcpOut${i}"></div>
+    </div>`).join('')}
+  </div>`;
+
+  // 함수 등록
+  window._mcpTools = tools;
+}
+
+function runMcpTool(i) {
+  const outEl = document.getElementById('mcpOut' + i);
+  if (!outEl) return;
+  outEl.style.display = 'block';
+  outEl.textContent = '⏳ 실행 중…';
+  setTimeout(() => {
+    try {
+      outEl.textContent = window._mcpTools[i].demoFn();
+    } catch(e) {
+      outEl.textContent = '오류: ' + e.message;
+      outEl.style.color = '#f87171';
+    }
+  }, 400);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TAB 5 — 통계 대시보드
+// ═══════════════════════════════════════════════════════════════
+function renderStatsTab(vc) {
+  if (!statsData) {
+    vc.innerHTML = `<div class="card" style="text-align:center;padding:50px;color:#475569">⏳ 통계 로딩 중…</div>`;
+    return;
+  }
+  const s = statsData;
+  const daily7 = s.daily_7d || [];
+
+  // 차트용 최대값 계산
+  const maxChg = Math.max(...daily7.map(d=>d.sum_chg||0), 1);
+
+  vc.innerHTML = `
+  <!-- KPI -->
+  <div class="kpi-grid">
+    ${[
+      ['총 보고서', s.total_reports||0, '#a5b4fc'],
+      ['평균 정확도', (s.avg_accuracy||0).toFixed(1)+'%',
+       (s.avg_accuracy||0)>=98?'#34d399':(s.avg_accuracy||0)>=95?'#fbbf24':'#f87171'],
+      ['누적 소진', s.total_missing_events||0, '#f87171'],
+      ['누적 변화', s.total_change_events||0, '#fbbf24'],
+    ].map(([l,v,c])=>`
+    <div class="kpi-card">
+      <div class="kpi-val" style="color:${c}">${v}</div>
+      <div class="kpi-lbl">${l}</div>
+    </div>`).join('')}
+  </div>
+
+  <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px">
+
+    <!-- 최근 7일 차트 -->
+    <div class="card">
+      <div class="card-title" style="color:#fbbf24">📈 최근 7일 변화 이벤트 추이</div>
+      ${daily7.length > 0 ? `
+      <div class="chart-bars">
+        ${daily7.map(d => {
+          const h = Math.max(Math.round((d.sum_chg||0)/maxChg*90), 4);
+          const acc = d.avg_acc || 0;
+          const c = acc>=98?'#34d399':acc>=95?'#fbbf24':'#f87171';
+          return `<div class="chart-col">
+            <div style="font-size:0.6rem;color:#64748b">${(d.sum_chg||0)}</div>
+            <div class="chart-bar" style="height:${h}px;background:linear-gradient(to top,#6366f1,#818cf8)"></div>
+          </div>`;
+        }).join('')}
+      </div>
+      <div style="display:flex;gap:4px">
+        ${daily7.map(d=>`
+        <div style="flex:1;text-align:center;font-size:0.58rem;color:#475569">${(d.day||'').slice(5)}</div>`).join('')}
+      </div>
+      <div style="margin-top:10px;font-size:0.72rem;color:#475569">
+        막대: 총 변화 건수 | 최근 ${daily7.length}일 데이터
+      </div>` : `<div style="color:#475569;font-size:0.8rem;padding:20px 0">7일 데이터 없음</div>`}
+    </div>
+
+    <!-- 드론별 통계 -->
+    <div class="card">
+      <div class="card-title" style="color:#a5b4fc">🚁 드론별 성능</div>
+      ${(s.by_drone||[]).length > 0 ? (s.by_drone||[]).map(d=>`
+      <div style="margin-bottom:12px;padding:12px;background:rgba(255,255,255,0.02);border-radius:8px">
+        <div style="font-family:monospace;font-size:0.8rem;color:#a5b4fc;margin-bottom:4px">${d.drone_id||'—'}</div>
+        <div style="display:flex;gap:14px">
+          <div>
+            <div style="font-size:1.1rem;font-weight:900;color:#34d399">${(d.avg_acc||0).toFixed(1)}%</div>
+            <div style="font-size:0.65rem;color:#64748b">평균 정확도</div>
+          </div>
+          <div>
+            <div style="font-size:1.1rem;font-weight:900;color:#a5b4fc">${d.cnt||0}</div>
+            <div style="font-size:0.65rem;color:#64748b">순찰 횟수</div>
+          </div>
+        </div>
+      </div>`).join('') : '<div style="color:#475569;font-size:0.78rem">데이터 없음</div>'}
+    </div>
+  </div>
+
+  <!-- 최근 10건 -->
+  <div class="card" style="margin-top:4px">
+    <div class="card-title" style="color:#94a3b8">📋 최근 순찰 목록 (최대 10건)</div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th>보고서 ID</th><th>날짜</th><th>정확도</th><th>변화</th><th>소진</th><th></th>
+        </tr></thead>
+        <tbody>
+          ${(s.recent||[]).map(r=>`
+          <tr onclick="openReportModal('${r.id}')">
+            <td style="font-family:monospace;font-size:0.78rem;color:#a5b4fc">${r.id}</td>
+            <td style="font-size:0.78rem">${r.date_label||r.date||'—'}</td>
+            <td style="color:${parseFloat(r.accuracy||0)>=98?'#34d399':parseFloat(r.accuracy||0)>=95?'#fbbf24':'#f87171'};font-weight:700">
+              ${parseFloat(r.accuracy||0).toFixed(1)}%
+            </td>
+            <td style="color:#fbbf24;font-weight:700">${r.total_changes||0}</td>
+            <td style="color:#f87171;font-weight:700">${r.missing||0}</td>
+            <td><button onclick="event.stopPropagation();openReportModal('${r.id}')"
+              style="padding:3px 8px;border-radius:5px;font-size:0.68rem;cursor:pointer;
+                     border:1px solid rgba(165,180,252,0.3);background:rgba(99,102,241,0.08);color:#a5b4fc">
+              👁
+            </button></td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 상세 모달
+// ═══════════════════════════════════════════════════════════════
+async function openReportModal(reportId) {
+  const modal = document.getElementById('detailModal');
+  const titleEl = document.getElementById('modalTitle');
+  const bodyEl  = document.getElementById('modalBody');
+  modal.style.display = 'flex';
+  titleEl.textContent = '로딩 중…';
+  bodyEl.innerHTML = '<div style="text-align:center;padding:40px;color:#64748b">⏳ 불러오는 중…</div>';
+
+  try {
+    const res  = await fetch(`/api/reports/${reportId}`);
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error);
+
+    const r = json.report;
+    const d = (r.data && Object.keys(r.data).length > 0) ? r.data : r;
+
+    const missing  = parseInt(d.missing  || r.missing  || 0);
+    const newItems = parseInt(d.new_items || r.new_items || 0);
+    const changed  = parseInt(d.changed  || r.changed  || 0);
+    const moved    = parseInt(d.moved    || r.moved    || 0);
+    const acc      = parseFloat(d.accuracy || r.accuracy || 0);
+    const totalSc  = d.total_scanned || r.total_scanned || 0;
+    const totalCh  = d.total_changes  || r.total_changes  || 0;
+    const agAct    = d.agent_actions  || r.agent_actions  || 0;
+    const dateStr  = d.date || r.date_label || '—';
+    const timeStr  = d.time || r.time_label || '—';
+    const rptId    = d.report_id || r.id || reportId;
+    const decisions= d.agent_decisions || [];
+    const recs     = d.recommendations || [];
+
+    // 온톨로지 클래스
+    const ontEvents = [
+      missing  > 0 ? ['StockDepletionEvent',  missing,  '#f87171'] : null,
+      newItems > 0 ? ['NewStockArrivalEvent',  newItems, '#34d399'] : null,
+      changed  > 0 ? ['QuantityChangeEvent',   changed,  '#fbbf24'] : null,
+      moved    > 0 ? ['LocationMismatchEvent', moved,    '#22d3ee'] : null,
+    ].filter(Boolean);
+
+    titleEl.textContent = `${rptId} — ${dateStr} ${timeStr}`;
+
+    bodyEl.innerHTML = `
+    <!-- KPI -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px">
+      ${[[totalSc,'총 스캔','#a5b4fc'],[acc.toFixed(1)+'%','정확도','#34d399'],
+         [totalCh,'변화','#fbbf24'],[agAct,'AI 조치','#a78bfa']].map(([v,l,c])=>`
+      <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);
+                  border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:1.5rem;font-weight:900;color:${c}">${v}</div>
+        <div style="font-size:0.67rem;color:#64748b;margin-top:3px">${l}</div>
+      </div>`).join('')}
+    </div>
+
+    <!-- 변화 요약 -->
+    <div style="font-size:0.7rem;font-weight:800;color:#64748b;text-transform:uppercase;
+                letter-spacing:0.06em;margin-bottom:8px">📦 재고 변화</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:16px">
+      ${[['#f87171','🔴 소진',missing],['#34d399','🟢 신규',newItems],
+         ['#fbbf24','🟡 수량변화',changed],['#22d3ee','🔵 위치변경',moved]].map(([c,l,v])=>`
+      <div style="display:flex;justify-content:space-between;align-items:center;
+                  padding:7px 12px;border-radius:7px;border-left:3px solid ${c};
+                  background:rgba(255,255,255,0.02)">
+        <span style="color:${c};font-size:0.78rem;font-weight:700">${l}</span>
+        <span style="color:${c};font-size:0.95rem;font-weight:900">${v}건</span>
+      </div>`).join('')}
+    </div>
+
+    <!-- Ontology -->
+    ${ontEvents.length > 0 ? `
+    <div style="font-size:0.7rem;font-weight:800;color:#0891b2;text-transform:uppercase;
+                letter-spacing:0.06em;margin-bottom:8px">🧠 Ontology 분류</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px">
+      ${ontEvents.map(([n,c2,c])=>`
+      <span style="padding:4px 10px;border-radius:6px;font-family:monospace;font-size:0.7rem;
+                   font-weight:700;background:${c}18;color:${c};border:1px solid ${c}40">
+        ${n}(${c2})
+      </span>`).join('')}
+    </div>` : ''}
+
+    <!-- AI 조치 -->
+    ${decisions.length > 0 ? `
+    <div style="font-size:0.7rem;font-weight:800;color:#64748b;text-transform:uppercase;
+                letter-spacing:0.06em;margin-bottom:8px">🤖 AI 조치</div>
+    <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:16px">
+      ${decisions.map(dec=>{
+        const tc={RESCAN:'#a78bfa',CONFIRM:'#34d399',ALERT:'#f87171',ESCALATE:'#fbbf24'}[dec.type]||'#94a3b8';
+        return `<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;
+                            border-radius:7px;background:rgba(255,255,255,0.02)">
+          <span style="background:${tc}22;color:${tc};padding:2px 8px;border-radius:4px;
+                       font-size:0.68rem;font-weight:700;flex-shrink:0">${dec.type}</span>
+          <span style="flex:1;font-size:0.79rem;color:#e2e8f0">${dec.title}</span>
+          <span style="font-family:monospace;font-size:0.7rem;color:#64748b">${dec.timestamp||''}</span>
+        </div>`;
+      }).join('')}
+    </div>` : ''}
+
+    <!-- 권고 -->
+    ${recs.length > 0 ? `
+    <div style="font-size:0.7rem;font-weight:800;color:#64748b;text-transform:uppercase;
+                letter-spacing:0.06em;margin-bottom:8px">📌 권고사항</div>
+    <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:16px">
+      ${recs.map(rec=>{
+        const lv=rec.includes('[HIGH]')?'HIGH':rec.includes('[MEDIUM]')?'MEDIUM':rec.includes('[LOW]')?'LOW':'INFO';
+        const c={HIGH:'#f87171',MEDIUM:'#fbbf24',LOW:'#22d3ee',INFO:'#a5b4fc'}[lv];
+        const bg={HIGH:'rgba(248,113,113,0.07)',MEDIUM:'rgba(251,191,36,0.07)',LOW:'rgba(34,211,238,0.07)',INFO:'rgba(99,102,241,0.07)'}[lv];
+        return `<div style="padding:8px 12px;border-radius:7px;border-left:3px solid ${c};
+                            background:${bg};font-size:0.78rem;color:${c}">${rec}</div>`;
+      }).join('')}
+    </div>` : ''}
+
+    <!-- MCP 미리보기 -->
+    <div style="background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.18);
+                border-radius:8px;padding:12px;margin-bottom:14px">
+      <div style="font-size:0.67rem;font-weight:800;color:#818cf8;margin-bottom:5px">
+        🔌 MCP get_report("${rptId}")
+      </div>
+      <pre style="font-family:monospace;font-size:0.67rem;color:#94a3b8;margin:0;white-space:pre-wrap">accuracy:${acc.toFixed(1)}%, events:{StockDepletion:${missing},NewArrival:${newItems},QtyChange:${changed},LocMismatch:${moved}}, ai_actions:${agAct}, risk:${acc<95||missing>=5?'HIGH':missing>=3||totalCh>=15?'MEDIUM':'LOW'}</pre>
+    </div>
+
+    <!-- 메모 -->
+    <div style="margin-bottom:14px">
+      <div style="font-size:0.7rem;color:#64748b;margin-bottom:5px">📝 관리자 메모</div>
+      <textarea id="noteInput" rows="2"
+        style="width:100%;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.1);
+               border-radius:7px;color:#e2e8f0;padding:8px 12px;font-size:0.8rem;resize:vertical;outline:none"
+        placeholder="메모를 입력하세요…">${r.note||''}</textarea>
+      <button onclick="saveNote('${reportId}')"
+        style="margin-top:5px;padding:5px 14px;border-radius:6px;font-size:0.72rem;font-weight:700;
+               cursor:pointer;border:1px solid rgba(52,211,153,0.3);background:rgba(52,211,153,0.07);color:#34d399">
+        💾 저장
+      </button>
+    </div>
+
+    <!-- 버튼 -->
+    <div style="display:flex;gap:8px;justify-content:flex-end;padding-top:12px;
+                border-top:1px solid rgba(255,255,255,0.05)">
+      <button onclick="window.print()"
+        style="padding:8px 16px;border-radius:7px;font-size:0.8rem;font-weight:700;cursor:pointer;
+               border:1px solid rgba(99,102,241,0.4);background:rgba(99,102,241,0.1);color:#a5b4fc">
+        🖨️ 인쇄
+      </button>
+      <button onclick="deleteReport('${reportId}');closeModal()"
+        style="padding:8px 16px;border-radius:7px;font-size:0.8rem;font-weight:700;cursor:pointer;
+               border:1px solid rgba(248,113,113,0.3);background:rgba(248,113,113,0.06);color:#f87171">
+        🗑 삭제
+      </button>
+      <button onclick="closeModal()"
+        style="padding:8px 16px;border-radius:7px;font-size:0.8rem;cursor:pointer;
+               border:1px solid rgba(255,255,255,0.1);background:transparent;color:#64748b">
+        닫기
+      </button>
+    </div>`;
+
+  } catch(err) {
+    bodyEl.innerHTML = `<div style="color:#f87171;padding:20px">❌ ${err.message}</div>`;
+  }
+}
+
+function closeModal() {
+  document.getElementById('detailModal').style.display = 'none';
+}
+document.getElementById('detailModal').addEventListener('click', e => {
+  if (e.target === document.getElementById('detailModal')) closeModal();
+});
+
+async function saveNote(reportId) {
+  const note = document.getElementById('noteInput')?.value || '';
+  try {
+    const res = await fetch(`/api/reports/${reportId}`, {
+      method:'PATCH', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({note})
+    });
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error);
+    showToast('메모 저장 완료');
+    // 로컬 업데이트
+    const r = allReports.find(x=>x.id===reportId);
+    if (r) r.note = note;
+  } catch(e) {
+    showToast('저장 실패: '+e.message, true);
+  }
+}
+
+// ─── 삭제 ─────────────────────────────────────────────────────
+async function deleteReport(reportId) {
+  if (!confirm(`보고서 ${reportId}를 삭제하시겠습니까?`)) return;
+  try {
+    const res  = await fetch(`/api/reports/${reportId}`, {method:'DELETE'});
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error);
+    allReports = allReports.filter(r=>r.id!==reportId);
+    filteredRep = filteredRep.filter(r=>r.id!==reportId);
+    document.getElementById('sbBadgeTotal').textContent = allReports.length;
+    showToast(`삭제 완료: ${reportId}`);
+    switchTab(currentTab);
+  } catch(e) {
+    showToast('삭제 실패: '+e.message, true);
+  }
+}
+
+// ─── 내보내기 ────────────────────────────────────────────────
+function exportReports() {
+  window.open('/api/reports/export', '_blank');
+}
+
+// ─── 토스트 ──────────────────────────────────────────────────
+function showToast(msg, isError=false) {
+  const t = document.getElementById('toast');
+  t.textContent = (isError?'❌ ':'✅ ') + msg;
+  t.className = isError ? 'error' : '';
+  t.style.display = 'block';
+  setTimeout(()=>t.style.display='none', 3500);
+}
+</script>
+</body>
+</html>
