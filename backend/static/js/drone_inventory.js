@@ -173,7 +173,12 @@ function updateClock() {
 // ── View Router ────────────────────────────────────────────────
 function showView(view) {
     state.currentView = view;
+    // 모든 menu-item active 제거
     document.querySelectorAll('.menu-item').forEach(el => el.classList.remove('active'));
+
+    // data-view 속성으로 정확하게 해당 메뉴 아이템 활성화
+    const targetMenu = document.querySelector(`.menu-item[data-view="${view}"]`);
+    if (targetMenu) targetMenu.classList.add('active');
 
     const content = document.getElementById('dashboardContent');
     switch (view) {
@@ -2075,7 +2080,7 @@ async function archiveReport() {
             btn.style.borderColor = 'rgba(52,211,153,0.4)';
             btn.style.color = '#34d399';
             btn.style.opacity = '1';
-            statusEl.innerHTML = `<span style="color:#34d399;">✅ ${json.id} 기록 저장됨 · 보고서 기록 탭에서 확인하세요</span>`;
+            statusEl.innerHTML = `<span style="color:#34d399;">✅ ${json.id} 기록 저장됨 · </span><button onclick="showView('archive')" style="background:rgba(99,102,241,0.18);border:1px solid rgba(99,102,241,0.45);border-radius:6px;color:#a5b4fc;font-size:0.78rem;font-weight:700;padding:3px 12px;cursor:pointer;margin-left:4px;">📂 보고서 기록 바로 보기 →</button>`;
             addFeed(`🗂️ 보고서 기록 저장 완료 → ${json.id}`, 'agent-action');
 
             // 아카이브 배지 업데이트
