@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚁 Drone Inventory Intelligence System</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/drone_inventory.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo-container">
+                    <span class="logo-icon">🚁</span>
+                    <div>
+                        <span class="logo-text">Drone Inventory</span>
+                        <div class="logo-sub">Intelligence System</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Back to Warehouse ATC -->
+            <div class="menu-section">
+                <div class="menu-item" onclick="window.location.href='/'">
+                    <span class="menu-icon">🏭</span>
+                    <span class="menu-text">Warehouse ATC</span>
+                    <span class="menu-arrow">←</span>
+                </div>
+            </div>
+
+            <!-- Drone Status -->
+            <div class="menu-section">
+                <div class="menu-header">
+                    <span>🚁 드론 상태</span>
+                </div>
+                <div class="menu-content expanded" id="droneStatusMenu">
+                    <div class="drone-status-card" id="sidebarDroneStatus">
+                        <div class="drone-status-row">
+                            <span class="ds-label">드론 ID</span>
+                            <span class="ds-value" id="sb-droneId">DRONE-01</span>
+                        </div>
+                        <div class="drone-status-row">
+                            <span class="ds-label">상태</span>
+                            <span class="ds-value status-standby" id="sb-droneState">대기 중</span>
+                        </div>
+                        <div class="drone-status-row">
+                            <span class="ds-label">배터리</span>
+                            <span class="ds-value" id="sb-battery">100%</span>
+                        </div>
+                        <div class="drone-status-row">
+                            <span class="ds-label">현재 통로</span>
+                            <span class="ds-value" id="sb-aisle">—</span>
+                        </div>
+                        <div class="drone-status-row">
+                            <span class="ds-label">스캔 수</span>
+                            <span class="ds-value" id="sb-scanCount">0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mission Control -->
+            <div class="menu-section">
+                <div class="menu-header">
+                    <span>🎯 미션 제어</span>
+                </div>
+                <div class="menu-content expanded">
+                    <div class="menu-item active" onclick="showView('patrol')">
+                        <span class="menu-icon">🗺️</span>
+                        <span class="menu-text">순찰 지도</span>
+                    </div>
+                    <div class="menu-item" onclick="showView('scanlog')">
+                        <span class="menu-icon">📋</span>
+                        <span class="menu-text">스캔 이벤트</span>
+                        <span class="menu-badge" id="scanBadge">0</span>
+                    </div>
+                    <div class="menu-item" onclick="showView('compare')">
+                        <span class="menu-icon">📊</span>
+                        <span class="menu-text">재고 비교</span>
+                        <span class="menu-badge warning" id="changeBadge" style="display:none">0</span>
+                    </div>
+                    <div class="menu-item" onclick="showView('agent')">
+                        <span class="menu-icon">🤖</span>
+                        <span class="menu-text">Agentic AI</span>
+                        <span class="menu-badge ai" id="agentBadge" style="display:none">0</span>
+                    </div>
+                    <div class="menu-item" onclick="showView('ontology')">
+                        <span class="menu-icon">🧠</span>
+                        <span class="menu-text">Ontology</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Day Selector -->
+            <div class="menu-section">
+                <div class="menu-header">
+                    <span>📅 일자 선택</span>
+                </div>
+                <div class="menu-content expanded">
+                    <div class="day-selector">
+                        <button class="day-btn active" id="dayBtn1" onclick="selectDay(1)">Day 1</button>
+                        <button class="day-btn" id="dayBtn2" onclick="selectDay(2)">Day 2</button>
+                    </div>
+                    <div class="day-info" id="dayInfo">
+                        <span class="day-label">현재: Day 1</span>
+                        <span class="day-date" id="dayDate">2026-04-03</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="content-header">
+                <div class="header-left">
+                    <h1 id="pageTitle">🚁 드론 재고 순찰 시스템</h1>
+                    <p class="subtitle" id="pageSubtitle">Drone → Vision AI → Barcode → Inventory DB → Daily Comparison</p>
+                </div>
+                <div class="header-right">
+                    <div class="mission-stats">
+                        <div class="stat-chip">
+                            <span class="stat-icon">📦</span>
+                            <span id="totalScanned">0</span>
+                            <span class="stat-unit">스캔</span>
+                        </div>
+                        <div class="stat-chip warning" id="alertChip" style="display:none">
+                            <span class="stat-icon">⚠️</span>
+                            <span id="totalAlerts">0</span>
+                            <span class="stat-unit">변화감지</span>
+                        </div>
+                        <div class="stat-chip ai" id="agentChip" style="display:none">
+                            <span class="stat-icon">🤖</span>
+                            <span id="agentActions">0</span>
+                            <span class="stat-unit">AI 조치</span>
+                        </div>
+                    </div>
+                    <div class="status-badge status-active" id="systemStatus">
+                        <span class="status-dot"></span>
+                        <span id="systemStatusText">시스템 준비</span>
+                    </div>
+                    <div class="current-time" id="currentTime"></div>
+                </div>
+            </header>
+
+            <!-- Dashboard Content -->
+            <div class="dashboard-content" id="dashboardContent">
+                <!-- 동적으로 렌더링 -->
+            </div>
+        </main>
+    </div>
+
+    <!-- Agent Decision Modal -->
+    <div class="modal-overlay" id="agentModal" style="display:none">
+        <div class="modal-box agent-modal">
+            <div class="modal-header">
+                <span class="modal-icon">🤖</span>
+                <h3>Agentic AI — 자율 판단 중</h3>
+                <button class="modal-close" onclick="closeAgentModal()">✕</button>
+            </div>
+            <div class="modal-body" id="agentModalBody">
+                <!-- Agent reasoning steps -->
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/drone_inventory.js"></script>
+</body>
+</html>
