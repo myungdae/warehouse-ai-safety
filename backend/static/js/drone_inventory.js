@@ -1859,6 +1859,29 @@ function renderFinalReport() {
             </div>
         </div>
 
+        <!-- 이메일 발송 섹션 -->
+        <div class="fr-section">
+            <div class="fr-section-title">📧 보고서 이메일 발송</div>
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                <div style="flex:1;min-width:220px;">
+                    <input type="email" id="reportEmailInput"
+                        value="myungdae.cho@gmail.com"
+                        placeholder="수신 이메일 주소"
+                        style="width:100%;padding:9px 14px;background:rgba(255,255,255,0.05);
+                               border:1px solid rgba(255,255,255,0.12);border-radius:8px;
+                               color:#e2e8f0;font-size:0.85rem;box-sizing:border-box;outline:none;"/>
+                </div>
+                <button id="sendReportBtn" onclick="sendReportEmail()"
+                    style="padding:9px 22px;border-radius:8px;border:1px solid rgba(251,191,36,0.5);
+                           background:linear-gradient(135deg,rgba(251,191,36,0.15),rgba(251,191,36,0.08));
+                           color:#fbbf24;font-size:0.85rem;font-weight:700;cursor:pointer;
+                           transition:all 0.2s;white-space:nowrap;">
+                    📤 이메일 발송
+                </button>
+                <div id="sendReportStatus" style="font-size:0.82rem;color:#64748b;"></div>
+            </div>
+        </div>
+
         <!-- 푸터 -->
         <div class="fr-footer">
             <div>자동 생성 by Drone Inventory Intelligence System v1.0</div>
@@ -1866,4 +1889,101 @@ function renderFinalReport() {
             <div style="margin-top:4px;color:#374151">이 보고서는 ERP 시스템 및 담당자 이메일로 자동 발송되었습니다</div>
         </div>
     </div>`;
+}
+
+// ============================================================
+// EMAIL SEND — POST /api/send_report
+// ============================================================
+async function sendReportEmail() {
+    const btn       = document.getElementById('sendReportBtn');
+    const statusEl  = document.getElementById('sendReportStatus');
+    const emailEl   = document.getElementById('reportEmailInput');
+    const recipient = emailEl ? emailEl.value.trim() : 'myungdae.cho@gmail.com';
+
+    if (!recipient) {
+        statusEl.textContent = '⚠️ 이메일 주소를 입력하세요';
+        statusEl.style.color = '#fbbf24';
+        return;
+    }
+
+    // 버튼 비활성화 + 로딩
+    btn.disabled = true;
+    btn.textContent = '⏳ 발송 중...';
+    btn.style.opacity = '0.6';
+    statusEl.textContent = '';
+
+    // 보고서 데이터 수집
+    const missing  = state.changeEvents.filter(e => e.type === 'MISSING').length;
+    const newItems = state.changeEvents.filter(e => e.type === 'NEW').length;
+    const changed  = state.changeEvents.filter(e => e.type === 'CHANGED').length;
+    const moved    = state.changeEvents.filter(e => e.type === 'MOVED').length;
+    const total    = state.scannedShelves.size || 48;
+    const accuracy = (((total - missing - moved) / total) * 100).toFixed(1);
+    const now      = new Date();
+
+    // 권고사항 텍스트
+    const recs = [];
+    if (missing > 0) recs.push(`[HIGH] ${missing}개 선반 소진 품목 — 바이어 재주문 요청 즉시 발송 권고`);
+    if (moved > 0)   recs.push(`[MEDIUM] ${moved}개 위치 SKU 불일치 — 창고 관리자 직접 현장 확인 필요`);
+    if ((state.rescanResults||[]).filter(r=>r.verdict==='SCAN_ERROR').length > 0)
+        recs.push(`[LOW] 스캔 오류 재발 방지 — 해당 위치 조명 및 드론 고도 점검 권고`);
+    recs.push(`[INFO] 다음 정기 순찰: ${new Date(Date.now()+86400000).toLocaleDateString('ko-KR')} 22:00 자동 예약됨`);
+
+    const reportData = {
+        report_id:       `RPT-${Date.now().toString(36).toUpperCase()}`,
+        date:            now.toLocaleDateString('ko-KR', {year:'numeric',month:'long',day:'numeric'}),
+        time:            now.toLocaleTimeString('ko-KR'),
+        drone_id:        'DRONE-01',
+        total_scanned:   total,
+        accuracy:        accuracy,
+        total_changes:   state.changeEvents.length,
+        agent_actions:   state.agentDecisions.length,
+        missing,
+        new_items:       newItems,
+        changed,
+        moved,
+        agent_decisions: state.agentDecisions.map(d => ({
+            type:      d.type,
+            title:     d.title,
+            timestamp: d.timestamp
+        })),
+        rescan_results:  (state.rescanResults || []).map(r => ({
+            shelfId:  r.shelfId,
+            location: r.location,
+            verdict:  r.verdict
+        })),
+        recommendations: recs
+    };
+
+    try {
+        const res = await fetch('/api/send_report', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ report_data: reportData, recipient })
+        });
+        const json = await res.json();
+
+        if (json.ok) {
+            btn.textContent = '✅ 발송 완료';
+            btn.style.background = 'rgba(52,211,153,0.15)';
+            btn.style.borderColor = 'rgba(52,211,153,0.4)';
+            btn.style.color = '#34d399';
+            btn.style.opacity = '1';
+
+            if (json.demo) {
+                statusEl.innerHTML = `<span style="color:#fbbf24;">⚠️ 데모 모드 — App Password 설정 시 실제 발송됩니다</span>`;
+            } else {
+                statusEl.innerHTML = `<span style="color:#34d399;">✅ ${recipient} 발송 완료 · ID: ${json.report_id}</span>`;
+                addFeed(`📧 보고서 이메일 발송 완료 → ${recipient}`, 'agent-action');
+            }
+        } else {
+            throw new Error(json.error || '발송 실패');
+        }
+    } catch (err) {
+        btn.disabled = false;
+        btn.textContent = '📤 이메일 발송';
+        btn.style.opacity = '1';
+        statusEl.innerHTML = `<span style="color:#f87171;">❌ 오류: ${err.message}</span>`;
+        console.error('Email send error:', err);
+    }
 }
