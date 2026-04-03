@@ -1,36 +1,442 @@
 #!/usr/bin/env python3
 """
 Warehouse AI Safety System - Flask Application
-Real-time sensor monitoring dashboard
+Real-time sensor monitoring dashboard + Drone Inventory Intelligence
 """
 
-from flask import Flask, render_template, send_from_directory
+from flask import Flask, render_template, send_from_directory, request, jsonify
 import os
+import smtplib
+import json
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from datetime import datetime
 
-# Initialize Flask app
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
+# ── Flask App ──────────────────────────────────────────────────
 app = Flask(__name__,
             template_folder='backend/templates',
             static_folder='backend/static')
 
+# ── Email Config (from .env) ───────────────────────────────────
+MAIL_SERVER   = os.getenv('MAIL_SERVER',   'smtp.gmail.com')
+MAIL_PORT     = int(os.getenv('MAIL_PORT', 587))
+MAIL_USERNAME = os.getenv('MAIL_USERNAME', '')
+MAIL_PASSWORD = os.getenv('MAIL_PASSWORD', '')
+MAIL_FROM     = os.getenv('MAIL_FROM',     MAIL_USERNAME)
+MAIL_FROM_NAME= os.getenv('MAIL_FROM_NAME','Drone Inventory System')
+REPORT_TO     = os.getenv('REPORT_TO',     '')
+
+# ── Routes ────────────────────────────────────────────────────
 @app.route('/')
 def index():
-    """Main dashboard page"""
     return render_template('warehouse_digital_twin.html')
+
+@app.route('/drone')
+def drone_inventory():
+    return render_template('drone_inventory.html')
 
 @app.route('/static/<path:filename>')
 def serve_static(filename):
-    """Serve static files"""
     return send_from_directory('backend/static', filename)
 
 @app.route('/ontology/<path:filename>')
 def serve_ontology(filename):
-    """Serve ontology files"""
     return send_from_directory('backend/ontology', filename)
 
-@app.route('/drone')
-def drone_inventory():
-    """Drone Inventory Intelligence System"""
-    return render_template('drone_inventory.html')
+# ── Email API ─────────────────────────────────────────────────
+@app.route('/api/send_report', methods=['POST'])
+def send_report():
+    """
+    보고서 이메일 발송 API
+    POST /api/send_report
+    Body: { report_data: {...}, recipient: "email@..." }
+    """
+    try:
+        body = request.get_json(force=True) or {}
+        report_data = body.get('report_data', {})
+        recipient   = body.get('recipient', REPORT_TO)
+
+        if not recipient:
+            return jsonify({'ok': False, 'error': '수신 이메일 없음'}), 400
+
+        # 자격증명 확인
+        if not MAIL_USERNAME or not MAIL_PASSWORD or MAIL_PASSWORD == 'placeholder_replace_with_apppassword':
+            # 데모 모드: 실제 발송 없이 성공 응답 (개발/데모용)
+            print(f"[DEMO MODE] 이메일 발송 시뮬레이션 → {recipient}")
+            return jsonify({
+                'ok': True,
+                'demo': True,
+                'message': f'[데모 모드] {recipient} 로 발송 시뮬레이션 완료',
+                'report_id': report_data.get('report_id', 'RPT-DEMO')
+            })
+
+        # HTML 이메일 생성
+        html_body = build_html_email(report_data, recipient)
+
+        # SMTP 발송
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = f"[Drone Inventory] 일일 재고 인텔리전스 보고서 — {report_data.get('date', datetime.now().strftime('%Y-%m-%d'))}"
+        msg['From']    = f"{MAIL_FROM_NAME} <{MAIL_FROM}>"
+        msg['To']      = recipient
+
+        msg.attach(MIMEText(build_text_email(report_data), 'plain', 'utf-8'))
+        msg.attach(MIMEText(html_body, 'html', 'utf-8'))
+
+        with smtplib.SMTP(MAIL_SERVER, MAIL_PORT) as smtp:
+            smtp.ehlo()
+            smtp.starttls()
+            smtp.login(MAIL_USERNAME, MAIL_PASSWORD)
+            smtp.sendmail(MAIL_FROM, [recipient], msg.as_string())
+
+        print(f"[EMAIL OK] 발송 완료 → {recipient}")
+        return jsonify({
+            'ok': True,
+            'demo': False,
+            'message': f'{recipient} 로 발송 완료',
+            'report_id': report_data.get('report_id', '')
+        })
+
+    except smtplib.SMTPAuthenticationError:
+        return jsonify({'ok': False, 'error': 'Gmail 인증 실패 — App Password를 확인하세요'}), 500
+    except Exception as e:
+        print(f"[EMAIL ERROR] {e}")
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+def build_text_email(d):
+    """Plain-text fallback"""
+    lines = [
+        "=" * 60,
+        "  일일 재고 인텔리전스 보고서",
+        "  Drone Inventory Intelligence System",
+        "=" * 60,
+        f"  보고서 ID : {d.get('report_id','')}",
+        f"  생성일시  : {d.get('date','')} {d.get('time','')}",
+        f"  드론 ID   : {d.get('drone_id','DRONE-01')}",
+        "",
+        "[ 핵심 지표 ]",
+        f"  총 스캔 선반 : {d.get('total_scanned', 0)}개",
+        f"  재고 정확도  : {d.get('accuracy', 0)}%",
+        f"  변화 감지    : {d.get('total_changes', 0)}건",
+        f"  AI 자율 조치 : {d.get('agent_actions', 0)}건",
+        "",
+        "[ 변화 요약 ]",
+        f"  🔴 소진 (Missing)    : {d.get('missing', 0)}건",
+        f"  🟢 신규 입고 (New)   : {d.get('new_items', 0)}건",
+        f"  🟡 수량 변화 (Changed): {d.get('changed', 0)}건",
+        f"  🔵 위치 변경 (Moved) : {d.get('moved', 0)}건",
+        "",
+        "[ Agentic AI 조치 ]",
+    ]
+    for action in d.get('agent_decisions', []):
+        lines.append(f"  [{action.get('type','')}] {action.get('title','')}")
+    lines += [
+        "",
+        "[ 권고 사항 ]",
+    ]
+    for rec in d.get('recommendations', []):
+        lines.append(f"  • {rec}")
+    lines += [
+        "",
+        "=" * 60,
+        "  Powered by Operational Ontology + Agentic AI",
+        "  자동 생성된 보고서입니다.",
+        "=" * 60,
+    ]
+    return "\n".join(lines)
+
+
+def build_html_email(d, recipient):
+    """다크 테마 HTML 이메일"""
+    date_str   = d.get('date', datetime.now().strftime('%Y-%m-%d'))
+    time_str   = d.get('time', datetime.now().strftime('%H:%M:%S'))
+    report_id  = d.get('report_id', f"RPT-{datetime.now().strftime('%Y%m%d%H%M')}")
+    drone_id   = d.get('drone_id', 'DRONE-01')
+    total_scan = d.get('total_scanned', 0)
+    accuracy   = d.get('accuracy', 0)
+    total_chg  = d.get('total_changes', 0)
+    agent_cnt  = d.get('agent_actions', 0)
+    missing    = d.get('missing', 0)
+    new_items  = d.get('new_items', 0)
+    changed    = d.get('changed', 0)
+    moved      = d.get('moved', 0)
+    recs       = d.get('recommendations', [])
+    decisions  = d.get('agent_decisions', [])
+    rescan_results = d.get('rescan_results', [])
+
+    # 변화 행
+    change_rows = ""
+    changes = [
+        ('#f87171', '🔴', '소진 (Missing)',     missing,   '전일 재고 있으나 당일 스캔 불가 — 출고 또는 이동 추정'),
+        ('#34d399', '🟢', '신규 입고 (New)',     new_items, '전일 빈 선반에 신규 SKU 감지 — WMS 입고 기록 매칭 완료'),
+        ('#fbbf24', '🟡', '수량 변화 (Changed)', changed,   f'동일 SKU 수량 변동 — 출고 {int(changed*0.7)}건 / 입고 {int(changed*0.3)}건'),
+        ('#22d3ee', '🔵', '위치 변경 (Moved)',   moved,     'SKU 위치 불일치 — CCTV 확인 요청 발송'),
+    ]
+    for color, emoji, label, cnt, desc in changes:
+        change_rows += f"""
+        <tr>
+          <td style="padding:10px 16px;border-bottom:1px solid #1e293b;">
+            <span style="color:{color};font-weight:700;">{emoji} {label}</span>
+          </td>
+          <td style="padding:10px 16px;border-bottom:1px solid #1e293b;text-align:center;">
+            <span style="font-size:1.3rem;font-weight:900;color:{color};">{cnt}</span>
+          </td>
+          <td style="padding:10px 16px;border-bottom:1px solid #1e293b;color:#94a3b8;font-size:0.85rem;">
+            {desc}
+          </td>
+        </tr>"""
+
+    # Agent 조치 행
+    type_colors = {'RESCAN':'#a78bfa','CONFIRM':'#34d399','ALERT':'#f87171','ESCALATE':'#fbbf24'}
+    decision_rows = ""
+    for dec in decisions:
+        tc = type_colors.get(dec.get('type',''), '#94a3b8')
+        decision_rows += f"""
+        <tr>
+          <td style="padding:9px 16px;border-bottom:1px solid #1e293b;">
+            <span style="background:{tc}22;color:{tc};padding:2px 8px;border-radius:4px;
+                         font-size:0.72rem;font-weight:700;">{dec.get('type','')}</span>
+          </td>
+          <td style="padding:9px 16px;border-bottom:1px solid #1e293b;color:#e2e8f0;font-size:0.85rem;">
+            {dec.get('title','')}
+          </td>
+          <td style="padding:9px 16px;border-bottom:1px solid #1e293b;color:#64748b;
+                     font-size:0.78rem;font-family:monospace;">
+            {dec.get('timestamp','')}
+          </td>
+        </tr>"""
+
+    # 재스캔 결과 섹션
+    rescan_section = ""
+    if rescan_results:
+        rescan_rows = ""
+        for r in rescan_results:
+            vc = '#34d399' if r.get('verdict') == 'SCAN_ERROR' else '#f87171'
+            vt = '⚠️ 초기 스캔 오류 → 복원' if r.get('verdict') == 'SCAN_ERROR' else '✅ 소진 확인'
+            rescan_rows += f"""
+            <tr>
+              <td style="padding:8px 12px;border-bottom:1px solid #1e293b;
+                         font-family:monospace;color:#a5b4fc;font-weight:700;">{r.get('shelfId','')}</td>
+              <td style="padding:8px 12px;border-bottom:1px solid #1e293b;color:#64748b;font-size:0.82rem;">{r.get('location','')}</td>
+              <td style="padding:8px 12px;border-bottom:1px solid #1e293b;color:{vc};font-weight:700;font-size:0.82rem;">{vt}</td>
+            </tr>"""
+        rescan_section = f"""
+        <div style="margin:0 0 24px;">
+          <div style="font-size:0.78rem;font-weight:800;color:#94a3b8;text-transform:uppercase;
+                      letter-spacing:0.06em;margin-bottom:12px;">🚁 재스캔 임무 결과</div>
+          <table width="100%" cellpadding="0" cellspacing="0"
+                 style="border-collapse:collapse;background:#0f172a;border-radius:10px;overflow:hidden;
+                        border:1px solid #1e293b;">
+            <thead>
+              <tr style="background:#0d1424;">
+                <th style="padding:9px 12px;text-align:left;color:#475569;font-size:0.72rem;
+                           text-transform:uppercase;letter-spacing:0.05em;">선반 ID</th>
+                <th style="padding:9px 12px;text-align:left;color:#475569;font-size:0.72rem;
+                           text-transform:uppercase;letter-spacing:0.05em;">위치</th>
+                <th style="padding:9px 12px;text-align:left;color:#475569;font-size:0.72rem;
+                           text-transform:uppercase;letter-spacing:0.05em;">판정</th>
+              </tr>
+            </thead>
+            <tbody>{rescan_rows}</tbody>
+          </table>
+        </div>"""
+
+    # 권고 사항
+    rec_colors = {'HIGH':'#f87171','MEDIUM':'#fbbf24','LOW':'#22d3ee','INFO':'#a5b4fc'}
+    rec_bgs    = {'HIGH':'rgba(248,113,113,0.08)','MEDIUM':'rgba(251,191,36,0.08)',
+                  'LOW':'rgba(34,211,238,0.08)','INFO':'rgba(165,180,252,0.08)'}
+    rec_html   = ""
+    for rec in recs:
+        level = 'HIGH' if '[HIGH]' in rec else 'MEDIUM' if '[MEDIUM]' in rec else 'LOW' if '[LOW]' in rec else 'INFO'
+        rc = rec_colors.get(level, '#94a3b8')
+        rb = rec_bgs.get(level, 'rgba(255,255,255,0.04)')
+        rec_html += f"""
+        <div style="padding:10px 14px;border-radius:8px;border-left:3px solid {rc};
+                    background:{rb};margin-bottom:8px;font-size:0.85rem;color:#e2e8f0;">
+          {rec}
+        </div>"""
+
+    # 최종 HTML
+    return f"""<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>일일 재고 인텔리전스 보고서</title>
+</head>
+<body style="margin:0;padding:0;background:#0f172a;font-family:'Segoe UI',Arial,sans-serif;color:#e2e8f0;">
+
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#0f172a;min-height:100vh;">
+<tr><td align="center" style="padding:32px 16px;">
+
+  <!-- 컨테이너 -->
+  <table width="680" cellpadding="0" cellspacing="0" style="max-width:680px;width:100%;">
+
+    <!-- 헤더 배너 -->
+    <tr>
+      <td style="background:linear-gradient(135deg,#1e3a5f 0%,#1e293b 100%);
+                 border-radius:16px 16px 0 0;padding:28px 32px;
+                 border:1px solid #334155;border-bottom:none;">
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr>
+            <td>
+              <div style="font-size:0.7rem;color:#475569;letter-spacing:0.12em;
+                          text-transform:uppercase;margin-bottom:8px;">
+                CONFIDENTIAL · INTERNAL USE ONLY
+              </div>
+              <div style="font-size:1.6rem;font-weight:900;color:#f1f5f9;line-height:1.2;margin-bottom:6px;">
+                🚁 일일 재고 인텔리전스 보고서
+              </div>
+              <div style="font-size:0.85rem;color:#64748b;">
+                Daily Inventory Intelligence Report — Drone Autonomous Patrol System
+              </div>
+            </td>
+            <td align="right" style="vertical-align:top;">
+              <div style="background:rgba(52,211,153,0.15);border:1px solid rgba(52,211,153,0.3);
+                          border-radius:8px;padding:10px 16px;text-align:right;">
+                <div style="font-size:0.7rem;color:#64748b;margin-bottom:4px;">보고서 ID</div>
+                <div style="font-family:monospace;font-weight:700;color:#34d399;font-size:0.85rem;">
+                  {report_id}
+                </div>
+              </div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+
+    <!-- 메타 정보 -->
+    <tr>
+      <td style="background:#1e293b;padding:14px 32px;border:1px solid #334155;border-top:none;border-bottom:none;">
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr>
+            <td style="font-size:0.78rem;color:#64748b;">
+              📅 생성일시: <span style="color:#94a3b8;">{date_str} {time_str}</span>
+            </td>
+            <td style="font-size:0.78rem;color:#64748b;text-align:center;">
+              🚁 드론: <span style="color:#94a3b8;">{drone_id}</span>
+            </td>
+            <td style="font-size:0.78rem;color:#64748b;text-align:right;">
+              📧 수신: <span style="color:#94a3b8;">{recipient}</span>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+
+    <!-- KPI 카드 4개 -->
+    <tr>
+      <td style="background:#1e293b;padding:20px 32px;border:1px solid #334155;border-top:none;border-bottom:none;">
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr>
+            {''.join(f"""
+            <td width="25%" style="padding:0 6px;">
+              <div style="background:#0f172a;border:1px solid #334155;border-radius:10px;
+                          padding:14px;text-align:center;">
+                <div style="font-size:1.8rem;font-weight:900;color:{kc};">{kv}</div>
+                <div style="font-size:0.7rem;color:#64748b;margin-top:4px;">{kl}</div>
+              </div>
+            </td>""" for kv, kl, kc in [
+                (total_scan, '총 스캔 선반', '#a5b4fc'),
+                (f"{accuracy}%", '재고 정확도', '#34d399'),
+                (total_chg, '변화 감지', '#fbbf24'),
+                (agent_cnt, 'AI 자율 조치', '#a78bfa'),
+            ])}
+          </tr>
+        </table>
+      </td>
+    </tr>
+
+    <!-- 재고 변화 요약 -->
+    <tr>
+      <td style="background:#1e293b;padding:20px 32px 0;border:1px solid #334155;border-top:none;border-bottom:none;">
+        <div style="font-size:0.78rem;font-weight:800;color:#94a3b8;text-transform:uppercase;
+                    letter-spacing:0.06em;margin-bottom:12px;">🔍 재고 변화 요약</div>
+        <table width="100%" cellpadding="0" cellspacing="0"
+               style="border-collapse:collapse;background:#0f172a;border-radius:10px;overflow:hidden;
+                      border:1px solid #1e293b;">
+          <thead>
+            <tr style="background:#0d1424;">
+              <th style="padding:9px 16px;text-align:left;color:#475569;font-size:0.72rem;
+                         text-transform:uppercase;letter-spacing:0.05em;">유형</th>
+              <th style="padding:9px 16px;text-align:center;color:#475569;font-size:0.72rem;
+                         text-transform:uppercase;letter-spacing:0.05em;">건수</th>
+              <th style="padding:9px 16px;text-align:left;color:#475569;font-size:0.72rem;
+                         text-transform:uppercase;letter-spacing:0.05em;">설명</th>
+            </tr>
+          </thead>
+          <tbody>{change_rows}</tbody>
+        </table>
+      </td>
+    </tr>
+
+    <!-- 재스캔 결과 (있을 경우) -->
+    {'<tr><td style="background:#1e293b;padding:20px 32px 0;border:1px solid #334155;border-top:none;border-bottom:none;">' + rescan_section + '</td></tr>' if rescan_section else ''}
+
+    <!-- Agentic AI 조치 -->
+    <tr>
+      <td style="background:#1e293b;padding:20px 32px 0;border:1px solid #334155;border-top:none;border-bottom:none;">
+        <div style="font-size:0.78rem;font-weight:800;color:#94a3b8;text-transform:uppercase;
+                    letter-spacing:0.06em;margin-bottom:12px;">🤖 Agentic AI 자율 조치 내역</div>
+        <table width="100%" cellpadding="0" cellspacing="0"
+               style="border-collapse:collapse;background:#0f172a;border-radius:10px;overflow:hidden;
+                      border:1px solid #1e293b;">
+          <thead>
+            <tr style="background:#0d1424;">
+              <th style="padding:9px 16px;text-align:left;color:#475569;font-size:0.72rem;
+                         text-transform:uppercase;letter-spacing:0.05em;width:90px;">유형</th>
+              <th style="padding:9px 16px;text-align:left;color:#475569;font-size:0.72rem;
+                         text-transform:uppercase;letter-spacing:0.05em;">내용</th>
+              <th style="padding:9px 16px;text-align:left;color:#475569;font-size:0.72rem;
+                         text-transform:uppercase;letter-spacing:0.05em;width:90px;">시간</th>
+            </tr>
+          </thead>
+          <tbody>{decision_rows}</tbody>
+        </table>
+      </td>
+    </tr>
+
+    <!-- 권고 사항 -->
+    <tr>
+      <td style="background:#1e293b;padding:20px 32px 4px;border:1px solid #334155;border-top:none;border-bottom:none;">
+        <div style="font-size:0.78rem;font-weight:800;color:#94a3b8;text-transform:uppercase;
+                    letter-spacing:0.06em;margin-bottom:12px;">💡 권고 사항 (Recommendations)</div>
+        {rec_html}
+      </td>
+    </tr>
+
+    <!-- 푸터 -->
+    <tr>
+      <td style="background:#0d1424;padding:20px 32px;border-radius:0 0 16px 16px;
+                 border:1px solid #334155;border-top:1px solid #1e293b;text-align:center;">
+        <div style="font-size:0.75rem;color:#334155;line-height:1.8;">
+          <span style="color:#475569;">🚁 Drone Inventory Intelligence System v1.0</span><br>
+          Powered by Operational Ontology + Agentic AI<br>
+          이 보고서는 자동 생성되어 발송되었습니다 · {date_str}
+        </div>
+        <div style="margin-top:12px;">
+          <span style="display:inline-block;background:rgba(99,102,241,0.15);
+                       border:1px solid rgba(99,102,241,0.3);border-radius:6px;
+                       padding:4px 12px;font-size:0.72rem;color:#818cf8;">
+            warehouse.exko.kr/drone
+          </span>
+        </div>
+      </td>
+    </tr>
+
+  </table>
+</td></tr>
+</table>
+
+</body>
+</html>"""
+
 
 if __name__ == '__main__':
     print("=" * 60)
@@ -38,5 +444,7 @@ if __name__ == '__main__':
     print("=" * 60)
     print("📊 Starting Flask server on http://0.0.0.0:5002")
     print("🌐 Access: http://localhost:5002")
+    mail_status = "✅ 설정됨" if (MAIL_PASSWORD and MAIL_PASSWORD != 'placeholder_replace_with_apppassword') else "⚠️  데모 모드 (App Password 미설정)"
+    print(f"📧 Email : {mail_status}")
     print("=" * 60)
     app.run(host='0.0.0.0', port=5002, debug=False)
