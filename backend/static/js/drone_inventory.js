@@ -182,6 +182,7 @@ function showView(view) {
         case 'compare':  renderCompareView(content);  break;
         case 'agent':    renderAgentView(content);    break;
         case 'ontology': renderOntologyView(content); break;
+        case 'report':   renderReportView(content);   break;
     }
 }
 
@@ -1146,6 +1147,20 @@ function renderAgentView(content) {
                             <span>${act.label}</span>
                         </div>`).join('')}
                     </div>
+                    ${ dec.type === 'RESCAN' ? `
+                    <div style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.06)">
+                        <div style="font-size:0.75rem;color:#64748b;margin-bottom:8px">▼ 재스캔 명령 실행 — 드론이 직접 해당 선반으로 비행합니다</div>
+                        <button class="rescan-exec-btn" onclick="launchRescanFromDecision('${dec.id}')">
+                            🚁 DRONE-01 재출동 — 재스캔 실행
+                        </button>
+                    </div>` : ''}
+                    ${ dec.type === 'ESCALATE' ? `
+                    <div style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.06)">
+                        <div style="font-size:0.75rem;color:#64748b;margin-bottom:8px">▼ 보고서 생성 프로세스를 실시간으로 확인합니다</div>
+                        <button class="report-exec-btn" onclick="showView('report')">
+                            📊 보고서 생성 프로세스 보기
+                        </button>
+                    </div>` : ''}
                 </div>
             </div>`).join('')}
         </div>`}
@@ -1266,4 +1281,589 @@ function showAgentModal(decisionId) {
 }
 function closeAgentModal() {
     document.getElementById('agentModal').style.display = 'none';
+}
+
+// ============================================================
+// RESCAN MISSION — 드론이 특정 선반으로 직접 비행
+// ============================================================
+let rescanQueue    = [];   // 재스캔할 선반 목록
+let rescanActive   = false;
+let rescanAnimFrame = null;
+
+// Agent Decision 카드에서 호출 — 해당 decision의 타겟 선반 추출
+function launchRescanFromDecision(decisionId) {
+    const dec = state.agentDecisions.find(d => d.id === decisionId);
+    if (!dec) return;
+
+    // MISSING 이벤트에서 선반 ID 추출
+    let targets = state.changeEvents
+        .filter(e => e.type === 'MISSING')
+        .slice(0, 3)
+        .map(e => e.shelfId);
+
+    if (targets.length === 0) {
+        // 없으면 CHANGED 중 severity high
+        targets = state.changeEvents
+            .filter(e => e.severity === 'high')
+            .slice(0, 3)
+            .map(e => e.shelfId);
+    }
+
+    if (targets.length === 0) {
+        addFeed('⚠️ 재스캔 대상 선반을 찾을 수 없습니다.', 'alert-item');
+        return;
+    }
+
+    state.rescanResults = []; // 초기화
+    launchRescan(targets);
+}
+
+function launchRescan(shelfIds) {
+    // 순찰 지도 뷰로 전환
+    showView('patrol');
+
+    // 짧은 딜레이 후 실행 (DOM 렌더링 기다림)
+    setTimeout(() => {
+        if (rescanActive) return;
+
+        rescanQueue = shelfIds
+            .map(id => WAREHOUSE.shelves.find(s => s.id === id))
+            .filter(Boolean);
+
+        if (rescanQueue.length === 0) return;
+
+        rescanActive = true;
+        state.patrolActive = false;  // 기존 순찰 중지
+        if (state.animFrame) cancelAnimationFrame(state.animFrame);
+
+        updateSidebarDroneState('재스캔 출동', 'status-scanning');
+        addFeed(`🚁 DRONE-01 재출동 명령 — 대상: ${shelfIds.join(', ')}`, 'agent-action');
+
+        // 재스캔 경로: Dock → 각 선반 → Dock
+        const path = [];
+        rescanQueue.forEach(shelf => {
+            const aisle = WAREHOUSE.aisles.find(a => a.id === shelf.aisle);
+            path.push({
+                type: 'rescan_move',
+                x: aisle.x + aisle.w / 2,
+                y: shelf.y + 15,
+                shelf: shelf
+            });
+        });
+        path.push({ type: 'rescan_dock', x: 27, y: 210 });
+
+        state.drone.x = 27;
+        state.drone.y = 210;
+
+        // 드론 엘리먼트가 없으면 재생성
+        if (!state.droneEl) renderWarehouseElements();
+
+        // 재스캔 진행 표시
+        showRescanProgressPanel(shelfIds);
+
+        runRescanLoop(path, 0);
+    }, 300);
+}
+
+function runRescanLoop(path, idx) {
+    if (!rescanActive || idx >= path.length) {
+        finishRescan(path);
+        return;
+    }
+
+    const target = path[idx];
+    const dx = target.x - state.drone.x;
+    const dy = target.y - state.drone.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    if (dist < 2.5) {
+        if (target.type === 'rescan_move') {
+            executeRescanAtShelf(target.shelf);
+            updateRescanProgressStep(target.shelf.id);
+        } else if (target.type === 'rescan_dock') {
+            updateSidebarDroneState('충전 중', 'status-charging');
+        }
+        rescanAnimFrame = requestAnimationFrame(() => runRescanLoop(path, idx + 1));
+    } else {
+        state.drone.x += (dx / dist) * (DRONE.speed * 1.4);  // 재스캔은 더 빠르게
+        state.drone.y += (dy / dist) * (DRONE.speed * 1.4);
+        updateDroneElement();
+        rescanAnimFrame = requestAnimationFrame(() => runRescanLoop(path, idx));
+    }
+}
+
+function executeRescanAtShelf(shelf) {
+    const inv = getCurrentInventory();  // Day2 기준 재스캔
+    const item = inv[shelf.id];
+    const scanTime = new Date().toLocaleTimeString('ko-KR');
+
+    // 선반 강조 (재스캔 중)
+    const shelfEl = document.getElementById(`shelf-${shelf.id}`);
+    if (shelfEl) {
+        shelfEl.setAttribute('fill', 'rgba(251,191,36,0.35)');
+        shelfEl.setAttribute('stroke', '#fbbf24');
+        shelfEl.setAttribute('stroke-width', '2');
+    }
+
+    flashScanBeam();
+
+    // 재스캔 결과: 90% 확률로 실제로 비어있음 확인, 10%는 스캔오류였음
+    const wasError = Math.random() < 0.1;
+    const rescanResult = {
+        shelfId: shelf.id,
+        location: `Aisle-${shelf.aisle} / Row-${shelf.row} / ${shelf.side === 'L' ? '좌측' : '우측'}`,
+        original: { sku: null, qty: 0 },
+        rescan:   wasError
+            ? { sku: item?.sku || 'SKU-RECOVERED', qty: item?.qty || 3, note: '⚠️ 초기 스캔 오류 확인됨' }
+            : { sku: null, qty: 0, note: '✅ 재고 소진 확인 — 출고/이동 가능성 높음' },
+        verdict: wasError ? 'SCAN_ERROR' : 'CONFIRMED_EMPTY',
+        timestamp: scanTime
+    };
+
+    state.rescanResults = state.rescanResults || [];
+    state.rescanResults.push(rescanResult);
+
+    // 선반 색상 최종 업데이트
+    setTimeout(() => {
+        if (shelfEl) {
+            shelfEl.setAttribute('stroke-width', '1');
+            if (wasError) {
+                shelfEl.setAttribute('fill', 'rgba(52,211,153,0.2)');
+                shelfEl.setAttribute('stroke', 'rgba(52,211,153,0.6)');
+            } else {
+                shelfEl.setAttribute('fill', 'rgba(248,113,113,0.15)');
+                shelfEl.setAttribute('stroke', 'rgba(248,113,113,0.5)');
+            }
+        }
+    }, 400);
+
+    addFeed(
+        `🔍 재스캔 완료: <span class="scan-barcode">${shelf.id}</span><br>` +
+        `<span class="scan-meta">${rescanResult.rescan.note}</span>`,
+        wasError ? 'agent-action' : 'alert-item',
+        scanTime
+    );
+}
+
+function finishRescan(path) {
+    rescanActive = false;
+    if (rescanAnimFrame) cancelAnimationFrame(rescanAnimFrame);
+    updateSidebarDroneState('재스캔 완료', 'status-standby');
+    addFeed(`✅ 재스캔 임무 완료 — ${(state.rescanResults||[]).length}개 선반 재확인`, 'agent-action');
+    finalizeRescanProgressPanel();
+}
+
+function showRescanProgressPanel(shelfIds) {
+    // 지도 패널 아래에 진행 패널 삽입
+    const mapPanel = document.querySelector('.map-panel');
+    if (!mapPanel) return;
+
+    const existing = document.getElementById('rescanProgressPanel');
+    if (existing) existing.remove();
+
+    const panel = document.createElement('div');
+    panel.id = 'rescanProgressPanel';
+    panel.style.cssText = 'margin-top:12px;background:rgba(15,23,42,0.8);border:1px solid rgba(251,191,36,0.3);border-radius:12px;padding:14px 18px;';
+    panel.innerHTML = `
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+            <span style="font-size:1rem">🚁</span>
+            <span style="font-weight:800;color:#fbbf24;font-size:0.9rem">DRONE-01 재스캔 임무 진행 중</span>
+            <span style="margin-left:auto;font-size:0.75rem;color:#64748b">Agentic AI 명령</span>
+        </div>
+        <div id="rescanStepList" style="display:flex;flex-direction:column;gap:6px">
+            ${shelfIds.map(id => `
+            <div id="rstep-${id}" style="display:flex;align-items:center;gap:10px;padding:7px 12px;
+                 background:rgba(255,255,255,0.03);border-radius:7px;border-left:3px solid rgba(255,255,255,0.1);
+                 font-size:0.8rem;transition:all 0.3s">
+                <span class="rstep-icon" style="font-size:0.9rem">⏳</span>
+                <span style="font-family:monospace;color:#e2e8f0;font-weight:700">${id}</span>
+                <span style="color:#64748b;flex:1">
+                    ${WAREHOUSE.shelves.find(s=>s.id===id)
+                        ? `Aisle-${WAREHOUSE.shelves.find(s=>s.id===id).aisle} / Row-${WAREHOUSE.shelves.find(s=>s.id===id).row}`
+                        : id}
+                </span>
+                <span class="rstep-result" style="font-size:0.75rem;color:#374151">대기 중</span>
+            </div>`).join('')}
+        </div>`;
+
+    // 오른쪽 패널 아래 삽입
+    const rightPanel = document.querySelector('.right-panel');
+    if (rightPanel) rightPanel.appendChild(panel);
+    else mapPanel.parentElement.appendChild(panel);
+}
+
+function updateRescanProgressStep(shelfId) {
+    const row = document.getElementById(`rstep-${shelfId}`);
+    if (!row) return;
+
+    const result = (state.rescanResults || []).find(r => r.shelfId === shelfId);
+    if (!result) return;
+
+    const isError   = result.verdict === 'SCAN_ERROR';
+    const color     = isError ? '#34d399' : '#f87171';
+    const borderClr = isError ? 'rgba(52,211,153,0.5)' : 'rgba(248,113,113,0.5)';
+    const icon      = isError ? '⚠️' : '✅';
+    const resultTxt = isError ? '초기 스캔 오류' : '소진 확인';
+
+    row.style.borderLeftColor = borderClr;
+    row.style.background = isError ? 'rgba(52,211,153,0.05)' : 'rgba(248,113,113,0.05)';
+    row.querySelector('.rstep-icon').textContent = icon;
+    row.querySelector('.rstep-result').textContent = resultTxt;
+    row.querySelector('.rstep-result').style.color = color;
+    row.querySelector('.rstep-result').style.fontWeight = '700';
+}
+
+function finalizeRescanProgressPanel() {
+    const panel = document.getElementById('rescanProgressPanel');
+    if (!panel) return;
+
+    const results = state.rescanResults || [];
+    const errors   = results.filter(r => r.verdict === 'SCAN_ERROR').length;
+    const confirmed = results.filter(r => r.verdict === 'CONFIRMED_EMPTY').length;
+
+    const summary = document.createElement('div');
+    summary.style.cssText = 'margin-top:12px;padding:10px 12px;background:rgba(52,211,153,0.07);border-radius:8px;border:1px solid rgba(52,211,153,0.2);font-size:0.8rem;';
+    summary.innerHTML = `
+        <div style="font-weight:800;color:#34d399;margin-bottom:6px">🤖 재스캔 임무 완료 — AI 최종 판단</div>
+        <div style="color:#94a3b8;line-height:1.8">
+            ✅ 소진 확인: <b style="color:#f87171">${confirmed}건</b> → 출고기록 대조 후 보안팀 보고<br>
+            ⚠️ 초기 스캔 오류: <b style="color:#34d399">${errors}건</b> → 재고 DB 자동 복원<br>
+            📋 다음 단계: WMS 출고 기록 매칭 → 에스컬레이션 결정
+        </div>`;
+    panel.appendChild(summary);
+}
+
+// ============================================================
+// REPORT VIEW — 보고서 생성 프로세스 실시간 시각화
+// ============================================================
+const REPORT_STEPS = [
+    {
+        id: 'step-collect',
+        icon: '📡',
+        title: '스캔 데이터 수집',
+        detail: 'Scan_Event 수집 · Day1/Day2 비교 준비',
+        duration: 900
+    },
+    {
+        id: 'step-ontology',
+        icon: '🧠',
+        title: 'Operational Ontology 추론',
+        detail: 'SWRL 규칙 적용 · 이벤트 분류 (Missing/New/Changed/Moved)',
+        duration: 1100
+    },
+    {
+        id: 'step-wms',
+        icon: '🔗',
+        title: 'WMS 출고 기록 대조',
+        detail: 'WMS API 조회 → 출고/입고 기록 매칭 · 미확인 건 분리',
+        duration: 1300
+    },
+    {
+        id: 'step-cctv',
+        icon: '📹',
+        title: 'CCTV 영상 분석',
+        detail: '위치 변경 감지 구역 시간대 추출 · 이상 접근 여부 확인',
+        duration: 1000
+    },
+    {
+        id: 'step-agent',
+        icon: '🤖',
+        title: 'Agentic AI 자율 판단',
+        detail: '재스캔 결과 통합 · 에스컬레이션 우선순위 결정',
+        duration: 1200
+    },
+    {
+        id: 'step-report',
+        icon: '📄',
+        title: '보고서 생성',
+        detail: 'Markdown / PDF 보고서 렌더링 · ERP 업데이트 페이로드 생성',
+        duration: 800
+    },
+    {
+        id: 'step-send',
+        icon: '📤',
+        title: '발송 & 저장',
+        detail: '이메일 / Slack 발송 · DB Audit Trail 기록 · 다음 순찰 예약',
+        duration: 700
+    }
+];
+
+function renderReportView(content) {
+    const canGenerate = state.day2PatrolDone;
+    const alreadyGenerated = !!state.reportGenerated;
+
+    content.innerHTML = `
+    <div class="report-view">
+        <!-- 헤더 -->
+        <div class="report-header-card">
+            <div style="display:flex;align-items:center;gap:16px">
+                <span style="font-size:2.5rem">📊</span>
+                <div style="flex:1">
+                    <h2 style="font-size:1.1rem;font-weight:800;color:#e2e8f0;margin-bottom:4px">
+                        일일 재고 인텔리전스 보고서 생성 프로세스
+                    </h2>
+                    <p style="font-size:0.8rem;color:#64748b">
+                        Drone → Scan_Event → Ontology → AI 판단 → 보고서 → ERP / 이메일 발송
+                    </p>
+                </div>
+                <button class="btn-start go" id="reportGenBtn"
+                    onclick="startReportGeneration()"
+                    ${(!canGenerate || alreadyGenerated) ? 'disabled style="opacity:0.4;cursor:not-allowed"' : ''}>
+                    ${alreadyGenerated ? '✅ 보고서 완료' : canGenerate ? '▶ 보고서 생성' : '⚠️ Day2 순찰 필요'}
+                </button>
+            </div>
+        </div>
+
+        <!-- 프로세스 파이프라인 -->
+        <div class="report-pipeline" id="reportPipeline">
+            ${REPORT_STEPS.map((step, i) => `
+            <div class="rp-step" id="${step.id}">
+                <div class="rp-step-num">${i+1}</div>
+                <div class="rp-step-body">
+                    <div class="rp-step-header">
+                        <span class="rp-step-icon">${step.icon}</span>
+                        <span class="rp-step-title">${step.title}</span>
+                        <span class="rp-step-status" id="${step.id}-status">대기</span>
+                    </div>
+                    <div class="rp-step-detail">${step.detail}</div>
+                    <div class="rp-step-bar"><div class="rp-step-bar-fill" id="${step.id}-bar"></div></div>
+                    <div class="rp-step-result" id="${step.id}-result" style="display:none"></div>
+                </div>
+                ${i < REPORT_STEPS.length - 1 ? '<div class="rp-arrow">↓</div>' : ''}
+            </div>`).join('')}
+        </div>
+
+        <!-- 최종 보고서 (생성 후 표시) -->
+        <div id="finalReport" style="display:none;margin-top:24px"></div>
+    </div>`;
+
+    // 이미 생성된 보고서 있으면 바로 표시
+    if (alreadyGenerated) renderFinalReport();
+}
+
+function startReportGeneration() {
+    if (!state.day2PatrolDone) return;
+
+    const btn = document.getElementById('reportGenBtn');
+    if (btn) { btn.disabled = true; btn.textContent = '⚙️ 생성 중...'; }
+
+    runReportStep(0);
+}
+
+function runReportStep(idx) {
+    if (idx >= REPORT_STEPS.length) {
+        finishReportGeneration();
+        return;
+    }
+
+    const step   = REPORT_STEPS[idx];
+    const stepEl = document.getElementById(step.id);
+    const statusEl = document.getElementById(`${step.id}-status`);
+    const barEl    = document.getElementById(`${step.id}-bar`);
+    const resultEl = document.getElementById(`${step.id}-result`);
+
+    if (!stepEl) { runReportStep(idx + 1); return; }
+
+    // 활성화
+    stepEl.classList.add('rp-active');
+    statusEl.textContent  = '처리 중...';
+    statusEl.className    = 'rp-step-status rp-status-running';
+
+    // 프로그레스 바 애니메이션
+    let pct = 0;
+    const interval = setInterval(() => {
+        pct = Math.min(100, pct + (100 / (step.duration / 30)));
+        barEl.style.width = pct + '%';
+        if (pct >= 100) clearInterval(interval);
+    }, 30);
+
+    setTimeout(() => {
+        clearInterval(interval);
+        barEl.style.width = '100%';
+
+        // 완료
+        stepEl.classList.remove('rp-active');
+        stepEl.classList.add('rp-done');
+        statusEl.textContent = '완료 ✓';
+        statusEl.className   = 'rp-step-status rp-status-done';
+
+        // 결과 메시지
+        resultEl.style.display = 'block';
+        resultEl.innerHTML = getStepResult(step.id);
+
+        // 다음 스텝
+        setTimeout(() => runReportStep(idx + 1), 200);
+    }, step.duration);
+}
+
+function getStepResult(stepId) {
+    const missing = state.changeEvents.filter(e => e.type === 'MISSING').length;
+    const newCnt  = state.changeEvents.filter(e => e.type === 'NEW').length;
+    const changed = state.changeEvents.filter(e => e.type === 'CHANGED').length;
+    const moved   = state.changeEvents.filter(e => e.type === 'MOVED').length;
+    const total   = state.scannedShelves.size || WAREHOUSE.shelves.length;
+    const rescanResults = state.rescanResults || [];
+
+    const results = {
+        'step-collect': `<span class="rp-result-ok">✓ Scan_Event ${state.scanEvents.length}건 (Day1) + ${state.scanEventsDay2.length}건 (Day2) 수집 완료</span>`,
+        'step-ontology': `<span class="rp-result-ok">✓ 변화 이벤트 ${state.changeEvents.length}건 분류: 소진 ${missing}건 · 신규 ${newCnt}건 · 수량변화 ${changed}건 · 이동 ${moved}건</span>`,
+        'step-wms': `<span class="rp-result-ok">✓ WMS 출고기록 ${missing + changed}건 대조 → 정상 ${Math.floor((missing+changed)*0.7)}건 확인, </span><span class="rp-result-warn">미확인 ${Math.ceil((missing+changed)*0.3)}건 → 에스컬레이션 대상</span>`,
+        'step-cctv': moved > 0
+            ? `<span class="rp-result-warn">⚠️ ${moved}개 위치 SKU 변경 구역 CCTV 영상 ${moved*2}건 추출 완료</span>`
+            : `<span class="rp-result-ok">✓ 비인가 이동 없음 확인</span>`,
+        'step-agent': `<span class="rp-result-ok">✓ Agentic AI ${state.agentDecisions.length}건 결정 완료</span>` +
+            (rescanResults.length > 0 ? ` · 재스캔 ${rescanResults.length}건 포함` : ''),
+        'step-report': `<span class="rp-result-ok">✓ 보고서 생성 완료 (Markdown · PDF · ERP payload)</span>`,
+        'step-send': `<span class="rp-result-ok">✓ 이메일 발송 완료 · Slack 알림 전송 · DB 기록 완료 · 다음 순찰 D+1 22:00 예약</span>`
+    };
+    return results[stepId] || '';
+}
+
+function finishReportGeneration() {
+    state.reportGenerated = true;
+    const btn = document.getElementById('reportGenBtn');
+    if (btn) { btn.textContent = '✅ 보고서 완료'; }
+    renderFinalReport();
+}
+
+function renderFinalReport() {
+    const el = document.getElementById('finalReport');
+    if (!el) return;
+
+    const missing = state.changeEvents.filter(e => e.type === 'MISSING').length;
+    const newCnt  = state.changeEvents.filter(e => e.type === 'NEW').length;
+    const changed = state.changeEvents.filter(e => e.type === 'CHANGED').length;
+    const moved   = state.changeEvents.filter(e => e.type === 'MOVED').length;
+    const total   = state.scannedShelves.size || WAREHOUSE.shelves.length;
+    const accuracy = (((total - missing - moved) / total) * 100).toFixed(1);
+    const now     = new Date();
+    const dateStr = now.toLocaleDateString('ko-KR', { year:'numeric', month:'long', day:'numeric' });
+    const timeStr = now.toLocaleTimeString('ko-KR');
+    const rescanResults = state.rescanResults || [];
+    const errCount = rescanResults.filter(r => r.verdict === 'SCAN_ERROR').length;
+    const confirmCount = rescanResults.filter(r => r.verdict === 'CONFIRMED_EMPTY').length;
+
+    el.style.display = 'block';
+    el.innerHTML = `
+    <div class="final-report-card">
+        <!-- 보고서 헤더 -->
+        <div class="fr-header">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between">
+                <div>
+                    <div class="fr-badge">CONFIDENTIAL · INTERNAL USE ONLY</div>
+                    <h1 class="fr-title">일일 재고 인텔리전스 보고서</h1>
+                    <div class="fr-subtitle">Daily Inventory Intelligence Report — Drone Autonomous Patrol System</div>
+                </div>
+                <div style="text-align:right">
+                    <div class="fr-meta">생성일시: ${dateStr} ${timeStr}</div>
+                    <div class="fr-meta">드론 ID: DRONE-01</div>
+                    <div class="fr-meta">대상 창고: Warehouse-A (4 Aisles)</div>
+                    <div class="fr-meta">보고서 ID: RPT-${Date.now().toString(36).toUpperCase()}</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 핵심 KPI -->
+        <div class="fr-section">
+            <div class="fr-section-title">📊 핵심 지표 (Key Performance Indicators)</div>
+            <div class="fr-kpi-grid">
+                <div class="fr-kpi">
+                    <div class="fr-kpi-val" style="color:#a5b4fc">${total}</div>
+                    <div class="fr-kpi-label">총 스캔 선반</div>
+                </div>
+                <div class="fr-kpi">
+                    <div class="fr-kpi-val" style="color:#34d399">${accuracy}%</div>
+                    <div class="fr-kpi-label">재고 정확도</div>
+                </div>
+                <div class="fr-kpi">
+                    <div class="fr-kpi-val" style="color:#fbbf24">${state.changeEvents.length}</div>
+                    <div class="fr-kpi-label">변화 감지 건수</div>
+                </div>
+                <div class="fr-kpi">
+                    <div class="fr-kpi-val" style="color:#a78bfa">${state.agentDecisions.length}</div>
+                    <div class="fr-kpi-label">AI 자율 조치</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 변화 요약 -->
+        <div class="fr-section">
+            <div class="fr-section-title">🔍 재고 변화 요약</div>
+            <div class="fr-change-grid">
+                <div class="fr-change-row" style="border-left-color:#f87171">
+                    <span class="fr-change-type" style="color:#f87171">🔴 소진 (Missing)</span>
+                    <span class="fr-change-cnt">${missing}건</span>
+                    <span class="fr-change-desc">전일 재고 있었으나 당일 스캔 불가 — 출고 또는 이동 추정</span>
+                </div>
+                <div class="fr-change-row" style="border-left-color:#34d399">
+                    <span class="fr-change-type" style="color:#34d399">🟢 신규 입고 (New)</span>
+                    <span class="fr-change-cnt">${newCnt}건</span>
+                    <span class="fr-change-desc">전일 빈 선반에 신규 SKU 감지 — WMS 입고 기록 매칭 완료</span>
+                </div>
+                <div class="fr-change-row" style="border-left-color:#fbbf24">
+                    <span class="fr-change-type" style="color:#fbbf24">🟡 수량 변화 (Changed)</span>
+                    <span class="fr-change-cnt">${changed}건</span>
+                    <span class="fr-change-desc">동일 SKU 수량 변동 — 출고 ${Math.floor(changed*0.7)}건 / 입고 ${Math.ceil(changed*0.3)}건</span>
+                </div>
+                <div class="fr-change-row" style="border-left-color:#22d3ee">
+                    <span class="fr-change-type" style="color:#22d3ee">🔵 위치 변경 (Moved)</span>
+                    <span class="fr-change-cnt">${moved}건</span>
+                    <span class="fr-change-desc">SKU 위치 불일치 — CCTV 확인 요청 발송 완료</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 재스캔 결과 (있을 경우) -->
+        ${rescanResults.length > 0 ? `
+        <div class="fr-section">
+            <div class="fr-section-title">🚁 Agentic AI 재스캔 임무 결과</div>
+            <div class="fr-rescan-summary">
+                <div style="font-size:0.82rem;color:#94a3b8;margin-bottom:10px">
+                    DRONE-01이 자율 판단으로 ${rescanResults.length}개 위치를 재스캔하여 다음과 같이 확인:
+                </div>
+                ${rescanResults.map(r => `
+                <div class="fr-rescan-row">
+                    <span class="fr-rescan-shelf">${r.shelfId}</span>
+                    <span class="fr-rescan-loc">${r.location}</span>
+                    <span class="fr-rescan-verdict" style="color:${r.verdict==='SCAN_ERROR'?'#34d399':'#f87171'}">
+                        ${r.verdict==='SCAN_ERROR' ? '⚠️ 초기 스캔 오류 → 복원' : '✅ 소진 확인'}
+                    </span>
+                    <span class="fr-rescan-note">${r.rescan.note}</span>
+                </div>`).join('')}
+                <div style="margin-top:10px;font-size:0.78rem;color:#64748b">
+                    결과: 스캔 오류 <b style="color:#34d399">${errCount}건</b> 자동 복원 ·
+                    소진 확인 <b style="color:#f87171">${confirmCount}건</b> WMS 대조 완료
+                </div>
+            </div>
+        </div>` : ''}
+
+        <!-- AI 조치 사항 -->
+        <div class="fr-section">
+            <div class="fr-section-title">🤖 Agentic AI 자율 조치 내역</div>
+            ${state.agentDecisions.map(dec => `
+            <div class="fr-action-row">
+                <span class="fr-action-type adc-type type-${dec.type.toLowerCase()}">${dec.type}</span>
+                <span class="fr-action-title">${dec.title}</span>
+                <span class="fr-action-time">${dec.timestamp}</span>
+            </div>`).join('')}
+        </div>
+
+        <!-- 권고 사항 -->
+        <div class="fr-section">
+            <div class="fr-section-title">💡 권고 사항 (Recommendations)</div>
+            <div class="fr-recommendations">
+                ${missing > 0 ? `<div class="fr-rec high">🔴 [HIGH] ${missing}개 선반 소진 품목 — 담당 바이어에게 재주문 요청 즉시 발송 권고</div>` : ''}
+                ${moved > 0 ? `<div class="fr-rec medium">🟡 [MEDIUM] ${moved}개 위치 SKU 불일치 — 창고 관리자 직접 현장 확인 필요</div>` : ''}
+                ${errCount > 0 ? `<div class="fr-rec low">🔵 [LOW] ${errCount}건 스캔 오류 재발 방지 — 해당 위치 조명 및 드론 고도 점검 권고</div>` : ''}
+                <div class="fr-rec info">ℹ️ 다음 정기 순찰: ${new Date(Date.now()+86400000).toLocaleDateString('ko-KR')} 22:00 자동 예약됨</div>
+            </div>
+        </div>
+
+        <!-- 푸터 -->
+        <div class="fr-footer">
+            <div>자동 생성 by Drone Inventory Intelligence System v1.0</div>
+            <div>Powered by Operational Ontology + Agentic AI</div>
+            <div style="margin-top:4px;color:#374151">이 보고서는 ERP 시스템 및 담당자 이메일로 자동 발송되었습니다</div>
+        </div>
+    </div>`;
 }
