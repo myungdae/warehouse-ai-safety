@@ -27,6 +27,11 @@ def serve_ontology(filename):
     """Serve ontology files"""
     return send_from_directory('backend/ontology', filename)
 
+@app.route('/drone')
+def drone_inventory():
+    """Drone Inventory Intelligence System"""
+    return render_template('drone_inventory.html')
+
 if __name__ == '__main__':
     print("=" * 60)
     print("🏭 Warehouse AI Safety System")
