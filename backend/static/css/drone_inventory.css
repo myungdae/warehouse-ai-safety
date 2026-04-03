@@ -2,6 +2,107 @@
    Drone Inventory Intelligence System — CSS
    ============================================================ */
 
+/* ── Sidebar — menu-item hover / active (drone page override) ── */
+.menu-section {
+    margin-bottom: 8px;
+}
+
+.menu-header {
+    padding: 10px 16px;
+    background: rgba(255,255,255,0.04);
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 700;
+    font-size: 0.78rem;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    transition: background 0.15s;
+    user-select: none;
+}
+
+.menu-header:hover {
+    background: rgba(255,255,255,0.07);
+    color: #94a3b8;
+}
+
+.menu-content {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+}
+
+.menu-content.expanded {
+    max-height: 1000px;
+}
+
+.menu-item {
+    padding: 9px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    font-size: 0.84rem;
+    color: #94a3b8;
+    border-left: 2px solid transparent;
+    transition: background 0.15s, color 0.15s, padding-left 0.15s, border-color 0.15s;
+    user-select: none;
+}
+
+.menu-item:hover {
+    background: rgba(255,255,255,0.07);
+    color: #e2e8f0;
+    padding-left: 22px;
+    border-left-color: rgba(99,102,241,0.4);
+}
+
+.menu-item.active {
+    background: rgba(99,102,241,0.12);
+    color: #a5b4fc;
+    border-left: 2px solid #6366f1;
+    font-weight: 700;
+}
+
+.menu-item.active:hover {
+    background: rgba(99,102,241,0.18);
+    padding-left: 22px;
+}
+
+.menu-icon {
+    font-size: 1.05rem;
+    width: 20px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.menu-text {
+    flex: 1;
+}
+
+.menu-badge {
+    background: rgba(59,130,246,0.2);
+    color: #93c5fd;
+    border: 1px solid rgba(59,130,246,0.3);
+    padding: 1px 7px;
+    border-radius: 10px;
+    font-size: 0.7rem;
+    font-weight: 700;
+}
+
+.menu-badge.warning {
+    background: rgba(245,158,11,0.2);
+    color: #fbbf24;
+    border-color: rgba(245,158,11,0.3);
+}
+
+.menu-badge.ai {
+    background: rgba(167,139,250,0.2);
+    color: #a78bfa;
+    border-color: rgba(167,139,250,0.3);
+}
+
 /* ── Sidebar additions ── */
 .logo-sub {
     font-size: 0.65rem;
