@@ -183,6 +183,7 @@ function showView(view) {
         case 'agent':    renderAgentView(content);    break;
         case 'ontology': renderOntologyView(content); break;
         case 'report':   renderReportView(content);   break;
+        case 'archive':  renderArchiveView(content);  break;
     }
 }
 
@@ -1746,6 +1747,13 @@ function renderFinalReport() {
     el.style.display = 'block';
     el.innerHTML = `
     <div class="final-report-card">
+        <!-- 프린트/저장 액션 바 -->
+        <div class="fr-actions-bar">
+            <button class="fr-print-btn" onclick="printReport()">🖨️ 인쇄 (Print)</button>
+            <button class="fr-archive-btn" id="archiveReportBtn" onclick="archiveReport()">🗂️ 기록 저장</button>
+            <span class="fr-archive-status" id="archiveStatus"></span>
+        </div>
+
         <!-- 보고서 헤더 -->
         <div class="fr-header">
             <div style="display:flex;align-items:flex-start;justify-content:space-between">
@@ -1860,7 +1868,7 @@ function renderFinalReport() {
         </div>
 
         <!-- 이메일 발송 섹션 -->
-        <div class="fr-section">
+        <div class="fr-section email-section">
             <div class="fr-section-title">📧 보고서 이메일 발송</div>
             <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
                 <div style="flex:1;min-width:220px;">
@@ -1986,4 +1994,349 @@ async function sendReportEmail() {
         statusEl.innerHTML = `<span style="color:#f87171;">❌ 오류: ${err.message}</span>`;
         console.error('Email send error:', err);
     }
+}
+
+// ============================================================
+// PRINT REPORT
+// ============================================================
+function printReport() {
+    // 인쇄 전 문서 타이틀 변경 (PDF 파일명에 반영)
+    const origTitle = document.title;
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('ko-KR', { year:'numeric', month:'2-digit', day:'2-digit' })
+                        .replace(/\. /g, '-').replace('.', '');
+    document.title = `일일재고인텔리전스보고서_${dateStr}`;
+    window.print();
+    document.title = origTitle;
+}
+
+// ============================================================
+// ARCHIVE REPORT — POST /api/archive_report
+// ============================================================
+async function archiveReport() {
+    const btn      = document.getElementById('archiveReportBtn');
+    const statusEl = document.getElementById('archiveStatus');
+    if (!btn) return;
+
+    btn.disabled = true;
+    btn.textContent = '⏳ 저장 중...';
+    btn.style.opacity = '0.6';
+    statusEl.textContent = '';
+
+    // 현재 보고서 데이터 수집 (sendReportEmail과 동일 구조)
+    const missing  = state.changeEvents.filter(e => e.type === 'MISSING').length;
+    const newItems = state.changeEvents.filter(e => e.type === 'NEW').length;
+    const changed  = state.changeEvents.filter(e => e.type === 'CHANGED').length;
+    const moved    = state.changeEvents.filter(e => e.type === 'MOVED').length;
+    const total    = state.scannedShelves.size || 48;
+    const accuracy = (((total - missing - moved) / total) * 100).toFixed(1);
+    const now      = new Date();
+
+    const recs = [];
+    if (missing > 0) recs.push(`[HIGH] ${missing}개 선반 소진 품목 — 바이어 재주문 요청 즉시 발송 권고`);
+    if (moved > 0)   recs.push(`[MEDIUM] ${moved}개 위치 SKU 불일치 — 창고 관리자 직접 현장 확인 필요`);
+    if ((state.rescanResults||[]).filter(r=>r.verdict==='SCAN_ERROR').length > 0)
+        recs.push(`[LOW] 스캔 오류 재발 방지 — 해당 위치 조명 및 드론 고도 점검 권고`);
+    recs.push(`[INFO] 다음 정기 순찰: ${new Date(Date.now()+86400000).toLocaleDateString('ko-KR')} 22:00 자동 예약됨`);
+
+    const reportData = {
+        report_id:       `RPT-${Date.now().toString(36).toUpperCase()}`,
+        date:            now.toLocaleDateString('ko-KR', {year:'numeric',month:'long',day:'numeric'}),
+        time:            now.toLocaleTimeString('ko-KR'),
+        drone_id:        'DRONE-01',
+        total_scanned:   total,
+        accuracy:        accuracy,
+        total_changes:   state.changeEvents.length,
+        agent_actions:   state.agentDecisions.length,
+        missing,
+        new_items:       newItems,
+        changed,
+        moved,
+        agent_decisions: state.agentDecisions.map(d => ({
+            type: d.type, title: d.title, timestamp: d.timestamp
+        })),
+        rescan_results: (state.rescanResults || []).map(r => ({
+            shelfId: r.shelfId, location: r.location, verdict: r.verdict
+        })),
+        recommendations: recs
+    };
+
+    try {
+        const res  = await fetch('/api/archive_report', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ report_data: reportData })
+        });
+        const json = await res.json();
+
+        if (json.ok) {
+            btn.textContent = '✅ 저장 완료';
+            btn.style.background = 'rgba(52,211,153,0.15)';
+            btn.style.borderColor = 'rgba(52,211,153,0.4)';
+            btn.style.color = '#34d399';
+            btn.style.opacity = '1';
+            statusEl.innerHTML = `<span style="color:#34d399;">✅ ${json.id} 기록 저장됨 · 보고서 기록 탭에서 확인하세요</span>`;
+            addFeed(`🗂️ 보고서 기록 저장 완료 → ${json.id}`, 'agent-action');
+
+            // 아카이브 배지 업데이트
+            updateArchiveBadge();
+        } else {
+            throw new Error(json.error || '저장 실패');
+        }
+    } catch (err) {
+        btn.disabled = false;
+        btn.textContent = '🗂️ 기록 저장';
+        btn.style.opacity = '1';
+        statusEl.innerHTML = `<span style="color:#f87171;">❌ 오류: ${err.message}</span>`;
+        console.error('Archive error:', err);
+    }
+}
+
+// 아카이브 배지 숫자 업데이트
+async function updateArchiveBadge() {
+    try {
+        const res  = await fetch('/api/reports?limit=1');
+        const json = await res.json();
+        if (json.ok) {
+            const badge = document.getElementById('archiveBadge');
+            if (badge) badge.textContent = json.total;
+        }
+    } catch (_) {}
+}
+
+// ============================================================
+// ARCHIVE VIEW — 보고서 기록 조회
+// ============================================================
+async function renderArchiveView(content) {
+    content.innerHTML = `
+    <div class="archive-view">
+        <div class="archive-header-card">
+            <span style="font-size:2.5rem">🗂️</span>
+            <div style="flex:1">
+                <h2>보고서 기록 (Report Archive)</h2>
+                <p>매일 저장된 일일 재고 인텔리전스 보고서 · 날짜별 조회 및 재인쇄 가능</p>
+            </div>
+            <span class="archive-count-chip" id="arcTotalChip">불러오는 중...</span>
+        </div>
+        <div id="archiveListContainer">
+            <div style="text-align:center;padding:40px;color:#64748b">⏳ 불러오는 중...</div>
+        </div>
+    </div>`;
+
+    await loadArchiveList();
+    updateArchiveBadge();
+}
+
+async function loadArchiveList() {
+    const container = document.getElementById('archiveListContainer');
+    const chipEl    = document.getElementById('arcTotalChip');
+    if (!container) return;
+
+    try {
+        const res  = await fetch('/api/reports?limit=100');
+        const json = await res.json();
+
+        if (!json.ok) throw new Error(json.error);
+
+        const reports = json.reports;
+        if (chipEl) chipEl.textContent = `총 ${json.total}건`;
+
+        if (reports.length === 0) {
+            container.innerHTML = `
+            <div class="archive-empty">
+                <div class="archive-empty-icon">📭</div>
+                <div>저장된 보고서가 없습니다</div>
+                <div style="font-size:0.8rem;color:#1e293b;margin-top:8px">
+                    일일 보고서 탭에서 보고서를 생성한 후 "기록 저장" 버튼을 클릭하세요
+                </div>
+            </div>`;
+            return;
+        }
+
+        container.innerHTML = `<div class="archive-list">${reports.map((r, i) => `
+        <div class="archive-row" onclick="viewArchivedReport('${r.id}')">
+            <div class="archive-row-num">${i + 1}</div>
+            <div class="archive-row-meta">
+                <div class="archive-row-id">${r.id}</div>
+                <div class="archive-row-date">📅 ${r.date}</div>
+                <div class="archive-row-time">⏰ ${r.time}</div>
+            </div>
+            <div class="archive-row-kpis">
+                <div class="arc-kpi">
+                    <div class="arc-kpi-val" style="color:#a5b4fc">${r.total_scanned}</div>
+                    <div class="arc-kpi-label">스캔</div>
+                </div>
+                <div class="arc-kpi">
+                    <div class="arc-kpi-val" style="color:#34d399">${r.accuracy}%</div>
+                    <div class="arc-kpi-label">정확도</div>
+                </div>
+                <div class="arc-kpi">
+                    <div class="arc-kpi-val" style="color:#fbbf24">${r.total_changes}</div>
+                    <div class="arc-kpi-label">변화</div>
+                </div>
+                <div class="arc-kpi">
+                    <div class="arc-kpi-val" style="color:#f87171">${r.missing}</div>
+                    <div class="arc-kpi-label">소진</div>
+                </div>
+                <div class="arc-kpi">
+                    <div class="arc-kpi-val" style="color:#22d3ee">${r.moved}</div>
+                    <div class="arc-kpi-label">이동</div>
+                </div>
+            </div>
+            <div class="archive-row-actions">
+                <button class="arc-view-btn" onclick="event.stopPropagation(); viewArchivedReport('${r.id}')">👁 상세 보기</button>
+                <button class="arc-del-btn" onclick="event.stopPropagation(); deleteArchivedReport('${r.id}')">🗑</button>
+            </div>
+        </div>`).join('')}</div>`;
+
+    } catch (err) {
+        container.innerHTML = `<div style="text-align:center;padding:40px;color:#f87171">❌ 오류: ${err.message}</div>`;
+    }
+}
+
+async function viewArchivedReport(reportId) {
+    try {
+        const res  = await fetch(`/api/reports/${reportId}`);
+        const json = await res.json();
+        if (!json.ok) throw new Error(json.error);
+
+        const r = json.report;
+        const d = r.data;
+
+        // 오버레이 생성
+        let overlay = document.getElementById('archiveDetailOverlay');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'archiveDetailOverlay';
+            overlay.className = 'archive-detail-overlay';
+            document.body.appendChild(overlay);
+        }
+
+        const missing  = d.missing || 0;
+        const newItems = d.new_items || 0;
+        const changed  = d.changed || 0;
+        const moved    = d.moved || 0;
+
+        overlay.style.display = 'flex';
+        overlay.innerHTML = `
+        <div class="archive-detail-box">
+            <div class="archive-detail-header">
+                <span style="font-size:1.2rem">🗂️</span>
+                <h3>${d.report_id} — ${d.date} ${d.time}</h3>
+                <button class="arc-close-btn" onclick="closeArchiveDetail()">✕</button>
+            </div>
+            <div class="archive-detail-body">
+                <!-- KPI -->
+                <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px">
+                    ${[
+                        [d.total_scanned,'총 스캔','#a5b4fc'],
+                        [`${d.accuracy}%`,'정확도','#34d399'],
+                        [d.total_changes,'변화','#fbbf24'],
+                        [d.agent_actions,'AI 조치','#a78bfa']
+                    ].map(([v,l,c])=>`
+                    <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);
+                                border-radius:10px;padding:12px;text-align:center;">
+                        <div style="font-size:1.6rem;font-weight:900;color:${c}">${v}</div>
+                        <div style="font-size:0.7rem;color:#64748b;margin-top:4px">${l}</div>
+                    </div>`).join('')}
+                </div>
+
+                <!-- 변화 요약 -->
+                <div style="font-size:0.75rem;font-weight:800;color:#64748b;text-transform:uppercase;
+                            letter-spacing:0.06em;margin-bottom:10px">재고 변화 요약</div>
+                <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:20px">
+                    ${[
+                        ['#f87171','🔴 소진',missing],
+                        ['#34d399','🟢 신규 입고',newItems],
+                        ['#fbbf24','🟡 수량 변화',changed],
+                        ['#22d3ee','🔵 위치 변경',moved]
+                    ].map(([c,l,v])=>`
+                    <div style="display:flex;justify-content:space-between;align-items:center;
+                                padding:8px 12px;border-radius:7px;border-left:3px solid ${c};
+                                background:rgba(255,255,255,0.02)">
+                        <span style="color:${c};font-size:0.82rem;font-weight:700">${l}</span>
+                        <span style="color:${c};font-size:1rem;font-weight:900">${v}건</span>
+                    </div>`).join('')}
+                </div>
+
+                <!-- AI 조치 -->
+                ${(d.agent_decisions||[]).length > 0 ? `
+                <div style="font-size:0.75rem;font-weight:800;color:#64748b;text-transform:uppercase;
+                            letter-spacing:0.06em;margin-bottom:10px">Agentic AI 조치</div>
+                <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:20px">
+                    ${(d.agent_decisions||[]).map(dec=>{
+                        const tc = {RESCAN:'#a78bfa',CONFIRM:'#34d399',ALERT:'#f87171',ESCALATE:'#fbbf24'}[dec.type]||'#94a3b8';
+                        return `<div style="display:flex;align-items:center;gap:10px;padding:7px 10px;
+                                    border-radius:7px;background:rgba(255,255,255,0.02)">
+                            <span style="background:${tc}22;color:${tc};padding:2px 8px;border-radius:4px;
+                                         font-size:0.7rem;font-weight:700;flex-shrink:0">${dec.type}</span>
+                            <span style="flex:1;font-size:0.82rem;color:#e2e8f0">${dec.title}</span>
+                            <span style="font-family:monospace;font-size:0.72rem;color:#64748b">${dec.timestamp||''}</span>
+                        </div>`;
+                    }).join('')}
+                </div>` : ''}
+
+                <!-- 권고 사항 -->
+                ${(d.recommendations||[]).length > 0 ? `
+                <div style="font-size:0.75rem;font-weight:800;color:#64748b;text-transform:uppercase;
+                            letter-spacing:0.06em;margin-bottom:10px">권고 사항</div>
+                <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:20px">
+                    ${(d.recommendations||[]).map(rec=>{
+                        const level = rec.includes('[HIGH]')?'HIGH':rec.includes('[MEDIUM]')?'MEDIUM':rec.includes('[LOW]')?'LOW':'INFO';
+                        const c = {HIGH:'#f87171',MEDIUM:'#fbbf24',LOW:'#22d3ee',INFO:'#a5b4fc'}[level];
+                        const bg = {HIGH:'rgba(248,113,113,0.07)',MEDIUM:'rgba(251,191,36,0.07)',LOW:'rgba(34,211,238,0.07)',INFO:'rgba(99,102,241,0.07)'}[level];
+                        return `<div style="padding:8px 12px;border-radius:7px;border-left:3px solid ${c};
+                                     background:${bg};font-size:0.8rem;color:${c}">${rec}</div>`;
+                    }).join('')}
+                </div>` : ''}
+
+                <!-- 액션 버튼 -->
+                <div style="display:flex;gap:10px;justify-content:flex-end;padding-top:10px;
+                            border-top:1px solid rgba(255,255,255,0.05)">
+                    <button onclick="printArchivedReport('${reportId}')"
+                        style="padding:8px 18px;border-radius:7px;border:1px solid rgba(99,102,241,0.4);
+                               background:rgba(99,102,241,0.1);color:#a5b4fc;font-size:0.82rem;
+                               font-weight:700;cursor:pointer">🖨️ 이 보고서 인쇄</button>
+                    <button onclick="closeArchiveDetail()"
+                        style="padding:8px 18px;border-radius:7px;border:1px solid rgba(255,255,255,0.1);
+                               background:transparent;color:#64748b;font-size:0.82rem;cursor:pointer">닫기</button>
+                </div>
+            </div>
+        </div>`;
+
+        // 오버레이 외부 클릭 시 닫기
+        overlay.onclick = function(e) {
+            if (e.target === overlay) closeArchiveDetail();
+        };
+
+    } catch (err) {
+        alert(`❌ 보고서 로드 오류: ${err.message}`);
+    }
+}
+
+function closeArchiveDetail() {
+    const overlay = document.getElementById('archiveDetailOverlay');
+    if (overlay) overlay.style.display = 'none';
+}
+
+async function deleteArchivedReport(reportId) {
+    if (!confirm(`보고서 ${reportId}를 삭제하시겠습니까?`)) return;
+    try {
+        const res  = await fetch(`/api/reports/${reportId}`, { method: 'DELETE' });
+        const json = await res.json();
+        if (!json.ok) throw new Error(json.error);
+        addFeed(`🗑 보고서 삭제: ${reportId}`, 'warning');
+        // 목록 새로고침
+        const content = document.getElementById('dashboardContent');
+        await renderArchiveView(content);
+    } catch (err) {
+        alert(`❌ 삭제 오류: ${err.message}`);
+    }
+}
+
+async function printArchivedReport(reportId) {
+    // 아카이브된 보고서를 새 탭에서 열어 인쇄 (HTML 보고서 엔드포인트 활용)
+    // 현재는 창 인쇄 대화상자 호출
+    closeArchiveDetail();
+    window.print();
 }

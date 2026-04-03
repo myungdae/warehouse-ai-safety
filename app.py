@@ -11,6 +11,7 @@ import json
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from datetime import datetime
+import uuid
 
 try:
     from dotenv import load_dotenv
@@ -22,6 +23,26 @@ except ImportError:
 app = Flask(__name__,
             template_folder='backend/templates',
             static_folder='backend/static')
+
+# ── Report Archive DB (JSON file) ─────────────────────────────
+REPORT_ARCHIVE_DIR  = os.path.join(os.path.dirname(__file__), 'backend', 'data')
+REPORT_ARCHIVE_FILE = os.path.join(REPORT_ARCHIVE_DIR, 'report_archive.json')
+
+def load_archive():
+    """JSON 파일에서 보고서 목록 로드"""
+    if not os.path.exists(REPORT_ARCHIVE_FILE):
+        return []
+    try:
+        with open(REPORT_ARCHIVE_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return []
+
+def save_archive(records):
+    """JSON 파일에 보고서 목록 저장"""
+    os.makedirs(REPORT_ARCHIVE_DIR, exist_ok=True)
+    with open(REPORT_ARCHIVE_FILE, 'w', encoding='utf-8') as f:
+        json.dump(records, f, ensure_ascii=False, indent=2)
 
 # ── Email Config (from .env) ───────────────────────────────────
 MAIL_SERVER   = os.getenv('MAIL_SERVER',   'smtp.gmail.com')
@@ -436,6 +457,107 @@ def build_html_email(d, recipient):
 
 </body>
 </html>"""
+
+
+# ── Report Archive API ────────────────────────────────────────
+@app.route('/api/archive_report', methods=['POST'])
+def archive_report():
+    """
+    보고서 아카이브 저장 API
+    POST /api/archive_report
+    Body: { report_data: {...} }
+    """
+    try:
+        body = request.get_json(force=True) or {}
+        report_data = body.get('report_data', {})
+
+        if not report_data:
+            return jsonify({'ok': False, 'error': '보고서 데이터 없음'}), 400
+
+        # 고유 ID 및 저장 시각 추가
+        saved_at = datetime.now().isoformat()
+        record = {
+            'id':       report_data.get('report_id', f"RPT-{uuid.uuid4().hex[:8].upper()}"),
+            'saved_at': saved_at,
+            'date':     report_data.get('date', datetime.now().strftime('%Y-%m-%d')),
+            'time':     report_data.get('time', datetime.now().strftime('%H:%M:%S')),
+            'data':     report_data
+        }
+
+        archive = load_archive()
+        # 동일 report_id 중복 방지
+        archive = [r for r in archive if r['id'] != record['id']]
+        archive.insert(0, record)          # 최신이 앞에
+        archive = archive[:365]            # 최대 365건 보관
+        save_archive(archive)
+
+        print(f"[ARCHIVE] 보고서 저장 → {record['id']} ({saved_at})")
+        return jsonify({'ok': True, 'id': record['id'], 'saved_at': saved_at})
+
+    except Exception as e:
+        print(f"[ARCHIVE ERROR] {e}")
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@app.route('/api/reports', methods=['GET'])
+def list_reports():
+    """
+    보고서 목록 조회 API
+    GET /api/reports?limit=50
+    """
+    try:
+        limit   = int(request.args.get('limit', 50))
+        archive = load_archive()
+        summary = [{
+            'id':       r['id'],
+            'saved_at': r['saved_at'],
+            'date':     r['date'],
+            'time':     r['time'],
+            'total_scanned':  r['data'].get('total_scanned', 0),
+            'accuracy':       r['data'].get('accuracy', 0),
+            'total_changes':  r['data'].get('total_changes', 0),
+            'agent_actions':  r['data'].get('agent_actions', 0),
+            'missing':        r['data'].get('missing', 0),
+            'new_items':      r['data'].get('new_items', 0),
+            'changed':        r['data'].get('changed', 0),
+            'moved':          r['data'].get('moved', 0),
+        } for r in archive[:limit]]
+        return jsonify({'ok': True, 'reports': summary, 'total': len(archive)})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@app.route('/api/reports/<report_id>', methods=['GET'])
+def get_report(report_id):
+    """
+    특정 보고서 전체 데이터 조회
+    GET /api/reports/{report_id}
+    """
+    try:
+        archive = load_archive()
+        record  = next((r for r in archive if r['id'] == report_id), None)
+        if not record:
+            return jsonify({'ok': False, 'error': '보고서를 찾을 수 없습니다'}), 404
+        return jsonify({'ok': True, 'report': record})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@app.route('/api/reports/<report_id>', methods=['DELETE'])
+def delete_report(report_id):
+    """
+    특정 보고서 삭제
+    DELETE /api/reports/{report_id}
+    """
+    try:
+        archive = load_archive()
+        new_archive = [r for r in archive if r['id'] != report_id]
+        if len(new_archive) == len(archive):
+            return jsonify({'ok': False, 'error': '보고서를 찾을 수 없습니다'}), 404
+        save_archive(new_archive)
+        return jsonify({'ok': True, 'deleted': report_id})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
 
 
 if __name__ == '__main__':
