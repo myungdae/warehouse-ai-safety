@@ -2092,7 +2092,7 @@ async function archiveReport() {
     }
 }
 
-// 아카이브 배지 숫자 업데이트
+// ─── 아카이브 배지 업데이트 ──────────────────────────────────────
 async function updateArchiveBadge() {
     try {
         const res  = await fetch('/api/reports?limit=1');
@@ -2105,95 +2105,303 @@ async function updateArchiveBadge() {
 }
 
 // ============================================================
-// ARCHIVE VIEW — 보고서 기록 조회
+// ARCHIVE VIEW — Operational Ontology + Agentic AI + MCP Layer
 // ============================================================
 async function renderArchiveView(content) {
     content.innerHTML = `
     <div class="archive-view">
-        <div class="archive-header-card">
-            <span style="font-size:2.5rem">🗂️</span>
-            <div style="flex:1">
-                <h2>보고서 기록 (Report Archive)</h2>
-                <p>매일 저장된 일일 재고 인텔리전스 보고서 · 날짜별 조회 및 재인쇄 가능</p>
-            </div>
-            <span class="archive-count-chip" id="arcTotalChip">불러오는 중...</span>
+
+      <!-- ── 헤더 ── -->
+      <div class="archive-header-card">
+        <span style="font-size:2.4rem">🗂️</span>
+        <div style="flex:1">
+          <h2 style="margin:0 0 4px;font-size:1.25rem;font-weight:900;color:#e2e8f0">
+            보고서 기록 Archive
+          </h2>
+          <p style="margin:0;font-size:0.78rem;color:#64748b">
+            Operational Ontology · Agentic AI · MCP 인텔리전스 레이어 통합
+          </p>
         </div>
-        <div id="archiveListContainer">
-            <div style="text-align:center;padding:40px;color:#64748b">⏳ 불러오는 중...</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span class="archive-count-chip" id="arcTotalChip">로딩 중…</span>
+          <a href="/archive" target="_blank"
+             style="padding:6px 14px;border-radius:8px;font-size:0.75rem;font-weight:700;
+                    background:rgba(99,102,241,0.12);color:#a5b4fc;
+                    border:1px solid rgba(99,102,241,0.3);text-decoration:none;white-space:nowrap">
+            🖥️ 전체 관리 페이지
+          </a>
         </div>
+      </div>
+
+      <!-- ── Agentic AI 인텔리전스 패널 ── -->
+      <div id="arcIntelPanel" style="margin-bottom:16px">
+        <div style="text-align:center;padding:20px;color:#475569;font-size:0.82rem">
+          ⏳ AI 인텔리전스 분석 중…
+        </div>
+      </div>
+
+      <!-- ── 보고서 목록 ── -->
+      <div style="font-size:0.72rem;font-weight:800;color:#475569;text-transform:uppercase;
+                  letter-spacing:0.07em;margin-bottom:10px;padding-left:4px">
+        📋 보고서 목록
+      </div>
+      <div id="archiveListContainer">
+        <div style="text-align:center;padding:40px;color:#64748b">⏳ 불러오는 중…</div>
+      </div>
     </div>`;
 
     await loadArchiveList();
     updateArchiveBadge();
 }
 
+// ── 보고서 목록 로드 (버그 수정: date_label / time_label 사용) ──
 async function loadArchiveList() {
     const container = document.getElementById('archiveListContainer');
     const chipEl    = document.getElementById('arcTotalChip');
+    const intelEl   = document.getElementById('arcIntelPanel');
     if (!container) return;
 
     try {
         const res  = await fetch('/api/reports?limit=100');
         const json = await res.json();
-
-        if (!json.ok) throw new Error(json.error);
+        if (!json.ok) throw new Error(json.error || '목록 로드 실패');
 
         const reports = json.reports;
         if (chipEl) chipEl.textContent = `총 ${json.total}건`;
 
+        // ── Agentic AI 인텔리전스 분석 ──────────────────────────────
+        if (intelEl) renderArcIntelligence(intelEl, reports);
+
         if (reports.length === 0) {
             container.innerHTML = `
             <div class="archive-empty">
-                <div class="archive-empty-icon">📭</div>
-                <div>저장된 보고서가 없습니다</div>
-                <div style="font-size:0.8rem;color:#1e293b;margin-top:8px">
-                    일일 보고서 탭에서 보고서를 생성한 후 "기록 저장" 버튼을 클릭하세요
-                </div>
+              <div class="archive-empty-icon">📭</div>
+              <div>저장된 보고서가 없습니다</div>
+              <div style="font-size:0.8rem;color:#475569;margin-top:8px">
+                일일 보고서 탭에서 보고서 생성 후 "기록 저장" 버튼을 클릭하세요
+              </div>
             </div>`;
             return;
         }
 
-        container.innerHTML = `<div class="archive-list">${reports.map((r, i) => `
-        <div class="archive-row" onclick="viewArchivedReport('${r.id}')">
-            <div class="archive-row-num">${i + 1}</div>
-            <div class="archive-row-meta">
+        container.innerHTML = `<div class="archive-list">
+          ${reports.map((r, i) => {
+            // ── FIX: API가 반환하는 올바른 필드명 사용 ──
+            const dateLabel = r.date_label || r.date || '—';
+            const timeLabel = r.time_label || r.time || '—';
+            const accNum    = parseFloat(r.accuracy || 0);
+            const accColor  = accNum >= 98 ? '#34d399' : accNum >= 95 ? '#fbbf24' : '#f87171';
+            const riskTag   = computeRiskTag(r);
+            return `
+            <div class="archive-row" onclick="viewArchivedReport('${r.id}')">
+              <div class="archive-row-num">${i + 1}</div>
+              <div class="archive-row-meta">
                 <div class="archive-row-id">${r.id}</div>
-                <div class="archive-row-date">📅 ${r.date}</div>
-                <div class="archive-row-time">⏰ ${r.time}</div>
-            </div>
-            <div class="archive-row-kpis">
+                <div class="archive-row-date">📅 ${dateLabel}</div>
+                <div class="archive-row-time">⏰ ${timeLabel}</div>
+                ${riskTag}
+              </div>
+              <div class="archive-row-kpis">
                 <div class="arc-kpi">
-                    <div class="arc-kpi-val" style="color:#a5b4fc">${r.total_scanned}</div>
-                    <div class="arc-kpi-label">스캔</div>
+                  <div class="arc-kpi-val" style="color:#a5b4fc">${r.total_scanned}</div>
+                  <div class="arc-kpi-label">스캔</div>
                 </div>
                 <div class="arc-kpi">
-                    <div class="arc-kpi-val" style="color:#34d399">${r.accuracy}%</div>
-                    <div class="arc-kpi-label">정확도</div>
+                  <div class="arc-kpi-val" style="color:${accColor}">${accNum.toFixed(1)}%</div>
+                  <div class="arc-kpi-label">정확도</div>
                 </div>
                 <div class="arc-kpi">
-                    <div class="arc-kpi-val" style="color:#fbbf24">${r.total_changes}</div>
-                    <div class="arc-kpi-label">변화</div>
+                  <div class="arc-kpi-val" style="color:#fbbf24">${r.total_changes}</div>
+                  <div class="arc-kpi-label">변화</div>
                 </div>
                 <div class="arc-kpi">
-                    <div class="arc-kpi-val" style="color:#f87171">${r.missing}</div>
-                    <div class="arc-kpi-label">소진</div>
+                  <div class="arc-kpi-val" style="color:#f87171">${r.missing}</div>
+                  <div class="arc-kpi-label">소진</div>
                 </div>
                 <div class="arc-kpi">
-                    <div class="arc-kpi-val" style="color:#22d3ee">${r.moved}</div>
-                    <div class="arc-kpi-label">이동</div>
+                  <div class="arc-kpi-val" style="color:#22d3ee">${r.moved}</div>
+                  <div class="arc-kpi-label">이동</div>
                 </div>
-            </div>
-            <div class="archive-row-actions">
-                <button class="arc-view-btn" onclick="event.stopPropagation(); viewArchivedReport('${r.id}')">👁 상세 보기</button>
-                <button class="arc-del-btn" onclick="event.stopPropagation(); deleteArchivedReport('${r.id}')">🗑</button>
-            </div>
-        </div>`).join('')}</div>`;
+                <div class="arc-kpi">
+                  <div class="arc-kpi-val" style="color:#a78bfa">${r.agent_actions}</div>
+                  <div class="arc-kpi-label">AI조치</div>
+                </div>
+              </div>
+              <div class="archive-row-actions">
+                <button class="arc-view-btn"
+                  onclick="event.stopPropagation(); viewArchivedReport('${r.id}')">👁 상세 보기</button>
+                <button class="arc-del-btn"
+                  onclick="event.stopPropagation(); deleteArchivedReport('${r.id}')">🗑</button>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>`;
 
     } catch (err) {
-        container.innerHTML = `<div style="text-align:center;padding:40px;color:#f87171">❌ 오류: ${err.message}</div>`;
+        container.innerHTML = `
+          <div style="text-align:center;padding:40px;color:#f87171">❌ 오류: ${err.message}</div>`;
     }
 }
 
+// ── 리스크 태그 계산 ────────────────────────────────────────────
+function computeRiskTag(r) {
+    const acc = parseFloat(r.accuracy || 0);
+    if (r.missing >= 5 || acc < 95) {
+        return `<span style="display:inline-block;margin-top:4px;padding:2px 7px;border-radius:4px;
+                             font-size:0.64rem;font-weight:700;background:rgba(248,113,113,0.15);
+                             color:#f87171;border:1px solid rgba(248,113,113,0.3)">🔴 HIGH RISK</span>`;
+    } else if (r.missing >= 3 || r.total_changes >= 15) {
+        return `<span style="display:inline-block;margin-top:4px;padding:2px 7px;border-radius:4px;
+                             font-size:0.64rem;font-weight:700;background:rgba(251,191,36,0.15);
+                             color:#fbbf24;border:1px solid rgba(251,191,36,0.3)">🟡 MEDIUM</span>`;
+    } else if (acc >= 99 && r.missing === 0) {
+        return `<span style="display:inline-block;margin-top:4px;padding:2px 7px;border-radius:4px;
+                             font-size:0.64rem;font-weight:700;background:rgba(52,211,153,0.12);
+                             color:#34d399;border:1px solid rgba(52,211,153,0.3)">🟢 OPTIMAL</span>`;
+    }
+    return '';
+}
+
+// ── Agentic AI + Ontology + MCP 인텔리전스 패널 렌더링 ───────────
+function renderArcIntelligence(el, reports) {
+    if (!reports || reports.length === 0) {
+        el.innerHTML = '';
+        return;
+    }
+
+    // 통계 계산
+    const totalReports  = reports.length;
+    const avgAcc        = reports.reduce((s, r) => s + parseFloat(r.accuracy||0), 0) / totalReports;
+    const totalMissing  = reports.reduce((s, r) => s + (r.missing||0), 0);
+    const totalChanges  = reports.reduce((s, r) => s + (r.total_changes||0), 0);
+    const totalAI       = reports.reduce((s, r) => s + (r.agent_actions||0), 0);
+
+    // 트렌드 분석
+    const trend = reports.length >= 2
+        ? (parseFloat(reports[0].accuracy) - parseFloat(reports[reports.length-1].accuracy)).toFixed(1)
+        : null;
+    const trendTxt  = trend !== null
+        ? (parseFloat(trend) >= 0
+            ? `<span style="color:#34d399">▲ +${trend}%</span>`
+            : `<span style="color:#f87171">▼ ${trend}%</span>`)
+        : '<span style="color:#64748b">—</span>';
+
+    // 이상 탐지
+    const highRiskCount = reports.filter(r =>
+        parseFloat(r.accuracy||0) < 95 || (r.missing||0) >= 5).length;
+    const anomalyHTML   = highRiskCount > 0
+        ? `<div style="margin-top:6px;padding:8px 12px;border-radius:8px;
+                       background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.25);
+                       font-size:0.78rem;color:#fca5a5">
+             🚨 Agentic AI 이상 탐지: <strong>${highRiskCount}건</strong> 고위험 순찰 감지 — 즉시 점검 권고
+           </div>`
+        : `<div style="margin-top:6px;padding:8px 12px;border-radius:8px;
+                       background:rgba(52,211,153,0.07);border:1px solid rgba(52,211,153,0.2);
+                       font-size:0.78rem;color:#6ee7b7">
+             ✅ 이상 없음 — 모든 순찰 정상 범위
+           </div>`;
+
+    // Ontology 분류 요약
+    const ontClasses = [];
+    const missingSum = totalMissing;
+    if (missingSum > 0)    ontClasses.push(`StockDepletionEvent(${missingSum})`);
+    const movedSum   = reports.reduce((s, r) => s + (r.moved||0), 0);
+    if (movedSum > 0)      ontClasses.push(`LocationMismatchEvent(${movedSum})`);
+    const newSum     = reports.reduce((s, r) => s + (r.new_items||0), 0);
+    if (newSum > 0)        ontClasses.push(`NewStockArrivalEvent(${newSum})`);
+    const changedSum = reports.reduce((s, r) => s + (r.changed||0), 0);
+    if (changedSum > 0)    ontClasses.push(`QuantityChangeEvent(${changedSum})`);
+
+    // MCP 컨텍스트 프로토콜 요약
+    const mcpTools = [
+        { name: 'query_report_archive', desc: `${totalReports}개 보고서 쿼리 가능` },
+        { name: 'detect_anomalies',     desc: `임계값 95% 이하 / missing≥5 탐지` },
+        { name: 'classify_events',      desc: `OWL 온톨로지 기반 4종 분류` },
+        { name: 'generate_summary',     desc: `크로스-리포트 트렌드 요약 생성` },
+    ];
+
+    el.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+
+      <!-- Agentic AI 패널 -->
+      <div style="background:rgba(167,139,250,0.06);border:1px solid rgba(167,139,250,0.2);
+                  border-radius:12px;padding:16px">
+        <div style="font-size:0.7rem;font-weight:800;color:#7c3aed;text-transform:uppercase;
+                    letter-spacing:0.07em;margin-bottom:10px">🤖 Agentic AI 크로스-리포트 분석</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+          ${[
+            ['순찰 횟수', totalReports, '#a5b4fc'],
+            ['평균 정확도', `${avgAcc.toFixed(1)}%`, avgAcc>=98?'#34d399':avgAcc>=95?'#fbbf24':'#f87171'],
+            ['누적 변화', totalChanges, '#fbbf24'],
+            ['누적 AI 조치', totalAI, '#a78bfa'],
+          ].map(([l,v,c])=>`
+          <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:10px;text-align:center">
+            <div style="font-size:1.3rem;font-weight:900;color:${c}">${v}</div>
+            <div style="font-size:0.67rem;color:#64748b;margin-top:2px">${l}</div>
+          </div>`).join('')}
+        </div>
+        <div style="font-size:0.72rem;color:#94a3b8;margin-bottom:4px">
+          📈 정확도 트렌드: ${trendTxt}
+        </div>
+        ${anomalyHTML}
+      </div>
+
+      <!-- Operational Ontology 패널 -->
+      <div style="background:rgba(34,211,238,0.05);border:1px solid rgba(34,211,238,0.18);
+                  border-radius:12px;padding:16px">
+        <div style="font-size:0.7rem;font-weight:800;color:#0891b2;text-transform:uppercase;
+                    letter-spacing:0.07em;margin-bottom:10px">🧠 Operational Ontology 이벤트 분류</div>
+        <div style="font-size:0.72rem;color:#94a3b8;margin-bottom:8px">
+          OWL 클래스 기반 자동 분류 — InventoryEvent 상위 클래스
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px">
+          ${ontClasses.length > 0 ? ontClasses.map(cls => {
+            const [name, countStr] = cls.replace(')', '').split('(');
+            const colorMap = {
+              StockDepletionEvent: '#f87171',
+              LocationMismatchEvent: '#22d3ee',
+              NewStockArrivalEvent: '#34d399',
+              QuantityChangeEvent: '#fbbf24'
+            };
+            const c = colorMap[name] || '#94a3b8';
+            return `<div style="display:flex;align-items:center;justify-content:space-between;
+                                padding:6px 10px;border-radius:6px;
+                                background:rgba(255,255,255,0.02);border-left:2px solid ${c}">
+              <span style="font-family:monospace;font-size:0.72rem;color:${c}">${name}</span>
+              <span style="font-size:0.8rem;font-weight:700;color:${c}">${countStr}건</span>
+            </div>`;
+          }).join('') : '<div style="color:#475569;font-size:0.78rem">이벤트 없음</div>'}
+        </div>
+        <div style="font-size:0.7rem;color:#475569;font-style:italic">
+          📌 owl:InventoryEvent → DronePatrolReport → WarehouseOntology v2.1
+        </div>
+      </div>
+    </div>
+
+    <!-- MCP 컨텍스트 프로토콜 도구 패널 -->
+    <div style="background:rgba(99,102,241,0.05);border:1px solid rgba(99,102,241,0.18);
+                border-radius:12px;padding:16px;margin-bottom:12px">
+      <div style="font-size:0.7rem;font-weight:800;color:#4f46e5;text-transform:uppercase;
+                  letter-spacing:0.07em;margin-bottom:10px">
+        🔌 MCP (Model Context Protocol) — 아카이브 인텔리전스 도구
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+        ${mcpTools.map(t => `
+        <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(99,102,241,0.15);
+                    border-radius:8px;padding:10px">
+          <div style="font-family:monospace;font-size:0.7rem;color:#818cf8;margin-bottom:4px;
+                      font-weight:700">${t.name}()</div>
+          <div style="font-size:0.67rem;color:#64748b">${t.desc}</div>
+        </div>`).join('')}
+      </div>
+      <div style="margin-top:10px;font-size:0.7rem;color:#475569">
+        💡 MCP 서버 연동 시 LLM 에이전트가 위 도구를 호출하여 실시간 창고 인텔리전스 생성
+        — <span style="color:#818cf8">warehouse-drone-mcp v1.0</span>
+      </div>
+    </div>`;
+}
+
+// ── 보고서 상세 보기 오버레이 ────────────────────────────────────
 async function viewArchivedReport(reportId) {
     try {
         const res  = await fetch(`/api/reports/${reportId}`);
@@ -2201,9 +2409,31 @@ async function viewArchivedReport(reportId) {
         if (!json.ok) throw new Error(json.error);
 
         const r = json.report;
-        const d = r.data;
+        // payload 우선, data fallback
+        const d = r.data && Object.keys(r.data).length > 0 ? r.data : r;
 
-        // 오버레이 생성
+        const missing  = parseInt(d.missing  || r.missing  || 0);
+        const newItems = parseInt(d.new_items || r.new_items|| 0);
+        const changed  = parseInt(d.changed  || r.changed  || 0);
+        const moved    = parseInt(d.moved    || r.moved    || 0);
+        const accuracy = d.accuracy || r.accuracy || 0;
+        const totalSc  = d.total_scanned || r.total_scanned || 0;
+        const totalCh  = d.total_changes  || r.total_changes  || 0;
+        const agAct    = d.agent_actions  || r.agent_actions  || 0;
+        const dateStr  = d.date || r.date_label || '—';
+        const timeStr  = d.time || r.time_label || '—';
+        const reportId2= d.report_id || r.id || reportId;
+        const decisions= d.agent_decisions || [];
+        const recs     = d.recommendations || [];
+
+        // OWL 온톨로지 이벤트 클래스
+        const ontEvents = [
+            missing  > 0 ? { cls:'StockDepletionEvent',   cnt:missing,  c:'#f87171' } : null,
+            newItems > 0 ? { cls:'NewStockArrivalEvent',   cnt:newItems, c:'#34d399' } : null,
+            changed  > 0 ? { cls:'QuantityChangeEvent',    cnt:changed,  c:'#fbbf24' } : null,
+            moved    > 0 ? { cls:'LocationMismatchEvent',  cnt:moved,    c:'#22d3ee' } : null,
+        ].filter(Boolean);
+
         let overlay = document.getElementById('archiveDetailOverlay');
         if (!overlay) {
             overlay = document.createElement('div');
@@ -2211,103 +2441,123 @@ async function viewArchivedReport(reportId) {
             overlay.className = 'archive-detail-overlay';
             document.body.appendChild(overlay);
         }
-
-        const missing  = d.missing || 0;
-        const newItems = d.new_items || 0;
-        const changed  = d.changed || 0;
-        const moved    = d.moved || 0;
-
         overlay.style.display = 'flex';
+
         overlay.innerHTML = `
         <div class="archive-detail-box">
-            <div class="archive-detail-header">
-                <span style="font-size:1.2rem">🗂️</span>
-                <h3>${d.report_id} — ${d.date} ${d.time}</h3>
-                <button class="arc-close-btn" onclick="closeArchiveDetail()">✕</button>
+          <div class="archive-detail-header">
+            <span style="font-size:1.1rem">🗂️</span>
+            <h3 style="flex:1;font-size:0.95rem">${reportId2} &nbsp;—&nbsp; ${dateStr} &nbsp;${timeStr}</h3>
+            <button class="arc-close-btn" onclick="closeArchiveDetail()">✕</button>
+          </div>
+          <div class="archive-detail-body">
+
+            <!-- KPI -->
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px">
+              ${[
+                [totalSc, '총 스캔', '#a5b4fc'],
+                [`${parseFloat(accuracy).toFixed(1)}%`, '정확도', '#34d399'],
+                [totalCh, '변화', '#fbbf24'],
+                [agAct,   'AI 조치', '#a78bfa']
+              ].map(([v,l,c])=>`
+              <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);
+                          border-radius:10px;padding:12px;text-align:center">
+                <div style="font-size:1.5rem;font-weight:900;color:${c}">${v}</div>
+                <div style="font-size:0.68rem;color:#64748b;margin-top:3px">${l}</div>
+              </div>`).join('')}
             </div>
-            <div class="archive-detail-body">
-                <!-- KPI -->
-                <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px">
-                    ${[
-                        [d.total_scanned,'총 스캔','#a5b4fc'],
-                        [`${d.accuracy}%`,'정확도','#34d399'],
-                        [d.total_changes,'변화','#fbbf24'],
-                        [d.agent_actions,'AI 조치','#a78bfa']
-                    ].map(([v,l,c])=>`
-                    <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);
-                                border-radius:10px;padding:12px;text-align:center;">
-                        <div style="font-size:1.6rem;font-weight:900;color:${c}">${v}</div>
-                        <div style="font-size:0.7rem;color:#64748b;margin-top:4px">${l}</div>
-                    </div>`).join('')}
-                </div>
 
-                <!-- 변화 요약 -->
-                <div style="font-size:0.75rem;font-weight:800;color:#64748b;text-transform:uppercase;
-                            letter-spacing:0.06em;margin-bottom:10px">재고 변화 요약</div>
-                <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:20px">
-                    ${[
-                        ['#f87171','🔴 소진',missing],
-                        ['#34d399','🟢 신규 입고',newItems],
-                        ['#fbbf24','🟡 수량 변화',changed],
-                        ['#22d3ee','🔵 위치 변경',moved]
-                    ].map(([c,l,v])=>`
-                    <div style="display:flex;justify-content:space-between;align-items:center;
-                                padding:8px 12px;border-radius:7px;border-left:3px solid ${c};
-                                background:rgba(255,255,255,0.02)">
-                        <span style="color:${c};font-size:0.82rem;font-weight:700">${l}</span>
-                        <span style="color:${c};font-size:1rem;font-weight:900">${v}건</span>
-                    </div>`).join('')}
-                </div>
-
-                <!-- AI 조치 -->
-                ${(d.agent_decisions||[]).length > 0 ? `
-                <div style="font-size:0.75rem;font-weight:800;color:#64748b;text-transform:uppercase;
-                            letter-spacing:0.06em;margin-bottom:10px">Agentic AI 조치</div>
-                <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:20px">
-                    ${(d.agent_decisions||[]).map(dec=>{
-                        const tc = {RESCAN:'#a78bfa',CONFIRM:'#34d399',ALERT:'#f87171',ESCALATE:'#fbbf24'}[dec.type]||'#94a3b8';
-                        return `<div style="display:flex;align-items:center;gap:10px;padding:7px 10px;
-                                    border-radius:7px;background:rgba(255,255,255,0.02)">
-                            <span style="background:${tc}22;color:${tc};padding:2px 8px;border-radius:4px;
-                                         font-size:0.7rem;font-weight:700;flex-shrink:0">${dec.type}</span>
-                            <span style="flex:1;font-size:0.82rem;color:#e2e8f0">${dec.title}</span>
-                            <span style="font-family:monospace;font-size:0.72rem;color:#64748b">${dec.timestamp||''}</span>
-                        </div>`;
-                    }).join('')}
-                </div>` : ''}
-
-                <!-- 권고 사항 -->
-                ${(d.recommendations||[]).length > 0 ? `
-                <div style="font-size:0.75rem;font-weight:800;color:#64748b;text-transform:uppercase;
-                            letter-spacing:0.06em;margin-bottom:10px">권고 사항</div>
-                <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:20px">
-                    ${(d.recommendations||[]).map(rec=>{
-                        const level = rec.includes('[HIGH]')?'HIGH':rec.includes('[MEDIUM]')?'MEDIUM':rec.includes('[LOW]')?'LOW':'INFO';
-                        const c = {HIGH:'#f87171',MEDIUM:'#fbbf24',LOW:'#22d3ee',INFO:'#a5b4fc'}[level];
-                        const bg = {HIGH:'rgba(248,113,113,0.07)',MEDIUM:'rgba(251,191,36,0.07)',LOW:'rgba(34,211,238,0.07)',INFO:'rgba(99,102,241,0.07)'}[level];
-                        return `<div style="padding:8px 12px;border-radius:7px;border-left:3px solid ${c};
-                                     background:${bg};font-size:0.8rem;color:${c}">${rec}</div>`;
-                    }).join('')}
-                </div>` : ''}
-
-                <!-- 액션 버튼 -->
-                <div style="display:flex;gap:10px;justify-content:flex-end;padding-top:10px;
-                            border-top:1px solid rgba(255,255,255,0.05)">
-                    <button onclick="printArchivedReport('${reportId}')"
-                        style="padding:8px 18px;border-radius:7px;border:1px solid rgba(99,102,241,0.4);
-                               background:rgba(99,102,241,0.1);color:#a5b4fc;font-size:0.82rem;
-                               font-weight:700;cursor:pointer">🖨️ 이 보고서 인쇄</button>
-                    <button onclick="closeArchiveDetail()"
-                        style="padding:8px 18px;border-radius:7px;border:1px solid rgba(255,255,255,0.1);
-                               background:transparent;color:#64748b;font-size:0.82rem;cursor:pointer">닫기</button>
-                </div>
+            <!-- 재고 변화 요약 -->
+            <div style="font-size:0.7rem;font-weight:800;color:#64748b;text-transform:uppercase;
+                        letter-spacing:0.06em;margin-bottom:8px">📦 재고 변화 요약</div>
+            <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:16px">
+              ${[['#f87171','🔴 소진',missing],['#34d399','🟢 신규 입고',newItems],
+                 ['#fbbf24','🟡 수량 변화',changed],['#22d3ee','🔵 위치 변경',moved]
+                ].map(([c,l,v])=>`
+              <div style="display:flex;justify-content:space-between;align-items:center;
+                          padding:7px 12px;border-radius:7px;border-left:3px solid ${c};
+                          background:rgba(255,255,255,0.02)">
+                <span style="color:${c};font-size:0.8rem;font-weight:700">${l}</span>
+                <span style="color:${c};font-size:0.95rem;font-weight:900">${v}건</span>
+              </div>`).join('')}
             </div>
+
+            <!-- Ontology 이벤트 분류 -->
+            ${ontEvents.length > 0 ? `
+            <div style="font-size:0.7rem;font-weight:800;color:#0891b2;text-transform:uppercase;
+                        letter-spacing:0.06em;margin-bottom:8px">🧠 Ontology 이벤트 분류</div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px">
+              ${ontEvents.map(e=>`
+              <span style="padding:4px 10px;border-radius:6px;font-family:monospace;font-size:0.7rem;
+                           font-weight:700;background:${e.c}18;color:${e.c};border:1px solid ${e.c}40">
+                ${e.cls}(${e.cnt})
+              </span>`).join('')}
+            </div>` : ''}
+
+            <!-- AI 조치 -->
+            ${decisions.length > 0 ? `
+            <div style="font-size:0.7rem;font-weight:800;color:#64748b;text-transform:uppercase;
+                        letter-spacing:0.06em;margin-bottom:8px">🤖 Agentic AI 조치</div>
+            <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:16px">
+              ${decisions.map(dec => {
+                const tc = {RESCAN:'#a78bfa',CONFIRM:'#34d399',ALERT:'#f87171',ESCALATE:'#fbbf24'}[dec.type]||'#94a3b8';
+                return `<div style="display:flex;align-items:center;gap:10px;padding:7px 10px;
+                                   border-radius:7px;background:rgba(255,255,255,0.02)">
+                  <span style="background:${tc}22;color:${tc};padding:2px 8px;border-radius:4px;
+                               font-size:0.68rem;font-weight:700;flex-shrink:0">${dec.type}</span>
+                  <span style="flex:1;font-size:0.8rem;color:#e2e8f0">${dec.title}</span>
+                  <span style="font-family:monospace;font-size:0.7rem;color:#64748b">${dec.timestamp||''}</span>
+                </div>`;
+              }).join('')}
+            </div>` : ''}
+
+            <!-- 권고 사항 -->
+            ${recs.length > 0 ? `
+            <div style="font-size:0.7rem;font-weight:800;color:#64748b;text-transform:uppercase;
+                        letter-spacing:0.06em;margin-bottom:8px">📌 권고 사항</div>
+            <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:16px">
+              ${recs.map(rec => {
+                const level = rec.includes('[HIGH]')?'HIGH':rec.includes('[MEDIUM]')?'MEDIUM':rec.includes('[LOW]')?'LOW':'INFO';
+                const c  = {HIGH:'#f87171',MEDIUM:'#fbbf24',LOW:'#22d3ee',INFO:'#a5b4fc'}[level];
+                const bg = {HIGH:'rgba(248,113,113,0.07)',MEDIUM:'rgba(251,191,36,0.07)',
+                            LOW:'rgba(34,211,238,0.07)',INFO:'rgba(99,102,241,0.07)'}[level];
+                return `<div style="padding:8px 12px;border-radius:7px;border-left:3px solid ${c};
+                                   background:${bg};font-size:0.78rem;color:${c}">${rec}</div>`;
+              }).join('')}
+            </div>` : ''}
+
+            <!-- MCP 도구 호출 미리보기 -->
+            <div style="background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.18);
+                        border-radius:8px;padding:12px;margin-bottom:16px">
+              <div style="font-size:0.68rem;font-weight:800;color:#818cf8;margin-bottom:6px">
+                🔌 MCP 컨텍스트 — 이 보고서
+              </div>
+              <pre style="font-family:monospace;font-size:0.67rem;color:#94a3b8;margin:0;
+                          white-space:pre-wrap">get_report("${reportId2}") →
+  date: "${dateStr}", accuracy: ${parseFloat(accuracy).toFixed(1)}%
+  events: StockDepletion(${missing}), NewArrival(${newItems}), QtyChange(${changed}), LocMismatch(${moved})
+  ai_actions: ${agAct}, risk: ${parseFloat(accuracy)<95||missing>=5?'HIGH':missing>=3||totalCh>=15?'MEDIUM':'LOW'}</pre>
+            </div>
+
+            <!-- 액션 버튼 -->
+            <div style="display:flex;gap:10px;justify-content:flex-end;padding-top:10px;
+                        border-top:1px solid rgba(255,255,255,0.05)">
+              <button onclick="printArchivedReport('${reportId}')"
+                style="padding:8px 18px;border-radius:7px;border:1px solid rgba(99,102,241,0.4);
+                       background:rgba(99,102,241,0.1);color:#a5b4fc;font-size:0.8rem;
+                       font-weight:700;cursor:pointer">🖨️ 인쇄</button>
+              <button onclick="window.open('/archive#${reportId}','_blank')"
+                style="padding:8px 18px;border-radius:7px;border:1px solid rgba(34,211,238,0.3);
+                       background:rgba(34,211,238,0.07);color:#22d3ee;font-size:0.8rem;
+                       font-weight:700;cursor:pointer">🖥️ 관리 페이지</button>
+              <button onclick="closeArchiveDetail()"
+                style="padding:8px 18px;border-radius:7px;border:1px solid rgba(255,255,255,0.1);
+                       background:transparent;color:#64748b;font-size:0.8rem;cursor:pointer">닫기</button>
+            </div>
+          </div>
         </div>`;
 
-        // 오버레이 외부 클릭 시 닫기
-        overlay.onclick = function(e) {
-            if (e.target === overlay) closeArchiveDetail();
-        };
+        overlay.onclick = e => { if (e.target === overlay) closeArchiveDetail(); };
 
     } catch (err) {
         alert(`❌ 보고서 로드 오류: ${err.message}`);
@@ -2315,8 +2565,8 @@ async function viewArchivedReport(reportId) {
 }
 
 function closeArchiveDetail() {
-    const overlay = document.getElementById('archiveDetailOverlay');
-    if (overlay) overlay.style.display = 'none';
+    const ov = document.getElementById('archiveDetailOverlay');
+    if (ov) ov.style.display = 'none';
 }
 
 async function deleteArchivedReport(reportId) {
@@ -2326,7 +2576,6 @@ async function deleteArchivedReport(reportId) {
         const json = await res.json();
         if (!json.ok) throw new Error(json.error);
         addFeed(`🗑 보고서 삭제: ${reportId}`, 'warning');
-        // 목록 새로고침
         const content = document.getElementById('dashboardContent');
         await renderArchiveView(content);
     } catch (err) {
@@ -2335,8 +2584,6 @@ async function deleteArchivedReport(reportId) {
 }
 
 async function printArchivedReport(reportId) {
-    // 아카이브된 보고서를 새 탭에서 열어 인쇄 (HTML 보고서 엔드포인트 활용)
-    // 현재는 창 인쇄 대화상자 호출
     closeArchiveDetail();
-    window.print();
+    setTimeout(() => window.print(), 300);
 }

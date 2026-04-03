@@ -125,6 +125,10 @@ def drone_inventory():
 def admin_reports():
     return render_template('admin_reports.html')
 
+@app.route('/archive')
+def archive_intelligence():
+    return render_template('archive_intelligence.html')
+
 @app.route('/static/<path:filename>')
 def serve_static(filename):
     return send_from_directory('backend/static', filename)
