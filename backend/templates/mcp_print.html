@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🖨️ MCP Auto-Print — Warehouse Drone System</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:'Segoe UI','Noto Sans KR',sans-serif;
+  background:linear-gradient(135deg,#0a0f1e 0%,#0f172a 60%,#0d1424 100%);
+  color:#e2e8f0;min-height:100vh;
+}
+/* ── Layout ── */
+.wrap{display:flex;min-height:100vh}
+.sidebar{
+  width:240px;min-height:100vh;flex-shrink:0;
+  background:linear-gradient(180deg,#1e293b,#0f172a);
+  border-right:1px solid rgba(255,255,255,0.07);
+  display:flex;flex-direction:column;
+}
+.logo{padding:22px 20px 16px;border-bottom:1px solid rgba(255,255,255,0.06)}
+.logo-icon{font-size:1.8rem}
+.logo-text{font-size:0.95rem;font-weight:800;color:#e2e8f0;margin-top:4px}
+.logo-sub{font-size:0.68rem;color:#475569;margin-top:2px}
+.nav{padding:12px 0;flex:1}
+.nav-section{padding:8px 16px 4px;font-size:0.63rem;color:#334155;text-transform:uppercase;letter-spacing:.1em;font-weight:700}
+.nav-item{
+  display:flex;align-items:center;gap:10px;padding:9px 20px;
+  font-size:0.84rem;color:#64748b;cursor:pointer;
+  transition:all .15s;border-left:2px solid transparent;text-decoration:none;
+}
+.nav-item:hover{color:#e2e8f0;background:rgba(255,255,255,.04)}
+.nav-item.active{color:#a5b4fc;background:rgba(99,102,241,.1);border-left-color:#6366f1}
+.main{flex:1;overflow-y:auto;padding:28px 32px}
+
+/* ── Cards ── */
+.page-title{font-size:1.5rem;font-weight:800;color:#e2e8f0;margin-bottom:4px}
+.page-sub{font-size:0.82rem;color:#64748b;margin-bottom:28px}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px}
+@media(max-width:900px){.grid2{grid-template-columns:1fr}.grid3{grid-template-columns:1fr 1fr}}
+
+.card{
+  background:rgba(15,23,42,.7);border-radius:12px;
+  border:1px solid rgba(99,102,241,.2);padding:20px;
+}
+.card-title{font-size:0.9rem;font-weight:700;color:#a5b4fc;margin-bottom:16px;
+  display:flex;align-items:center;gap:8px}
+
+/* ── KPI chips ── */
+.kpi-row{display:flex;gap:12px;margin-bottom:24px;flex-wrap:wrap}
+.kpi{
+  flex:1;min-width:140px;
+  background:rgba(15,23,42,.7);border-radius:10px;padding:14px 18px;
+  border:1px solid rgba(99,102,241,.2);
+}
+.kpi-val{font-size:1.6rem;font-weight:800;margin-bottom:2px}
+.kpi-lbl{font-size:0.68rem;color:#64748b;text-transform:uppercase;letter-spacing:.05em}
+
+/* ── Printer status indicator ── */
+.printer-status{
+  display:flex;align-items:center;gap:12px;padding:14px 18px;
+  border-radius:10px;border:2px solid;margin-bottom:20px;
+}
+.status-dot{width:14px;height:14px;border-radius:50%;flex-shrink:0;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.status-online{border-color:#34d399;background:rgba(52,211,153,.08)}
+.status-offline{border-color:#f87171;background:rgba(248,113,113,.08)}
+.status-checking{border-color:#fbbf24;background:rgba(251,191,36,.08)}
+
+/* ── Form elements ── */
+.form-row{margin-bottom:14px}
+.form-label{font-size:0.75rem;color:#94a3b8;font-weight:600;margin-bottom:6px;display:block}
+.form-input{
+  width:100%;background:rgba(0,0,0,.3);border:1px solid rgba(99,102,241,.3);
+  border-radius:7px;color:#e2e8f0;padding:9px 13px;font-size:0.85rem;
+  transition:border-color .2s;
+}
+.form-input:focus{outline:none;border-color:#6366f1}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;
+  border-bottom:1px solid rgba(255,255,255,.05)}
+.toggle-lbl{font-size:0.85rem;color:#e2e8f0}
+.toggle-sub{font-size:0.72rem;color:#64748b;margin-top:2px}
+/* toggle switch */
+.switch{position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0}
+.switch input{opacity:0;width:0;height:0}
+.slider{position:absolute;cursor:pointer;inset:0;background:#334155;border-radius:24px;transition:.3s}
+.slider:before{content:'';position:absolute;height:18px;width:18px;left:3px;bottom:3px;
+  background:#94a3b8;border-radius:50%;transition:.3s}
+input:checked+.slider{background:#6366f1}
+input:checked+.slider:before{transform:translateX(20px);background:#fff}
+
+/* ── Buttons ── */
+.btn{padding:9px 20px;border-radius:8px;cursor:pointer;font-size:0.84rem;
+  font-weight:700;border:none;transition:all .2s}
+.btn-primary{background:linear-gradient(135deg,#6366f1,#22d3ee);color:#fff}
+.btn-primary:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(99,102,241,.4)}
+.btn-success{background:linear-gradient(135deg,#34d399,#059669);color:#fff}
+.btn-success:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(52,211,153,.35)}
+.btn-warn{background:rgba(251,191,36,.15);color:#fbbf24;border:1px solid rgba(251,191,36,.4)}
+.btn-warn:hover{background:rgba(251,191,36,.25)}
+.btn-danger{background:rgba(248,113,113,.15);color:#f87171;border:1px solid rgba(248,113,113,.4)}
+.btn-gray{background:rgba(100,116,139,.2);color:#94a3b8;border:1px solid rgba(100,116,139,.3)}
+.btn:disabled{opacity:.5;cursor:default;transform:none !important}
+
+/* ── Log table ── */
+.log-wrap{max-height:360px;overflow-y:auto}
+.log-row{
+  display:grid;grid-template-columns:160px 90px 1fr;gap:10px;
+  padding:9px 0;border-bottom:1px solid rgba(255,255,255,.04);font-size:0.76rem;align-items:start;
+}
+.log-row:last-child{border-bottom:none}
+.log-time{color:#475569;font-family:monospace}
+.log-badge{padding:2px 8px;border-radius:4px;font-weight:700;font-size:0.68rem;text-align:center;width:fit-content}
+.badge-sent{background:rgba(52,211,153,.2);color:#34d399}
+.badge-offline{background:rgba(248,113,113,.2);color:#f87171}
+.badge-error{background:rgba(248,113,113,.2);color:#f87171}
+.badge-patrol{background:rgba(167,139,250,.2);color:#a78bfa}
+.badge-sched{background:rgba(34,211,238,.2);color:#22d3ee}
+.badge-no_report{background:rgba(251,191,36,.2);color:#fbbf24}
+.badge-manual{background:rgba(99,102,241,.2);color:#a5b4fc}
+
+/* ── Preview window ── */
+.preview-box{
+  background:#0a0f18;border:1px solid rgba(34,211,238,.25);border-radius:8px;
+  padding:16px;font-family:'Courier New',monospace;font-size:0.75rem;
+  color:#94a3b8;white-space:pre;overflow:auto;max-height:380px;
+}
+/* ── Scheduler timeline ── */
+.timeline{display:flex;flex-direction:column;gap:0}
+.tl-item{display:flex;gap:14px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+.tl-item:last-child{border-bottom:none}
+.tl-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;margin-top:5px}
+.tl-body{flex:1;font-size:0.8rem}
+.tl-time{font-size:0.7rem;color:#475569;margin-top:2px;font-family:monospace}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="logo">
+      <div class="logo-icon">🖨️</div>
+      <div class="logo-text">MCP Auto-Print</div>
+      <div class="logo-sub">Agentic AI · Samsung Warehouse</div>
+    </div>
+    <div class="nav">
+      <div class="nav-section">Navigation</div>
+      <a class="nav-item" href="/drone">🚁 Drone Patrol</a>
+      <a class="nav-item" href="/admin/reports">📋 Report Admin</a>
+      <a class="nav-item active" href="/mcp">🖨️ MCP Auto-Print</a>
+      <div class="nav-section" style="margin-top:12px">System</div>
+      <a class="nav-item" href="/" >🏠 Home</a>
+    </div>
+  </nav>
+
+  <!-- Main -->
+  <main class="main">
+    <div class="page-title">🖨️ MCP Auto-Print Control</div>
+    <div class="page-sub">
+      Operational Ontology + Agentic AI + MCP — 야간 드론 순찰 완료 후 담당자 출근 전 자동 보고서 출력
+    </div>
+
+    <!-- KPI row -->
+    <div class="kpi-row" id="kpiRow">
+      <div class="kpi">
+        <div class="kpi-val" id="kpiStatus" style="color:#fbbf24">–</div>
+        <div class="kpi-lbl">Auto-Print</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-val" id="kpiPrintTime" style="color:#22d3ee">–</div>
+        <div class="kpi-lbl">예약 출력 시각</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-val" id="kpiPatrolTime" style="color:#a78bfa">–</div>
+        <div class="kpi-lbl">야간 순찰 시작</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-val" id="kpiLastPrint" style="color:#34d399;font-size:1rem">–</div>
+        <div class="kpi-lbl">최근 출력</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-val" id="kpiLogCount" style="color:#f87171">0</div>
+        <div class="kpi-lbl">출력 이력</div>
+      </div>
+    </div>
+
+    <!-- Printer Status + Manual Print -->
+    <div class="grid2">
+
+      <!-- Left: Printer Status -->
+      <div class="card">
+        <div class="card-title">🖨️ 프린터 상태</div>
+        <div class="printer-status status-checking" id="printerStatusBox">
+          <div class="status-dot" id="statusDot" style="background:#fbbf24"></div>
+          <div>
+            <div id="statusText" style="font-weight:700;font-size:0.9rem">상태 확인 중…</div>
+            <div id="statusSub" style="font-size:0.72rem;color:#94a3b8;margin-top:3px">–</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-gray" onclick="checkPrinter()">🔄 상태 새로고침</button>
+          <button class="btn btn-success" id="btnManualPrint" onclick="manualPrint()">🖨️ 즉시 수동 출력</button>
+        </div>
+        <div style="margin-top:14px;font-size:0.75rem;color:#64748b;line-height:1.7">
+          <div>📡 프린터 IP: <span id="dispIp" style="color:#e2e8f0;font-family:monospace">–</span></div>
+          <div>🔌 포트: <span id="dispPort" style="color:#e2e8f0;font-family:monospace">–</span></div>
+          <div>⏱️ 마지막 확인: <span id="dispChecked" style="color:#e2e8f0">–</span></div>
+        </div>
+      </div>
+
+      <!-- Right: MCP Scheduler Timeline -->
+      <div class="card">
+        <div class="card-title">⏰ MCP 일정 타임라인 (오늘)</div>
+        <div class="timeline" id="timeline">
+          <div class="tl-item">
+            <div class="tl-dot" id="tlPatrolDot" style="background:#475569"></div>
+            <div class="tl-body">
+              <div style="color:#a78bfa;font-weight:700">🚁 야간 순찰 시작</div>
+              <div style="color:#94a3b8;font-size:0.78rem">드론 A·B 자동 출동, 창고 전체 스캔</div>
+              <div class="tl-time" id="tlPatrolTime">–</div>
+            </div>
+          </div>
+          <div class="tl-item">
+            <div class="tl-dot" style="background:#475569"></div>
+            <div class="tl-body">
+              <div style="color:#6366f1;font-weight:700">🤖 AI 분석 & ERP 비교</div>
+              <div style="color:#94a3b8;font-size:0.78rem">Day1 vs Day2 재고 대조, Rescan 판정</div>
+              <div class="tl-time">순찰 완료 후 자동</div>
+            </div>
+          </div>
+          <div class="tl-item">
+            <div class="tl-dot" style="background:#475569"></div>
+            <div class="tl-body">
+              <div style="color:#34d399;font-weight:700">💾 보고서 자동 저장</div>
+              <div style="color:#94a3b8;font-size:0.78rem">SQLite DB 저장 → Report Admin 등록</div>
+              <div class="tl-time">분석 완료 후 자동</div>
+            </div>
+          </div>
+          <div class="tl-item">
+            <div class="tl-dot" id="tlPrintDot" style="background:#475569"></div>
+            <div class="tl-body">
+              <div style="color:#22d3ee;font-weight:700">🖨️ 자동 출력 (MCP)</div>
+              <div style="color:#94a3b8;font-size:0.78rem">프린터 온라인 확인 후 보고서 출력</div>
+              <div class="tl-time" id="tlPrintTime">–</div>
+            </div>
+          </div>
+          <div class="tl-item">
+            <div class="tl-dot" style="background:#34d399"></div>
+            <div class="tl-body">
+              <div style="color:#e2e8f0;font-weight:700">📄 담당자 출근 · 보고서 수령</div>
+              <div style="color:#94a3b8;font-size:0.78rem">프린터에서 출력된 보고서 확인</div>
+              <div class="tl-time">07:00~ (담당자 출근)</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Config -->
+    <div class="grid2">
+
+      <!-- MCP Configuration -->
+      <div class="card">
+        <div class="card-title">⚙️ MCP 설정</div>
+
+        <div class="toggle-row" style="margin-bottom:14px">
+          <div>
+            <div class="toggle-lbl">🖨️ 자동 출력 활성화</div>
+            <div style="font-size:0.72rem;color:#64748b;margin-top:2px">지정 시각에 최신 보고서 자동 출력</div>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="togAutoprint" onchange="saveConfig()">
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="form-row">
+          <label class="form-label">🕕 자동 출력 시각</label>
+          <input class="form-input" type="time" id="cfgPrintTime" value="06:00" onchange="saveConfig()">
+          <div style="font-size:0.7rem;color:#475569;margin-top:4px">담당자 출근 전 (기본: 오전 6시)</div>
+        </div>
+
+        <div class="form-row">
+          <label class="form-label">🖨️ 프린터 IP 주소</label>
+          <input class="form-input" type="text" id="cfgPrinterIp" placeholder="192.168.1.100" onchange="saveConfig()">
+        </div>
+
+        <div class="form-row">
+          <label class="form-label">🔌 포트 (RAW=9100 / IPP=631)</label>
+          <input class="form-input" type="number" id="cfgPrinterPort" value="9100" onchange="saveConfig()">
+        </div>
+
+        <div class="form-row">
+          <label class="form-label">🏷️ 프린터 이름 (식별용)</label>
+          <input class="form-input" type="text" id="cfgPrinterName" placeholder="Office-Printer" onchange="saveConfig()">
+        </div>
+
+        <div class="toggle-row" style="margin-top:10px">
+          <div>
+            <div class="toggle-lbl">🚁 야간 순찰 자동 시작</div>
+            <div style="font-size:0.72rem;color:#64748b;margin-top:2px">지정 시각에 드론 순찰 자동 트리거</div>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="togPatrol" onchange="saveConfig()">
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="form-row" style="margin-top:14px">
+          <label class="form-label">🌙 야간 순찰 시작 시각</label>
+          <input class="form-input" type="time" id="cfgPatrolTime" value="22:00" onchange="saveConfig()">
+          <div style="font-size:0.7rem;color:#475569;margin-top:4px">기본: 오후 10시 (야간 순찰 시작)</div>
+        </div>
+
+        <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="saveConfig(true)">💾 설정 저장</button>
+      </div>
+
+      <!-- Print Preview -->
+      <div class="card">
+        <div class="card-title">👁️ 출력 미리보기</div>
+        <p style="font-size:0.77rem;color:#64748b;margin-bottom:12px">실제 프린터로 전송될 텍스트 형식 미리보기 (최신 보고서 기준)</p>
+        <div class="preview-box" id="previewBox">미리보기를 로드하려면 아래 버튼을 누르세요…</div>
+        <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap">
+          <button class="btn btn-gray" onclick="loadPreview()">🔄 미리보기 새로고침</button>
+          <button class="btn btn-success" onclick="manualPrint()">🖨️ 이 내용 즉시 출력</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MCP 설명 패널 -->
+    <div class="card" style="margin-bottom:24px">
+      <div class="card-title">🤖 MCP 자동화 흐름 — Operational Ontology + Agentic AI</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px">
+        <div style="background:rgba(167,139,250,.08);border:1px solid rgba(167,139,250,.2);border-radius:8px;padding:14px">
+          <div style="font-size:1.4rem;margin-bottom:8px">🚁</div>
+          <div style="font-size:0.82rem;font-weight:700;color:#a78bfa;margin-bottom:6px">1. 야간 드론 순찰</div>
+          <div style="font-size:0.72rem;color:#64748b;line-height:1.6">설정된 시각에 드론 A·B 자동 출동. Rack-by-Rack 스캔. 유선 전원으로 무제한 운용.</div>
+        </div>
+        <div style="background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.2);border-radius:8px;padding:14px">
+          <div style="font-size:1.4rem;margin-bottom:8px">🤖</div>
+          <div style="font-size:0.82rem;font-weight:700;color:#6366f1;margin-bottom:6px">2. AI 분석 & Rescan</div>
+          <div style="font-size:0.72rem;color:#64748b;line-height:1.6">ERP Day1 vs Day2 비교, 분실·감소 감지, 자동 Rescan 판정 및 우선순위 분류.</div>
+        </div>
+        <div style="background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.2);border-radius:8px;padding:14px">
+          <div style="font-size:1.4rem;margin-bottom:8px">💾</div>
+          <div style="font-size:0.82rem;font-weight:700;color:#22d3ee;margin-bottom:6px">3. 보고서 자동 저장</div>
+          <div style="font-size:0.72rem;color:#64748b;line-height:1.6">AI 권고사항·재스캔 결과·변동 내역 포함한 종합보고서 DB 저장. Report Admin 즉시 등록.</div>
+        </div>
+        <div style="background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);border-radius:8px;padding:14px">
+          <div style="font-size:1.4rem;margin-bottom:8px">🖨️</div>
+          <div style="font-size:0.82rem;font-weight:700;color:#34d399;margin-bottom:6px">4. 자동 출력 (MCP)</div>
+          <div style="font-size:0.72rem;color:#64748b;line-height:1.6">프린터 전원 확인 후 지정 시각에 보고서 자동 출력. 담당자 출근 시 이미 인쇄 완료 상태.</div>
+        </div>
+      </div>
+      <div style="margin-top:16px;padding:12px 16px;background:rgba(251,191,36,.07);border:1px solid rgba(251,191,36,.2);border-radius:8px;font-size:0.78rem;color:#fbbf24">
+        ⚠️ <strong>프린터 전원 조건:</strong> 자동 출력이 정상 작동하려면 프린터가 네트워크에 연결된 상태(전원 ON + LAN 연결)여야 합니다.
+        프린터가 오프라인이면 출력을 건너뛰고 로그에 기록합니다. 이후 수동 출력 버튼으로 재시도 가능합니다.
+      </div>
+    </div>
+
+    <!-- Log -->
+    <div class="card">
+      <div class="card-title" style="justify-content:space-between">
+        <span>📜 MCP 출력 이력 로그</span>
+        <button class="btn btn-gray" style="padding:5px 14px;font-size:0.75rem" onclick="loadLog()">🔄 새로고침</button>
+      </div>
+      <div class="log-wrap" id="logWrap">
+        <div style="color:#475569;font-size:0.8rem;padding:20px;text-align:center">로그를 불러오는 중…</div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Toast -->
+<div id="toast" style="
+  position:fixed;bottom:28px;right:28px;
+  background:rgba(15,23,42,.97);border:1px solid rgba(99,102,241,.4);
+  border-radius:10px;padding:12px 20px;font-size:0.83rem;color:#e2e8f0;
+  box-shadow:0 8px 32px rgba(0,0,0,.5);transform:translateY(80px);
+  opacity:0;transition:all .3s;z-index:9999;max-width:340px;
+"></div>
+
+<script>
+// ── Toast ──────────────────────────────────────────────────────
+function toast(msg, type='info') {
+  const t = document.getElementById('toast');
+  const colors = { info:'#a5b4fc', success:'#34d399', error:'#f87171', warn:'#fbbf24' };
+  t.style.borderColor = `rgba(${type==='success'?'52,211,153':type==='error'?'248,113,113':type==='warn'?'251,191,36':'99,102,241'},.5)`;
+  t.style.color = colors[type] || colors.info;
+  t.textContent = msg;
+  t.style.transform = 'translateY(0)';
+  t.style.opacity = '1';
+  setTimeout(() => { t.style.transform = 'translateY(80px)'; t.style.opacity = '0'; }, 3500);
+}
+
+// ── Load config from backend ───────────────────────────────────
+let currentConfig = {};
+
+async function loadConfig() {
+  try {
+    const r = await fetch('/api/mcp/config');
+    const d = await r.json();
+    if (!d.ok) return;
+    const c = d.config;
+    currentConfig = c;
+
+    document.getElementById('togAutoprint').checked = !!c.auto_print_enabled;
+    document.getElementById('cfgPrintTime').value   = c.print_time  || '06:00';
+    document.getElementById('cfgPrinterIp').value   = c.printer_ip  || '';
+    document.getElementById('cfgPrinterPort').value = c.printer_port || 9100;
+    document.getElementById('cfgPrinterName').value = c.printer_name || '';
+    document.getElementById('togPatrol').checked    = !!c.patrol_auto_start;
+    document.getElementById('cfgPatrolTime').value  = c.patrol_start_time || '22:00';
+
+    // KPI
+    document.getElementById('kpiStatus').textContent = c.auto_print_enabled ? '🟢 ON' : '🔴 OFF';
+    document.getElementById('kpiStatus').style.color = c.auto_print_enabled ? '#34d399' : '#f87171';
+    document.getElementById('kpiPrintTime').textContent = c.print_time || '–';
+    document.getElementById('kpiPatrolTime').textContent = c.patrol_start_time || '–';
+    document.getElementById('kpiLastPrint').textContent  = c.last_auto_print
+      ? new Date(c.last_auto_print).toLocaleString('ko-KR').slice(0,16)
+      : '없음';
+
+    // Timeline
+    document.getElementById('tlPatrolTime').textContent = c.patrol_start_time + ' (야간 순찰)';
+    document.getElementById('tlPrintTime').textContent  = c.print_time + ' (자동 출력)';
+
+    // Dot colors based on enabled
+    document.getElementById('tlPatrolDot').style.background = c.patrol_auto_start ? '#a78bfa' : '#334155';
+    document.getElementById('tlPrintDot').style.background  = c.auto_print_enabled  ? '#22d3ee' : '#334155';
+  } catch(e) {
+    toast('설정 로드 실패: ' + e.message, 'error');
+  }
+}
+
+async function saveConfig(showToast=false) {
+  const body = {
+    auto_print_enabled: document.getElementById('togAutoprint').checked,
+    print_time:         document.getElementById('cfgPrintTime').value,
+    printer_ip:         document.getElementById('cfgPrinterIp').value,
+    printer_port:       parseInt(document.getElementById('cfgPrinterPort').value) || 9100,
+    printer_name:       document.getElementById('cfgPrinterName').value,
+    patrol_auto_start:  document.getElementById('togPatrol').checked,
+    patrol_start_time:  document.getElementById('cfgPatrolTime').value,
+  };
+  try {
+    const r = await fetch('/api/mcp/config', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(body),
+    });
+    const d = await r.json();
+    if (d.ok) {
+      currentConfig = d.config;
+      if (showToast) toast('✅ 설정이 저장되었습니다', 'success');
+      loadConfig();
+    } else {
+      toast('저장 실패: ' + (d.error||''), 'error');
+    }
+  } catch(e) {
+    toast('저장 오류: ' + e.message, 'error');
+  }
+}
+
+// ── Printer Status ─────────────────────────────────────────────
+async function checkPrinter() {
+  const box  = document.getElementById('printerStatusBox');
+  const dot  = document.getElementById('statusDot');
+  const txt  = document.getElementById('statusText');
+  const sub  = document.getElementById('statusSub');
+  box.className  = 'printer-status status-checking';
+  dot.style.background = '#fbbf24';
+  txt.textContent = '프린터 상태 확인 중…';
+  sub.textContent = '';
+  try {
+    const r = await fetch('/api/printer/status');
+    const d = await r.json();
+    const online = d.online;
+    box.className  = online ? 'printer-status status-online' : 'printer-status status-offline';
+    dot.style.background = online ? '#34d399' : '#f87171';
+    txt.textContent = online ? '🟢 프린터 온라인 — 출력 준비 완료' : '🔴 프린터 오프라인 — 연결 불가';
+    sub.textContent = `IP: ${d.ip}:${d.port} | RAW:${d.raw_port_ok?'✅':'❌'} IPP:${d.ipp_port_ok?'✅':'❌'}`;
+    document.getElementById('dispIp').textContent      = d.ip;
+    document.getElementById('dispPort').textContent    = d.port;
+    document.getElementById('dispChecked').textContent = new Date(d.checked_at).toLocaleTimeString('ko-KR');
+    document.getElementById('btnManualPrint').disabled = !online;
+    if (online) toast('🖨️ 프린터 온라인 확인', 'success');
+    else        toast('⚠️ 프린터 오프라인 — 전원 및 네트워크 확인', 'warn');
+  } catch(e) {
+    txt.textContent = '상태 확인 실패';
+    sub.textContent = e.message;
+    toast('프린터 상태 확인 실패', 'error');
+  }
+}
+
+// ── Manual Print ───────────────────────────────────────────────
+async function manualPrint(reportId=null) {
+  const btn = document.getElementById('btnManualPrint');
+  const origText = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ 출력 중…'; }
+  toast('🖨️ 출력 요청 전송 중…', 'info');
+  try {
+    const body = reportId ? { report_id: reportId } : {};
+    const r = await fetch('/api/print/manual', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(body),
+    });
+    const d = await r.json();
+    if (d.ok) {
+      toast(`✅ 출력 완료 — ${d.bytes} bytes 전송`, 'success');
+      loadLog();
+    } else {
+      const msgs = {
+        printer_offline: '⚠️ 프린터 오프라인 — 전원 및 LAN 연결 확인',
+        error: '❌ 출력 오류: ' + d.message,
+      };
+      toast(msgs[d.status] || '출력 실패: ' + d.message, d.ok ? 'success' : 'error');
+    }
+  } catch(e) {
+    toast('출력 오류: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = origText; }
+  }
+}
+
+// ── Print Preview ──────────────────────────────────────────────
+async function loadPreview() {
+  document.getElementById('previewBox').textContent = '미리보기 로드 중…';
+  try {
+    const r = await fetch('/api/print/preview', { method:'POST',
+      headers:{'Content-Type':'application/json'}, body:'{}' });
+    const d = await r.json();
+    if (d.ok) {
+      document.getElementById('previewBox').textContent = d.text;
+    } else {
+      document.getElementById('previewBox').textContent = '⚠️ ' + (d.error || '보고서 없음');
+    }
+  } catch(e) {
+    document.getElementById('previewBox').textContent = '오류: ' + e.message;
+  }
+}
+
+// ── Log ───────────────────────────────────────────────────────
+async function loadLog() {
+  try {
+    const r = await fetch('/api/mcp/log?limit=50');
+    const d = await r.json();
+    document.getElementById('kpiLogCount').textContent = d.total || 0;
+    const logs = d.logs || [];
+    if (!logs.length) {
+      document.getElementById('logWrap').innerHTML =
+        '<div style="color:#475569;font-size:0.8rem;padding:20px;text-align:center">출력 이력이 없습니다.</div>';
+      return;
+    }
+    const badgeCls = {
+      sent:'badge-sent', printer_offline:'badge-offline', error:'badge-error',
+      patrol_triggered:'badge-patrol', no_report:'badge-no_report', manual:'badge-manual',
+    };
+    const badgeLbl = {
+      sent:'출력 완료', printer_offline:'오프라인', error:'오류',
+      patrol_triggered:'순찰 시작', no_report:'보고서 없음', manual:'수동', unknown:'–',
+    };
+    document.getElementById('logWrap').innerHTML = logs.map(l => {
+      const ts  = new Date(l.timestamp).toLocaleString('ko-KR');
+      const st  = l.status || 'unknown';
+      const cls = badgeCls[st] || 'badge-sched';
+      const lbl = badgeLbl[st] || st;
+      const trig = l.triggered_by === 'scheduler' ? '⏰ 스케줄러' : '👤 수동';
+      return `<div class="log-row">
+        <div class="log-time">${ts}</div>
+        <div><span class="log-badge ${cls}">${lbl}</span><br><span style="font-size:0.65rem;color:#475569;margin-top:3px;display:block">${trig}</span></div>
+        <div style="color:#94a3b8;line-height:1.5">${l.message || '–'}
+          ${l.report_id && l.report_id!=='N/A' ? `<br><span style="font-family:monospace;font-size:0.68rem;color:#475569">${l.report_id}</span>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    document.getElementById('logWrap').innerHTML =
+      `<div style="color:#f87171;font-size:0.8rem;padding:12px">오류: ${e.message}</div>`;
+  }
+}
+
+// ── Test Scheduler Time (simulate) ────────────────────────────
+function simulateSchedule() {
+  toast('🧪 스케줄러 시뮬레이션: 다음 틱(30초)에 출력 실행 예정', 'info');
+}
+
+// ── Init ──────────────────────────────────────────────────────
+loadConfig();
+checkPrinter();
+loadLog();
+loadPreview();
+
+// auto-refresh every 60 s
+setInterval(() => { checkPrinter(); loadLog(); loadConfig(); }, 60000);
+</script>
+</body>
+</html>
