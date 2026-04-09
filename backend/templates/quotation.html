@@ -1,0 +1,1641 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>소프트웨어 개발 견적서 — Warehouse AI Drone System v2.0</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800;900&display=swap');
+
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --indigo:#4F46E5;
+  --indigo-light:#6366f1;
+  --cyan:#06B6D4;
+  --emerald:#10B981;
+  --amber:#F59E0B;
+  --rose:#F43F5E;
+  --violet:#8B5CF6;
+  --orange:#F97316;
+  --slate-900:#0F172A;
+  --slate-800:#1E293B;
+  --slate-700:#334155;
+  --slate-600:#475569;
+  --slate-400:#94A3B8;
+  --slate-300:#CBD5E1;
+  --slate-100:#F1F5F9;
+  --white:#FFFFFF;
+}
+body{font-family:'Noto Sans KR',sans-serif;background:#f0f4f8;color:#1e293b;font-size:13px;line-height:1.6;}
+
+/* ── Screen-only controls ── */
+.screen-only{position:fixed;top:20px;right:20px;display:flex;gap:8px;z-index:9999;flex-wrap:wrap;max-width:320px;justify-content:flex-end;}
+.btn-ctrl{border:none;padding:9px 18px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;transition:all .2s;letter-spacing:.2px;}
+.btn-print{background:linear-gradient(135deg,#1e293b,#334155);color:#e2e8f0;box-shadow:0 4px 14px rgba(0,0,0,.3);}
+.btn-print:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,.4);}
+.btn-pdf{background:linear-gradient(135deg,#dc2626,#ef4444);color:#fff;box-shadow:0 4px 14px rgba(220,38,38,.4);}
+.btn-pdf:hover{transform:translateY(-2px);}
+.btn-admin{background:linear-gradient(135deg,var(--indigo),var(--cyan));color:#fff;box-shadow:0 4px 14px rgba(79,70,229,.4);}
+.btn-admin:hover{transform:translateY(-2px);}
+
+@media print{
+  .screen-only{display:none!important}
+  body{background:#fff;font-size:10.5px;}
+  .page-break{page-break-before:always;}
+  .no-break{page-break-inside:avoid;}
+  .doc{box-shadow:none!important;}
+}
+
+/* ── Document wrapper ── */
+.doc{max-width:1100px;margin:20px auto;background:#fff;box-shadow:0 0 80px rgba(0,0,0,.12);border-radius:4px;overflow:hidden;}
+
+/* ══ COVER PAGE ══ */
+.cover{
+  background:linear-gradient(155deg,#060d1f 0%,#0a1628 30%,#0d1f3c 55%,#091428 80%,#060d1f 100%);
+  padding:56px 68px 48px;min-height:600px;position:relative;overflow:hidden;
+  display:flex;flex-direction:column;gap:0;
+}
+/* grid decoration */
+.cover::before{
+  content:'';position:absolute;inset:0;
+  background-image:
+    linear-gradient(rgba(99,102,241,.06) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(99,102,241,.06) 1px,transparent 1px);
+  background-size:40px 40px;
+}
+.cover-glow1{position:absolute;top:-100px;right:-100px;width:550px;height:550px;border-radius:50%;background:radial-gradient(circle,rgba(99,102,241,.18) 0%,transparent 65%);pointer-events:none;}
+.cover-glow2{position:absolute;bottom:-120px;left:-80px;width:480px;height:480px;border-radius:50%;background:radial-gradient(circle,rgba(6,182,212,.12) 0%,transparent 65%);pointer-events:none;}
+.cover-glow3{position:absolute;top:40%;left:40%;width:300px;height:300px;border-radius:50%;background:radial-gradient(circle,rgba(16,185,129,.08) 0%,transparent 65%);pointer-events:none;}
+
+.cover-inner{position:relative;z-index:2;display:flex;flex-direction:column;height:100%;gap:32px;}
+
+.cover-topbar{display:flex;justify-content:space-between;align-items:flex-start;}
+.cover-logo{display:flex;align-items:center;gap:12px;}
+.cover-logo-icon{width:44px;height:44px;background:linear-gradient(135deg,var(--indigo),var(--cyan));border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;}
+.cover-logo-text{font-size:13px;font-weight:800;color:#e2e8f0;line-height:1.3;}
+.cover-logo-sub{font-size:10px;color:#475569;font-weight:500;}
+.cover-doctype{text-align:right;}
+.cover-doctype-label{font-size:10px;font-weight:700;color:#64748b;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px;}
+.cover-doctype-num{font-size:12px;font-weight:800;color:#94a3b8;font-family:'Courier New',monospace;}
+
+.cover-badges{display:flex;gap:8px;flex-wrap:wrap;}
+.cbadge{padding:5px 13px;border-radius:20px;font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;display:flex;align-items:center;gap:5px;}
+.cb-indigo{background:rgba(99,102,241,.2);color:#a5b4fc;border:1px solid rgba(99,102,241,.35);}
+.cb-cyan{background:rgba(6,182,212,.18);color:#67e8f9;border:1px solid rgba(6,182,212,.3);}
+.cb-emerald{background:rgba(16,185,129,.18);color:#6ee7b7;border:1px solid rgba(16,185,129,.3);}
+.cb-amber{background:rgba(245,158,11,.18);color:#fcd34d;border:1px solid rgba(245,158,11,.3);}
+.cb-rose{background:rgba(244,63,94,.18);color:#fca5a5;border:1px solid rgba(244,63,94,.3);}
+
+.cover-title-block{margin-top:4px;}
+.cover-kw{font-size:10px;font-weight:700;color:#4f46e5;letter-spacing:3px;text-transform:uppercase;margin-bottom:10px;}
+.cover-title{font-size:40px;font-weight:900;color:#fff;line-height:1.15;margin-bottom:12px;}
+.cover-title .hl{background:linear-gradient(90deg,#818cf8,#22d3ee,#34d399);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.cover-subtitle{font-size:14px;color:#94a3b8;line-height:1.8;max-width:560px;}
+.cover-subtitle strong{color:#cbd5e1;}
+
+.cover-meta-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:4px;}
+.cover-meta-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:14px 16px;}
+.cmc-label{font-size:9.5px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px;}
+.cmc-val{font-size:13px;font-weight:700;color:#e2e8f0;line-height:1.3;}
+.cmc-sub{font-size:10.5px;color:#64748b;margin-top:3px;}
+
+.cover-divider{border:none;border-top:1px solid rgba(255,255,255,.07);margin:0;}
+
+.cover-bottom{display:flex;justify-content:space-between;align-items:flex-end;padding-top:4px;}
+.cover-price-block{}
+.cpb-note{font-size:10px;font-weight:700;color:#475569;letter-spacing:.5px;text-transform:uppercase;margin-bottom:6px;}
+.cpb-amount{font-size:46px;font-weight:900;background:linear-gradient(90deg,#34d399,#22d3ee);-webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1;}
+.cpb-sub{font-size:11px;color:#334155;margin-top:6px;}
+.cpb-vat{font-size:11.5px;color:#64748b;margin-top:3px;}
+.cover-stamp-area{text-align:right;}
+.cover-company-name{font-size:16px;font-weight:900;color:#e2e8f0;}
+.cover-company-info{font-size:10.5px;color:#334155;margin-top:4px;line-height:1.8;}
+.cover-stamp{width:70px;height:70px;border:2px solid rgba(244,63,94,.5);border-radius:50%;display:flex;align-items:center;justify-content:center;color:rgba(244,63,94,.7);font-size:9px;font-weight:800;text-align:center;letter-spacing:.5px;line-height:1.3;margin-top:10px;margin-left:auto;}
+
+/* ══ BODY ══ */
+.body{padding:48px 68px;}
+.section{margin-bottom:40px;}
+.section-hd{display:flex;align-items:center;gap:10px;padding-bottom:12px;border-bottom:2px solid;margin-bottom:20px;}
+.section-hd.indigo{border-color:rgba(99,102,241,.2);}
+.section-hd.cyan{border-color:rgba(6,182,212,.2);}
+.section-hd.emerald{border-color:rgba(16,185,129,.2);}
+.section-hd.amber{border-color:rgba(245,158,11,.2);}
+.section-num{width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:#fff;flex-shrink:0;}
+.sn-indigo{background:linear-gradient(135deg,var(--indigo),var(--cyan));}
+.sn-cyan{background:linear-gradient(135deg,var(--cyan),var(--emerald));}
+.sn-emerald{background:linear-gradient(135deg,var(--emerald),#059669);}
+.sn-amber{background:linear-gradient(135deg,var(--amber),var(--orange));}
+.sn-rose{background:linear-gradient(135deg,var(--rose),#be123c);}
+.sn-violet{background:linear-gradient(135deg,var(--violet),var(--indigo));}
+.section-title{font-size:15px;font-weight:800;}
+.st-indigo{color:var(--indigo-light);}
+.st-cyan{color:#0891b2;}
+.st-emerald{color:#059669;}
+.st-amber{color:#d97706;}
+
+/* ── info grid ── */
+.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.info-box{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:16px 20px;}
+.info-box-title{font-size:10.5px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #e2e8f0;}
+.info-row{display:flex;gap:8px;margin-bottom:6px;align-items:baseline;}
+.info-row:last-child{margin-bottom:0;}
+.info-key{font-size:11px;font-weight:700;color:#64748b;min-width:90px;flex-shrink:0;}
+.info-val{font-size:12.5px;color:#1e293b;font-weight:500;}
+
+/* ── tech highlights ── */
+.tech-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px;}
+.tech-card{border-radius:10px;padding:14px 16px;border:1px solid;}
+.tc-i{background:linear-gradient(135deg,rgba(99,102,241,.05),rgba(99,102,241,.02));border-color:rgba(99,102,241,.2);}
+.tc-c{background:linear-gradient(135deg,rgba(6,182,212,.05),rgba(6,182,212,.02));border-color:rgba(6,182,212,.2);}
+.tc-e{background:linear-gradient(135deg,rgba(16,185,129,.05),rgba(16,185,129,.02));border-color:rgba(16,185,129,.2);}
+.tc-a{background:linear-gradient(135deg,rgba(245,158,11,.05),rgba(245,158,11,.02));border-color:rgba(245,158,11,.2);}
+.tc-r{background:linear-gradient(135deg,rgba(244,63,94,.05),rgba(244,63,94,.02));border-color:rgba(244,63,94,.2);}
+.tc-v{background:linear-gradient(135deg,rgba(139,92,246,.05),rgba(139,92,246,.02));border-color:rgba(139,92,246,.2);}
+.tc-title{font-size:11px;font-weight:800;margin-bottom:8px;display:flex;align-items:center;gap:6px;}
+.tc-body{font-size:11px;color:#64748b;line-height:1.6;}
+.tc-body li{margin-bottom:3px;}
+
+/* ── quote table ── */
+.qt-wrap{overflow-x:auto;}
+table.qt{width:100%;border-collapse:collapse;font-size:11.5px;}
+table.qt thead tr{background:linear-gradient(135deg,#0f172a,#1e293b);}
+table.qt thead th{padding:11px 10px;text-align:left;font-weight:700;font-size:10.5px;letter-spacing:.4px;text-transform:uppercase;color:#94a3b8;white-space:nowrap;}
+table.qt thead th:nth-child(n+3){text-align:right;}
+table.qt tbody tr{border-bottom:1px solid #f1f5f9;transition:background .15s;}
+table.qt tbody tr:hover{background:#fafbff;}
+table.qt td{padding:10px 10px;vertical-align:top;}
+table.qt td:nth-child(3),table.qt td:nth-child(4),table.qt td:nth-child(5){text-align:right;white-space:nowrap;font-family:'Courier New',monospace;}
+table.qt td:last-child{text-align:right;font-weight:700;color:var(--indigo);white-space:nowrap;font-family:'Courier New',monospace;}
+
+.cat-row td{background:linear-gradient(135deg,rgba(79,70,229,.07),rgba(6,182,212,.04));font-weight:900;font-size:11px;color:var(--indigo-light);padding:9px 10px;border-top:2px solid rgba(99,102,241,.12);}
+.cat-row td:first-child{border-left:3px solid var(--indigo-light);}
+
+.iname{font-weight:600;color:#1e293b;margin-bottom:3px;font-size:12px;}
+.idesc{font-size:10.5px;color:#64748b;line-height:1.55;margin-bottom:4px;}
+.tag{display:inline-block;padding:1px 6px;border-radius:3px;font-size:9px;font-weight:700;margin:1px 2px 1px 0;border:1px solid;}
+.tag-i{background:rgba(99,102,241,.08);color:#6366f1;border-color:rgba(99,102,241,.2);}
+.tag-c{background:rgba(6,182,212,.08);color:#0891b2;border-color:rgba(6,182,212,.2);}
+.tag-e{background:rgba(16,185,129,.08);color:#059669;border-color:rgba(16,185,129,.2);}
+.tag-a{background:rgba(245,158,11,.08);color:#b45309;border-color:rgba(245,158,11,.2);}
+.tag-r{background:rgba(244,63,94,.08);color:#be123c;border-color:rgba(244,63,94,.2);}
+.tag-v{background:rgba(139,92,246,.08);color:#7c3aed;border-color:rgba(139,92,246,.2);}
+
+.subtotal-row td{background:#f8fafc;font-weight:700;color:#475569;padding:8px 10px;border-top:1px dashed #e2e8f0;font-size:11px;}
+.subtotal-row td:last-child{color:var(--indigo);font-size:12.5px;font-family:'Courier New',monospace;}
+
+/* total box */
+.total-wrap{display:flex;justify-content:flex-end;margin-top:24px;}
+.total-box{background:linear-gradient(155deg,#060d1f,#0f172a,#0a1628);border-radius:14px;padding:26px 32px;min-width:380px;border:1px solid rgba(99,102,241,.15);}
+.tl{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:12px;}
+.tl:last-child{border-bottom:none;}
+.tl-l{color:#94a3b8;}
+.tl-r{color:#e2e8f0;font-weight:600;font-family:'Courier New',monospace;}
+.tl-sub{display:flex;justify-content:space-between;padding:5px 0 5px 12px;font-size:11px;border-bottom:1px solid rgba(255,255,255,.03);}
+.tl-sub .tl-l{color:#64748b;}
+.tl-sub .tl-r{color:#94a3b8;font-family:'Courier New',monospace;}
+.tl-divider{border:none;border-top:1px solid rgba(255,255,255,.1);margin:8px 0;}
+.tl-grand{display:flex;justify-content:space-between;align-items:center;padding:12px 0 0;}
+.tl-grand .tl-l{color:#a5b4fc;font-weight:900;font-size:14px;}
+.tl-grand .tl-r{font-size:26px;font-weight:900;background:linear-gradient(90deg,#34d399,#22d3ee);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+
+/* ── schedule ── */
+.gantt-wrap{overflow-x:auto;}
+table.gantt{width:100%;border-collapse:collapse;font-size:11.5px;}
+table.gantt th{background:#f1f5f9;padding:9px 12px;font-size:10.5px;font-weight:700;color:#475569;text-align:left;border-bottom:2px solid #e2e8f0;white-space:nowrap;}
+table.gantt td{padding:10px 12px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
+.phase-badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:10px;font-weight:700;white-space:nowrap;}
+.ph1{background:rgba(99,102,241,.12);color:var(--indigo-light);}
+.ph2{background:rgba(6,182,212,.12);color:#0891b2;}
+.ph3{background:rgba(16,185,129,.12);color:#059669;}
+.ph4{background:rgba(245,158,11,.12);color:#b45309;}
+.ph5{background:rgba(244,63,94,.12);color:#be123c;}
+.week-badge{display:inline-block;background:var(--slate-700);color:#e2e8f0;padding:2px 10px;border-radius:10px;font-size:10px;font-weight:700;}
+.gantt-bar{height:7px;border-radius:4px;margin-top:5px;}
+.gb1{background:linear-gradient(90deg,var(--indigo),var(--cyan));}
+.gb2{background:linear-gradient(90deg,var(--cyan),var(--emerald));}
+.gb3{background:linear-gradient(90deg,var(--emerald),#059669);}
+.gb4{background:linear-gradient(90deg,var(--amber),var(--orange));}
+.gb5{background:linear-gradient(90deg,var(--rose),#be123c);}
+.deliverable{font-size:10.5px;color:#475569;line-height:1.6;}
+.payment-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;}
+.pay-green{background:rgba(16,185,129,.12);color:#059669;}
+.pay-blue{background:rgba(99,102,241,.12);color:var(--indigo-light);}
+
+/* ── payment schedule ── */
+.payment-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;}
+.pay-card{border-radius:10px;padding:16px;text-align:center;border:1px solid;}
+.pc1{background:rgba(99,102,241,.05);border-color:rgba(99,102,241,.2);}
+.pc2{background:rgba(6,182,212,.05);border-color:rgba(6,182,212,.2);}
+.pc3{background:rgba(16,185,129,.05);border-color:rgba(16,185,129,.2);}
+.pc4{background:rgba(245,158,11,.05);border-color:rgba(245,158,11,.2);}
+.pc-stage{font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;}
+.pc-trigger{font-size:11.5px;font-weight:700;color:#334155;margin-bottom:8px;line-height:1.4;}
+.pc-pct{font-size:28px;font-weight:900;margin-bottom:4px;}
+.pc1 .pc-pct{color:var(--indigo-light);}
+.pc2 .pc-pct{color:#0891b2;}
+.pc3 .pc-pct{color:#059669;}
+.pc4 .pc-pct{color:#d97706;}
+.pc-amount{font-size:13px;font-weight:700;color:#1e293b;font-family:'Courier New',monospace;}
+
+/* ── terms ── */
+.terms-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.term-card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:16px 18px;}
+.term-title{font-size:11px;font-weight:800;color:#334155;margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+.term-item{font-size:11.5px;color:#475569;padding:5px 0;border-bottom:1px solid #f1f5f9;display:flex;align-items:baseline;gap:8px;}
+.term-item:last-child{border-bottom:none;}
+.term-item::before{content:'▸';color:var(--indigo-light);font-size:10px;flex-shrink:0;}
+
+/* ── value proposition ── */
+.value-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+.value-card{background:linear-gradient(135deg,#0f172a,#1e293b);border-radius:12px;padding:20px;border:1px solid rgba(255,255,255,.06);}
+.vc-icon{font-size:24px;margin-bottom:10px;}
+.vc-title{font-size:12px;font-weight:800;color:#e2e8f0;margin-bottom:6px;}
+.vc-body{font-size:11px;color:#64748b;line-height:1.6;}
+.vc-metric{font-size:22px;font-weight:900;background:linear-gradient(90deg,#818cf8,#22d3ee);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-top:10px;}
+.vc-metric-label{font-size:10px;color:#475569;}
+
+/* ── sig ── */
+.sig-grid{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:30px;}
+.sig-box{border:1px solid #e2e8f0;border-radius:12px;padding:22px 26px;}
+.sig-title{font-size:10.5px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px;}
+.sig-name{font-size:16px;font-weight:800;color:#1e293b;margin-bottom:4px;}
+.sig-role{font-size:12px;color:#64748b;}
+.sig-fields{margin-top:24px;border-top:1px solid #e2e8f0;padding-top:14px;}
+.sig-field{display:flex;gap:10px;margin-bottom:10px;font-size:11.5px;color:#64748b;}
+.sig-field-label{min-width:50px;font-weight:700;}
+.sig-line-blank{flex:1;border-bottom:1px solid #cbd5e1;}
+
+/* ── footer ── */
+.doc-footer{background:linear-gradient(135deg,#060d1f,#0f172a);padding:18px 68px;display:flex;justify-content:space-between;align-items:center;}
+.footer-brand{font-size:11px;font-weight:700;color:#334155;line-height:1.8;}
+.footer-conf{font-size:9.5px;font-weight:700;color:#1e293b;letter-spacing:1.5px;text-transform:uppercase;text-align:right;}
+
+/* ── kpi summary bar ── */
+.kpi-bar{background:linear-gradient(135deg,#f8fafc,#f1f5f9);border:1px solid #e2e8f0;border-radius:12px;padding:18px 24px;display:grid;grid-template-columns:repeat(5,1fr);gap:0;margin-bottom:24px;}
+.kpi-item{text-align:center;padding:0 12px;border-right:1px solid #e2e8f0;}
+.kpi-item:last-child{border-right:none;}
+.kpi-val{font-size:20px;font-weight:900;color:var(--indigo-light);}
+.kpi-label{font-size:10px;color:#64748b;font-weight:600;margin-top:2px;}
+
+/* arch diagram */
+.arch-diagram{background:linear-gradient(135deg,#0f172a,#1e293b);border-radius:14px;padding:28px;margin-bottom:20px;border:1px solid rgba(99,102,241,.1);overflow:hidden;position:relative;}
+.arch-diagram::before{content:'';position:absolute;inset:0;background-image:linear-gradient(rgba(99,102,241,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(99,102,241,.04) 1px,transparent 1px);background-size:30px 30px;}
+.arch-inner{position:relative;z-index:1;}
+.arch-title{font-size:12px;font-weight:800;color:#94a3b8;text-align:center;margin-bottom:20px;letter-spacing:2px;text-transform:uppercase;}
+.arch-layers{display:flex;flex-direction:column;gap:10px;}
+.arch-layer{display:flex;align-items:center;gap:10px;}
+.arch-layer-label{font-size:9.5px;font-weight:800;color:#475569;width:80px;text-align:right;flex-shrink:0;text-transform:uppercase;letter-spacing:.5px;}
+.arch-layer-boxes{display:flex;gap:8px;flex:1;flex-wrap:wrap;}
+.arch-box{border-radius:7px;padding:7px 12px;font-size:10.5px;font-weight:700;text-align:center;flex:1;min-width:80px;}
+.ab-i{background:rgba(99,102,241,.18);color:#a5b4fc;border:1px solid rgba(99,102,241,.3);}
+.ab-c{background:rgba(6,182,212,.18);color:#67e8f9;border:1px solid rgba(6,182,212,.3);}
+.ab-e{background:rgba(16,185,129,.18);color:#6ee7b7;border:1px solid rgba(16,185,129,.3);}
+.ab-a{background:rgba(245,158,11,.18);color:#fcd34d;border:1px solid rgba(245,158,11,.3);}
+.ab-r{background:rgba(244,63,94,.18);color:#fca5a5;border:1px solid rgba(244,63,94,.3);}
+.ab-v{background:rgba(139,92,246,.18);color:#c4b5fd;border:1px solid rgba(139,92,246,.3);}
+.arch-arrow{color:#334155;font-size:14px;text-align:center;line-height:1;}
+
+/* highlight banner */
+.highlight-banner{background:linear-gradient(135deg,rgba(99,102,241,.08),rgba(6,182,212,.05));border:1px solid rgba(99,102,241,.15);border-radius:10px;padding:14px 20px;margin-bottom:16px;display:flex;align-items:flex-start;gap:12px;}
+.hb-icon{font-size:20px;flex-shrink:0;margin-top:2px;}
+.hb-text{font-size:12px;color:#334155;line-height:1.7;}
+.hb-text strong{color:var(--indigo-light);}
+</style>
+</head>
+<body>
+
+<div class="screen-only">
+  <button class="btn-ctrl btn-print" onclick="window.open('/admin/reports','_blank')">📋 보고서 DB</button>
+  <button class="btn-ctrl btn-pdf" onclick="window.print()">🖨️ 인쇄 / PDF</button>
+</div>
+
+<div class="doc">
+
+<!-- ══════════════════════
+     COVER PAGE
+══════════════════════ -->
+<div class="cover">
+  <div class="cover-glow1"></div>
+  <div class="cover-glow2"></div>
+  <div class="cover-glow3"></div>
+
+  <div class="cover-inner">
+
+    <!-- top bar -->
+    <div class="cover-topbar">
+      <div class="cover-logo">
+        <div class="cover-logo-icon">🤖</div>
+        <div>
+          <div class="cover-logo-text">Warehouse AI Solutions</div>
+          <div class="cover-logo-sub">Agentic AI · MCP · Operational Ontology</div>
+        </div>
+      </div>
+      <div class="cover-doctype">
+        <div class="cover-doctype-label">Software Development Quotation</div>
+        <div class="cover-doctype-num">QT-2026-0409-SW-001</div>
+      </div>
+    </div>
+
+    <!-- badges -->
+    <div class="cover-badges">
+      <span class="cbadge cb-indigo">🧠 Operational Ontology</span>
+      <span class="cbadge cb-cyan">🤖 Agentic AI</span>
+      <span class="cbadge cb-emerald">⚙️ MCP · Model Context Protocol</span>
+      <span class="cbadge cb-amber">🚁 Tethered Drone Control</span>
+      <span class="cbadge cb-rose">🌐 Zero-Touch Automation</span>
+    </div>
+
+    <!-- title -->
+    <div class="cover-title-block">
+      <div class="cover-kw">세계 최초 통합 아키텍처</div>
+      <div class="cover-title">자율 드론 창고 재고관리<br><span class="hl">AI 통합 소프트웨어 시스템</span></div>
+      <div class="cover-subtitle">
+        <strong>삼성반도체 창고</strong>에 최적화된 Tethered 드론 기반 실시간 재고 스캔 · ERP 연동 ·<br>
+        Agentic AI 자율 판단 · MCP 야간 자동화 · 담당자 출근 전 보고서 자동 출력<br>
+        누구도 구현하지 못한 <strong>Operational Ontology + Agentic AI + MCP</strong> 세 기술의 완전한 통합
+      </div>
+    </div>
+
+    <!-- meta cards -->
+    <div class="cover-meta-grid">
+      <div class="cover-meta-card">
+        <div class="cmc-label">발주처 (Client)</div>
+        <div class="cmc-val">삼성반도체 주식회사</div>
+        <div class="cmc-sub">DS부문 스마트팩토리팀</div>
+      </div>
+      <div class="cover-meta-card">
+        <div class="cmc-label">공급사 (Vendor)</div>
+        <div class="cmc-val">Warehouse AI Solutions</div>
+        <div class="cmc-sub">AI·MCP·Ontology 전문 개발사</div>
+      </div>
+      <div class="cover-meta-card">
+        <div class="cmc-label">견적 번호 / 발행일</div>
+        <div class="cmc-val">QT-2026-0409-001</div>
+        <div class="cmc-sub">2026년 4월 9일 · 유효 30일</div>
+      </div>
+      <div class="cover-meta-card">
+        <div class="cmc-label">적용 스펙</div>
+        <div class="cmc-val">15 Aisle × 20 Rack × 15 Lv</div>
+        <div class="cmc-sub">Tethered 드론 2대 · Dock 2개소</div>
+      </div>
+    </div>
+
+    <hr class="cover-divider">
+
+    <!-- bottom -->
+    <div class="cover-bottom">
+      <div class="cover-price-block">
+        <div class="cpb-note">소프트웨어 개발 총액 (VAT 별도)</div>
+        <div class="cpb-amount">₩ 80,000,000</div>
+        <div class="cpb-vat">VAT 포함 시 ₩ 88,000,000 &nbsp;|&nbsp; 하드웨어 비용 별도</div>
+        <div class="cpb-sub">계약금 30% → 중도금 50% → 잔금 20% · 납기 16주</div>
+      </div>
+      <div class="cover-stamp-area">
+        <div class="cover-company-name">Warehouse AI Solutions</div>
+        <div class="cover-company-info">
+          대표이사 OOO &nbsp;|&nbsp; 사업자등록번호 000-00-00000<br>
+          📧 contact@warehouse-ai.kr &nbsp;|&nbsp; ☎ 02-0000-0000<br>
+          🌐 https://warehouse.exko.kr
+        </div>
+        <div class="cover-stamp">공급사<br>인&nbsp;(印)</div>
+      </div>
+    </div>
+
+  </div><!-- /cover-inner -->
+</div><!-- /cover -->
+
+
+<!-- ══════════════════════
+     BODY
+══════════════════════ -->
+<div class="body">
+
+<!-- ① 견적 기본 정보 -->
+<div class="section no-break">
+  <div class="section-hd indigo">
+    <div class="section-num sn-indigo">1</div>
+    <div class="section-title st-indigo">견적 기본 정보 및 프로젝트 개요</div>
+  </div>
+  <div class="info-grid">
+    <div class="info-box">
+      <div class="info-box-title">📄 문서 정보</div>
+      <div class="info-row"><span class="info-key">견적 번호</span><span class="info-val">QT-2026-0409-SW-001</span></div>
+      <div class="info-row"><span class="info-key">발행일</span><span class="info-val">2026년 4월 9일 (목)</span></div>
+      <div class="info-row"><span class="info-key">유효기간</span><span class="info-val">발행일로부터 30일 이내</span></div>
+      <div class="info-row"><span class="info-key">납기 예정</span><span class="info-val">계약일로부터 16주 (약 4개월)</span></div>
+      <div class="info-row"><span class="info-key">정산 방식</span><span class="info-val">마일스톤 기준 단계별 정산</span></div>
+      <div class="info-row"><span class="info-key">통화</span><span class="info-val">KRW (대한민국 원화) · VAT 별도</span></div>
+    </div>
+    <div class="info-box">
+      <div class="info-box-title">🏭 발주처 / 공급사</div>
+      <div class="info-row"><span class="info-key">발주처</span><span class="info-val">삼성반도체 주식회사</span></div>
+      <div class="info-row"><span class="info-key">담당부서</span><span class="info-val">DS부문 제조&인프라총괄 / 스마트팩토리팀</span></div>
+      <div class="info-row"><span class="info-key">공급사</span><span class="info-val">Warehouse AI Solutions</span></div>
+      <div class="info-row"><span class="info-key">견적 범위</span><span class="info-val">소프트웨어 전체 (하드웨어 제외)</span></div>
+      <div class="info-row"><span class="info-key">적용 창고</span><span class="info-val">삼성반도체 DS부문 부품 창고</span></div>
+      <div class="info-row"><span class="info-key">GitHub</span><span class="info-val">myungdae/warehouse-ai-safety</span></div>
+    </div>
+  </div>
+
+  <!-- KPI Summary -->
+  <div class="kpi-bar" style="margin-top:16px;">
+    <div class="kpi-item">
+      <div class="kpi-val">43</div>
+      <div class="kpi-label">개발 항목 수</div>
+    </div>
+    <div class="kpi-item">
+      <div class="kpi-val" style="color:#0891b2;">11</div>
+      <div class="kpi-label">개발 카테고리</div>
+    </div>
+    <div class="kpi-item">
+      <div class="kpi-val" style="color:#059669;">16주</div>
+      <div class="kpi-label">개발 기간</div>
+    </div>
+    <div class="kpi-item">
+      <div class="kpi-val" style="color:#d97706;">₩80M</div>
+      <div class="kpi-label">소프트웨어 총액</div>
+    </div>
+    <div class="kpi-item">
+      <div class="kpi-val" style="color:#be123c;">3대1</div>
+      <div class="kpi-label">핵심기술 통합</div>
+    </div>
+  </div>
+</div>
+
+<!-- ② 시스템 아키텍처 & 기술 차별성 -->
+<div class="section no-break">
+  <div class="section-hd cyan">
+    <div class="section-num sn-cyan">2</div>
+    <div class="section-title st-cyan">핵심 기술 아키텍처 — 세계 최초 Ontology + Agentic AI + MCP 통합</div>
+  </div>
+
+  <div class="highlight-banner">
+    <div class="hb-icon">🏆</div>
+    <div class="hb-text">
+      본 시스템은 <strong>Operational Ontology(운영 지식 그래프)</strong>, <strong>Agentic AI(자율 의사결정 에이전트)</strong>,
+      <strong>MCP(Model Context Protocol, 야간 자동화 오케스트레이터)</strong>를 세계 최초로 단일 창고 운영 플랫폼에 통합한
+      혁신적 아키텍처입니다. Gartner Hype Cycle 2025/2026 최신 기술 3종을 선도 적용하여
+      <strong>야간 무인 스캔 → AI 분석 → 새벽 자동 출력</strong>의 Zero-Touch 워크플로우를 실현합니다.
+    </div>
+  </div>
+
+  <!-- Architecture Diagram -->
+  <div class="arch-diagram">
+    <div class="arch-inner">
+      <div class="arch-title">⚡ Zero-Touch Overnight Workflow Architecture</div>
+      <div class="arch-layers">
+        <div class="arch-layer">
+          <div class="arch-layer-label">Physical<br>Layer</div>
+          <div class="arch-layer-boxes">
+            <div class="arch-box ab-a">🚁 Tethered Drone A<br><span style="font-size:9px;opacity:.7">Aisle 1-7</span></div>
+            <div class="arch-box ab-a">🚁 Tethered Drone B<br><span style="font-size:9px;opacity:.7">Aisle 8-15</span></div>
+            <div class="arch-box ab-a">🖨️ Network Printer<br><span style="font-size:9px;opacity:.7">Port 9100 / IPP</span></div>
+          </div>
+        </div>
+        <div class="arch-arrow">⬇</div>
+        <div class="arch-layer">
+          <div class="arch-layer-label">Ontology<br>Layer</div>
+          <div class="arch-layer-boxes">
+            <div class="arch-box ab-i">🧠 Warehouse Ontology<br><span style="font-size:9px;opacity:.7">OWL/RDF Knowledge Graph</span></div>
+            <div class="arch-box ab-i">🗂️ ERP Semantic Mapping<br><span style="font-size:9px;opacity:.7">SPARQL · JSON-LD</span></div>
+            <div class="arch-box ab-i">📐 Digital Twin Model<br><span style="font-size:9px;opacity:.7">15A × 20R × 15L</span></div>
+            <div class="arch-box ab-i">🏷️ SKU Ontology<br><span style="font-size:9px;opacity:.7">Classification + SWRL</span></div>
+          </div>
+        </div>
+        <div class="arch-arrow">⬇</div>
+        <div class="arch-layer">
+          <div class="arch-layer-label">Agentic AI<br>Layer</div>
+          <div class="arch-layer-boxes">
+            <div class="arch-box ab-c">🤖 Patrol Agent<br><span style="font-size:9px;opacity:.7">자율 경로 결정</span></div>
+            <div class="arch-box ab-c">🔍 Anomaly Detector<br><span style="font-size:9px;opacity:.7">이상 감지 판정</span></div>
+            <div class="arch-box ab-c">🔁 Rescan Agent<br><span style="font-size:9px;opacity:.7">우선순위 재스캔</span></div>
+            <div class="arch-box ab-c">📝 Report Generator<br><span style="font-size:9px;opacity:.7">AI 권고 생성</span></div>
+            <div class="arch-box ab-c">📊 ERP Compare<br><span style="font-size:9px;opacity:.7">Day1 vs Day2</span></div>
+          </div>
+        </div>
+        <div class="arch-arrow">⬇</div>
+        <div class="arch-layer">
+          <div class="arch-layer-label">MCP<br>Layer</div>
+          <div class="arch-layer-boxes">
+            <div class="arch-box ab-e">⏰ Night Scheduler<br><span style="font-size:9px;opacity:.7">22:00 Patrol Trigger</span></div>
+            <div class="arch-box ab-e">🖨️ Auto Print 06:00<br><span style="font-size:9px;opacity:.7">RAW TCP · IPP</span></div>
+            <div class="arch-box ab-e">💾 DB Archive<br><span style="font-size:9px;opacity:.7">SQLite · Reports</span></div>
+            <div class="arch-box ab-e">📧 Email Alert<br><span style="font-size:9px;opacity:.7">SMTP Notification</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tech-grid">
+    <div class="tech-card tc-i">
+      <div class="tc-title" style="color:#818cf8">🧠 Operational Ontology</div>
+      <ul class="tc-body">
+        <li>창고 도메인 지식 OWL/RDF 형식화</li>
+        <li>물리 공간 → 지식 그래프 자동 변환</li>
+        <li>Aisle·Rack·Level 위상 관계 추론</li>
+        <li>SKU 계층 분류 체계 온톨로지</li>
+        <li>이상 패턴 규칙 기반 추론 (SWRL)</li>
+        <li>ERP 데이터 시맨틱 매핑 엔진</li>
+      </ul>
+    </div>
+    <div class="tech-card tc-c">
+      <div class="tc-title" style="color:#22d3ee">🤖 Agentic AI Engine</div>
+      <ul class="tc-body">
+        <li>자율 드론 순찰 경로 결정 에이전트</li>
+        <li>재고 이상 자동 감지·분류·판정</li>
+        <li>Rescan 작업 우선순위 자율 결정</li>
+        <li>Before/After 스냅샷 비교 엔진</li>
+        <li>AI 권고사항 자동 생성 (NLG)</li>
+        <li>Top-5 이상 SKU 리스크 분석</li>
+      </ul>
+    </div>
+    <div class="tech-card tc-e">
+      <div class="tc-title" style="color:#34d399">⚙️ MCP Automation</div>
+      <ul class="tc-body">
+        <li>야간 순찰 자동 스케줄러 (22:00)</li>
+        <li>담당자 출근 전 보고서 자동 출력 (06:00)</li>
+        <li>RAW TCP 9100 + IPP 631 이중 지원</li>
+        <li>프린터 온라인 상태 사전 체크</li>
+        <li>보고서 DB 자동 저장·아카이브</li>
+        <li>이메일·로그 알림 자동화</li>
+      </ul>
+    </div>
+    <div class="tech-card tc-a">
+      <div class="tc-title" style="color:#fbbf24">🚁 Tethered Drone Control</div>
+      <ul class="tc-body">
+        <li>유선 전원 드론 2대 동시 제어</li>
+        <li>횡·종 직선 경로만 허용 (케이블 보호)</li>
+        <li>Rack-by-Rack 정밀 일시정지 스캔</li>
+        <li>실시간 SVG 창고 맵 시각화</li>
+        <li>Dock 위치 최적화 알고리즘</li>
+        <li>2레이어 동시 스캔 (L1+L2)</li>
+      </ul>
+    </div>
+    <div class="tech-card tc-r">
+      <div class="tc-title" style="color:#f87171">📊 ERP Integration & Report</div>
+      <ul class="tc-body">
+        <li>Samsung ERP Day1/Day2 실시간 대조</li>
+        <li>6-KPI 일일 종합보고서 자동 생성</li>
+        <li>보고서 Admin 관리 대시보드</li>
+        <li>PDF·JSON·인쇄 다중 내보내기</li>
+        <li>SQLite 영속 아카이브 DB</li>
+        <li>ERP API Push 연동 버튼</li>
+      </ul>
+    </div>
+    <div class="tech-card tc-v">
+      <div class="tc-title" style="color:#c4b5fd">🔒 Reliability & Security</div>
+      <ul class="tc-body">
+        <li>Flask 경량 서버 24/7 무중단 운영</li>
+        <li>Background Daemon 자동 재시작</li>
+        <li>SMTP 이메일 이상 알림 시스템</li>
+        <li>API 키 기반 인증 · CORS 정책</li>
+        <li>.env 환경변수 민감정보 분리</li>
+        <li>GitHub CI/CD 자동 배포 파이프라인</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ③ 상세 견적 -->
+<div class="section page-break">
+  <div class="section-hd emerald">
+    <div class="section-num sn-emerald">3</div>
+    <div class="section-title st-emerald">소프트웨어 개발 상세 견적 — 43개 항목</div>
+  </div>
+
+  <div class="qt-wrap">
+  <table class="qt">
+    <thead>
+      <tr>
+        <th style="width:34px">#</th>
+        <th>개발 항목 및 상세 내용</th>
+        <th style="width:44px">단위</th>
+        <th style="width:44px">수량</th>
+        <th style="width:96px">단가 (원)</th>
+        <th style="width:110px">금액 (원)</th>
+      </tr>
+    </thead>
+    <tbody>
+
+    <!-- ═══════ CAT A ═══════ -->
+    <tr class="cat-row">
+      <td colspan="6">A. Operational Ontology 설계 · 구축 &nbsp;—&nbsp; 지식 그래프 기반 창고 도메인 모델링</td>
+    </tr>
+    <tr>
+      <td>A1</td>
+      <td>
+        <div class="iname">창고 도메인 온톨로지 설계 (OWL/RDF)</div>
+        <div class="idesc">15 Aisle × 20 Rack × 15 Level 전체 공간 지식 그래프 설계<br>
+          드론·Dock·SKU·Shelf 개념 체계 형식화 및 관계 정의<br>
+          <span class="tag tag-i">OWL 2.0</span><span class="tag tag-i">RDF/Turtle</span><span class="tag tag-c">SPARQL 1.1</span><span class="tag tag-e">Protégé</span>
+        </div>
+      </td>
+      <td>식</td><td>1</td><td>4,500,000</td><td>4,500,000</td>
+    </tr>
+    <tr>
+      <td>A2</td>
+      <td>
+        <div class="iname">ERP 시맨틱 매핑 엔진 개발</div>
+        <div class="idesc">삼성 ERP 스키마 → 온톨로지 자동 매핑 변환기<br>
+          Day1/Day2 인벤토리 정합성 추론 · 불일치 자동 탐지<br>
+          <span class="tag tag-i">Python</span><span class="tag tag-c">RDFLib</span><span class="tag tag-c">SPARQLWrapper</span><span class="tag tag-a">JSON-LD</span>
+        </div>
+      </td>
+      <td>식</td><td>1</td><td>3,500,000</td><td>3,500,000</td>
+    </tr>
+    <tr>
+      <td>A3</td>
+      <td>
+        <div class="iname">물리 공간 디지털 트윈 데이터 모델</div>
+        <div class="idesc">창고 3D 위상 데이터 구조 설계 · 선반 ID 체계(aisle-side-rack-layer) 확립<br>
+          좌표계 수학 모델 · SVG 렌더링 매핑 테이블 구축<br>
+          <span class="tag tag-a">GeoJSON</span><span class="tag tag-c">JSON Schema</span><span class="tag tag-e">좌표 변환 수식</span>
+        </div>
+      </td>
+      <td>식</td><td>1</td><td>2,000,000</td><td>2,000,000</td>
+    </tr>
+    <tr>
+      <td>A4</td>
+      <td>
+        <div class="iname">SKU 분류 체계 및 이상 패턴 온톨로지</div>
+        <div class="idesc">반도체 부품 SKU 계층 분류 온톨로지 구축<br>
+          분실(MISSING)·감소·증가·이동 이상 패턴 규칙 정의 (SWRL Rules)<br>
+          <span class="tag tag-i">OWL Restrictions</span><span class="tag tag-a">SWRL Rules</span><span class="tag tag-r">Risk Ontology</span>
+        </div>
+      </td>
+      <td>식</td><td>1</td><td>2,000,000</td><td>2,000,000</td>
+    </tr>
+    <tr>
+      <td>A5</td>
+      <td>
+        <div class="iname">온톨로지 서빙 API 엔드포인트</div>
+        <div class="idesc">/ontology/*.json — OWL 파일 정적 서빙 및 CORS 설정<br>
+          프론트엔드 실시간 온톨로지 참조 지원 아키텍처<br>
+          <span class="tag tag-i">Flask Route</span><span class="tag tag-c">Static Serve</span><span class="tag tag-e">CORS</span>
+        </div>
+      </td>
+      <td>식</td><td>1</td><td>800,000</td><td>800,000</td>
+    </tr>
+    <tr class="subtotal-row">
+      <td colspan="5" style="text-align:right;font-size:11.5px;">A. 소계 (Operational Ontology)</td>
+      <td>12,800,000</td>
+    </tr>
+
+    <!-- ═══════ CAT B ═══════ -->
+    <tr class="cat-row">
+      <td colspan="6">B. Agentic AI 엔진 개발 &nbsp;—&nbsp; 자율 의사결정·이상감지·판정·권고 AI 모듈</td>
+    </tr>
+    <tr>
+      <td>B1</td>
+      <td>
+        <div class="iname">자율 드론 순찰 의사결정 에이전트</div>
+        <div class="idesc">Dock 출발 → Aisle 진입 → Rack 스캔 → 귀환 자율 경로 생성 알고리즘<br>
+          직선(횡·종) 경로 강제 제약 (케이블 꼬임 방지) · 장애물 회피 로직<br>
+          <span class="tag tag-i">Path Algorithm</span><span class="tag tag-c">Canvas API</span><span class="tag tag-e">rAF Loop</span>
+        </div>
+      </td>
+      <td>식</td><td>1</td><td>5,000,000</td><td>5,000,000</td>
+    </tr>
+    <tr>
+      <td>B2</td>
+      <td>
+        <div class="iname">재고 이상 감지 및 자동 판정 AI 모듈</div>
+        <div class="idesc">Day1 vs Day2 재고 차이 분석 엔진 (분실·감소·증가·이동 4분류)<br>
+          심각도(HIGH/MEDIUM/LOW) 자동 판정 · 위치별 Delta 계산<br>
+          <span class="tag tag-i">Diff Engine</span><span class="tag tag-c">통계 분석</span><span class="tag tag-a">Rule-based AI</span>
+        </div>
+      </td>
+      <td>식</td><td>1</td><td>4,500,000</td><td>4,500,000</td>
+    </tr>
+    <tr>
+      <td>B3</td>
+      <td>
+        <div class="iname">자율 Rescan 우선순위 결정 에이전트</div>
+        <div class="idesc">이상 위치 자동 감지 후 Rescan 작업 큐 자율 구성<br>
+          HIGH/MEDIUM 우선순위 자동 분류 · Dock별 드론 배정 최적화<br>
+          <span class="tag tag-i">Task Queue</span><span class="tag tag-c">Priority Algorithm</span><span class="tag tag-e">Drone Assignment</span>
+        </div>
+      </td>
+      <td>식</td><td>1</td><td>3,500,000</td><td>3,500,000</td>
+    </tr>
+    <tr>
+      <td>B4</td>
+      <td>
+        <div class="iname">Rescan Before/After 비교 판정 엔진</div>
+        <div class="idesc">재스캔 전·후 스냅샷 자동 캡처 및 비교 분석<br>
+          판정 결과 3종: ✅ all_found / ⚠️ partial_found / 🚨 confirmed_missing<br>
+          <span class="tag tag-i">Snapshot Diff</span><span class="tag tag-e">Verdict Engine</span><span class="tag tag-r">Delta Calc</span>
+        </div>
+      </td>
+      <td>식</td><td>1</td><td>3,000,000</td><td>3,000,000</td>
+    </tr>
+    <tr>
+      <td>B5</td>
+      <td>
+        <div class="iname">AI 권고사항 자동 생성 엔진 (NLG)</div>
+        <div class="idesc">정확도·분실수·재스캔결과 기반 자연어 권고 텍스트 자동 생성<br>
+          🔴긴급 / 🟡주의 / 🟠권고 / 🟢양호 4단계 색상 코드 자동 분류<br>
+          <span class="tag tag-i">NLG Engine</span><span class="tag tag-a">Rule Engine</span><span class="tag tag-c">Context Aware</span>
+        </div>
+      </td>
+      <td>식</td><td>1</td><td>2,500,000</td><td>2,500,000</td>
+    </tr>
+    <tr>
+      <td>B6</td>
+      <td>
+        <div class="iname">주요 이상 SKU 자동 랭킹 분석 모듈</div>
+        <div class="idesc">손실 수량 기준 Top-5 이상 SKU 자동 정렬 및 리스크 분석<br>
+          분실건수·감소건수·총손실수량 종합 리스크 점수 산출<br>
+          <span class="tag tag-i">Analytics</span><span class="tag tag-r">Risk Scoring</span><span class="tag tag-c">Ranking</span>
+        </div>
+      </td>
+      <td>식</td><td>1</td><td>1,500,000</td><td>1,500,000</td>
+    </tr>
+    <tr>
+      <td>B7</td>
+      <td>
+        <div class="iname">드론 운영 현황 자동 집계 모듈</div>
+        <div class="idesc">Drone A/B 별 스캔 건수·담당 Zone·유선 전력 상태·완료율 자동 집계<br>
+          일일 보고서 드론 운영 현황 섹션 데이터 자동 생성<br>
+          <span class="tag tag-i">Stats Aggregation</span><span class="tag tag-c">Drone Telemetry</span>
+        </div>
+      </td>
+      <td>식</td><td>1</td><td>1,200,000</td><td>1,200,000</td>
+    </tr>
+    <tr class="subtotal-row">
+      <td colspan="5" style="text-align:right;">B. 소계 (Agentic AI 엔진)</td>
+      <td>21,200,000</td>
+    </tr>
+
+    <!-- ═══════ CAT C ═══════ -->
+    <tr class="cat-row">
+      <td colspan="6">C. MCP (Model Context Protocol) 야간 자동화 시스템 &nbsp;—&nbsp; Zero-Touch 오케스트레이터</td>
+    </tr>
+    <tr>
+      <td>C1</td>
+      <td>
+        <div class="iname">MCP 야간 스케줄러 백그라운드 데몬</div>
+        <div class="idesc">30초 tick 기반 Python 백그라운드 스케줄러 (threading.Thread Daemon)<br>
+          22:00 야간 순찰 자동 트리거 · 06:00 자동 출력 트리거 구현<br>
+          <span class="tag tag-i">Python</span><span class="tag tag-c">Threading</span><span class="tag tag-e">Daemon Process</span><span class="tag tag-a">Cron Logic</span>
+        </div>
+      </td>
+      <td>식</td><td>1</td><td>3,000,000</td><td>3,000,000</td>
+    </tr>
+    <tr>
+      <td>C2</td>
+      <td>
+        <div class="iname">네트워크 프린터 자동 출력 엔진</div>
+        <div class="idesc">RAW TCP (port 9100) + IPP (port 631) 이중 프로토콜 자동 시도<br>
+          PJL/ASCII 최적화 보고서 포맷 자동 생성 · Python socket 직접 전송<br>
+          프린터 오프라인 시 로그 기록 및 재시도 큐 관리<br>
+          <span class="tag tag-i">RAW TCP</span><span class="tag tag-c">IPP Protocol</span><span class="tag tag-a">PJL</span><span class="tag tag-e">Socket</span>
+        </div>
+      </td>
+      <td>식</td><td>1</td><td>3,500,000</td><td>3,500,000</td>
+    </tr>
+    <tr>
+      <td>C3</td>
+      <td>
+        <div class="iname">프린터 온라인 상태 체크 모듈</div>
+        <div class="idesc">출력 전 TCP 연결 시도로 프린터 온라인 확인 (타임아웃 3초)<br>
+          RAW 실패 시 IPP 자동 폴백 · 오프라인 시 이벤트 로그 기록<br>
+          <span class="tag tag-i">TCP Probe</span><span class="tag tag-c">IPP Fallback</span><span class="tag tag-a">Health Check</span>
+        </div>
+      </td>
+      <td>식</td><td>1</td><td>1,000,000</td><td>1,000,000</td>
+    </tr>
+    <tr>
+      <td>C4</td>
+      <td>
+        <div class="iname">MCP 설정 관리 시스템 (REST API)</div>
+        <div class="idesc">출력 시각·프린터 IP·순찰 시각·복사 매수·자동출력 ON/OFF 설정<br>
+          JSON 파일 영속 저장 · 런타임 동적 설정 변경 지원<br>
+          GET /api/mcp/config · POST /api/mcp/config 구현<br>
+          <span class="tag tag-i">REST API</span><span class="tag tag-c">JSON Config</span><span class="tag tag-e">Dynamic Config</span>
+        </div>
+      </td>
+      <td>식</td><td>1</td><td>1,500,000</td><td>1,500,000</td>
+    </tr>
+    <tr>
+      <td>C5</td>
+      <td>
+        <div class="iname">MCP 이벤트 로그 시스템</div>
+        <div class="idesc">출력 성공·실패·오프라인·순찰 완료 이벤트 JSON 로그 (최근 200건)<br>
+          타임스탬프·트리거 유형·프린터 상태·상세 메시지 기록<br>
+          GET /api/mcp/log 조회 엔드포인트<br>
+          <span class="tag tag-i">Event Log</span><span class="tag tag-e">JSON Persistence</span><span class="tag tag-c">200 History</span>
+        </div>
+      </td>
+      <td>식</td><td>1</td><td>1,000,000</td><td>1,000,000</td>
+    </tr>
+    <tr>
+      <td>C6</td>
+      <td>
+        <div class="iname">MCP Auto-Print 관리 대시보드 UI</div>
+        <div class="idesc">프린터 상태 실시간 카드 · 스케줄 타임라인 시각화<br>
+          출력 미리보기 팝업 · 수동 출력 버튼 · MCP 설정 폼 · 이력 로그 테이블<br>
+          <span class="tag tag-i">HTML5</span><span class="tag tag-c">CSS3</span><span class="tag tag-e">Vanilla JS</span><span class="tag tag-a">Real-time UI</span>
+        </div>
+      </td>
+      <td>식</td><td>1</td><td>2,000,000</td><td>2,000,000</td>
+    </tr>
+    <tr>
+      <td>C7</td>
+      <td>
+        <div class="iname">수동 출력 API 및 미리보기 엔드포인트</div>
+        <div class="idesc">POST /api/print/manual — 담당자 즉시 수동 출력 트리거<br>
+          POST /api/print/preview — 출력 내용 사전 확인 (HTML 렌더링)<br>
+          <span class="tag tag-i">Flask</span><span class="tag tag-c">REST API</span><span class="tag tag-e">Print Preview</span>
+        </div>
+      </td>
+      <td>식</td><td>1</td><td>1,000,000</td><td>1,000,000</td>
+    </tr>
+    <tr>
+      <td>C8</td>
+      <td>
+        <div class="iname">야간 순찰 신호 브릿지 API</div>
+        <div class="idesc">POST /api/mcp/patrol-signal — MCP 스케줄러 → 프론트 드론 UI 트리거<br>
+          patrol_trigger.json 파일 기반 신호 전달 · UI 폴링 감지 처리<br>
+          <span class="tag tag-i">Signal Bridge</span><span class="tag tag-c">JSON Flag</span><span class="tag tag-a">Polling</span>
+        </div>
+      </td>
+      <td>식</td><td>1</td><td>800,000</td><td>800,000</td>
+    </tr>
+    <tr class="subtotal-row">
+      <td colspan="5" style="text-align:right;">C. 소계 (MCP 자동화 시스템)</td>
+      <td>13,800,000</td>
+    </tr>
+
+    <!-- ═══════ CAT D ═══════ -->
+    <tr class="cat-row">
+      <td colspan="6">D. Tethered 드론 제어 & 실시간 창고 시각화 UI</td>
+    </tr>
+    <tr>
+      <td>D1</td>
+      <td>
+        <div class="iname">SVG 실시간 창고 맵 시각화 엔진</div>
+        <div class="idesc">1400×620px SVG 창고 전체 맵 동적 렌더링 · 15개 Aisle × 2 Side 색상 코딩<br>
+          스캔 상태별 색상: 미스캔(회색)·스캔중(노랑)·완료(초록)·이상(빨강)<br>
+          <span class="tag tag-i">SVG</span><span class="tag tag-c">Dynamic Render</span><span class="tag tag-e">Color Coding</span>
+        </div>
+      </td>
+      <td>식</td><td>1</td><td>3,000,000</td><td>3,000,000</td>
+    </tr>
+    <tr>
+      <td>D2</td>
+      <td>
+        <div class="iname">Tethered 드론 2대 실시간 애니메이션</div>
+        <div class="idesc">Dock A/B 출발·Aisle 진입·Rack 스캔·귀환 완전 애니메이션 구현<br>
+          Rack-by-Rack 800ms 일시정지 시각 피드백 · 드론 방향 아이콘 회전<br>
+          속도 3.0 units/frame · 현재 위치·레벨 실시간 패널 표시<br>
+          <span class="tag tag-i">JS Animation</span><span class="tag tag-c">rAF</span><span class="tag tag-e">SVG Move</span>
+        </div>
+      </td>
+      <td>식</td><td>1</td><td>3,500,000</td><td>3,500,000</td>
+    </tr>
+    <tr>
+      <td>D3</td>
+      <td>
+        <div class="iname">Dock 패널 실시간 상태 표시 시스템</div>
+        <div class="idesc">Dock A/B 별 드론 ID·담당 Aisle 범위·현재 Aisle·현재 Level 실시간 표시<br>
+          L1(녹색)·L2(청록) 레벨 색상 코딩 · 스캔 진행률 바<br>
+          <span class="tag tag-i">Real-time Panel</span><span class="tag tag-c">Status Card</span><span class="tag tag-a">Level Badge</span>
+        </div>
+      </td>
+      <td>식</td><td>1</td><td>1,500,000</td><td>1,500,000</td>
+    </tr>
+    <tr>
+      <td>D4</td>
+      <td>
+        <div class="iname">라이브 스캔 피드 로그 시스템</div>
+        <div class="idesc">Rack ID 읽기→Side A/B 스캔→완료 색상 코딩 피드 (최근 50건 롤링)<br>
+          System·Rack·Scan·Success·Warning 5종 메시지 색상 분류<br>
+          <span class="tag tag-i">Live Feed</span><span class="tag tag-c">Rolling Log</span><span class="tag tag-a">5-Type Color</span>
+        </div>
+      </td>
+      <td>식</td><td>1</td><td>1,000,000</td><td>1,000,000</td>
+    </tr>
+    <tr>
+      <td>D5</td>
+      <td>
+        <div class="iname">스캔 커버리지 및 통계 실시간 집계</div>
+        <div class="idesc">총 위치·스캔 건수·커버리지(%)·정확도 실시간 통계 카드<br>
+          Current Day 클릭 Day1/Day2 전환 기능 · ERP Compare 버튼<br>
+          <span class="tag tag-i">Statistics</span><span class="tag tag-c">Dynamic UI</span><span class="tag tag-e">Day Switch</span>
+        </div>
+      </td>
+      <td>식</td><td>1</td><td>1,000,000</td><td>1,000,000</td>
+    </tr>
+    <tr>
+      <td>D6</td>
+      <td>
+        <div class="iname">드론 제어 인터럽트 및 Rescan 경로 삽입</div>
+        <div class="idesc">기존 순찰 중단 · Rescan 작업을 경로 맨 앞에 삽입하는 인터럽트 로직<br>
+          재스캔 완료 후 이전 순찰 지점부터 자동 재개<br>
+          <span class="tag tag-i">Path Interrupt</span><span class="tag tag-c">Queue Prepend</span><span class="tag tag-e">Auto Resume</span>
+        </div>
+      </td>
+      <td>식</td><td>1</td><td>1,500,000</td><td>1,500,000</td>
+    </tr>
+    <tr class="subtotal-row">
+      <td colspan="5" style="text-align:right;">D. 소계 (드론 제어 & 시각화)</td>
+      <td>11,500,000</td>
+    </tr>
+
+    <!-- ═══════ CAT E ═══════ -->
+    <tr class="cat-row">
+      <td colspan="6">E. ERP 연동 · 일일 종합보고서 시스템</td>
+    </tr>
+    <tr>
+      <td>E1</td>
+      <td>
+        <div class="iname">Day1 vs Day2 ERP 비교 분석 뷰</div>
+        <div class="idesc">6-KPI 카드 (총위치·분실·감소·증가·정확도·재스캔완료) 인터랙티브 표시<br>
+          분실·감소·증가 상세 목록 15건 + Action Required 섹션<br>
+          <span class="tag tag-i">ERP Integration</span><span class="tag tag-c">Diff View</span><span class="tag tag-e">KPI Cards</span>
+        </div>
+      </td>
+      <td>식</td><td>1</td><td>2,500,000</td><td>2,500,000</td>
+    </tr>
+    <tr>
+      <td>E2</td>
+      <td>
+        <div class="iname">일일 종합보고서 자동 생성 엔진</div>
+        <div class="idesc">6섹션 보고서: KPI·AI권고·재스캔결과·변동내역·Top5 SKU·드론현황<br>
+          보고서 ID 자동 생성 (RPT-YYYYMMDD-HHMM) · 생성 시각 자동 기록<br>
+          <span class="tag tag-i">Report Engine</span><span class="tag tag-c">Auto Generation</span><span class="tag tag-e">ID System</span>
+        </div>
+      </td>
+      <td>식</td><td>1</td><td>2,500,000</td><td>2,500,000</td>
+    </tr>
+    <tr>
+      <td>E3</td>
+      <td>
+        <div class="iname">일일 보고서 모달 UI (6개 섹션)</div>
+        <div class="idesc">전체화면 모달 · 헤더 KPI 카드 6종 · AI 권고 색상 코딩 섹션<br>
+          상세 재스캔 결과 테이블 · 재고 변동 컬럼 · Top-5 SKU 랭킹 · 드론 현황<br>
+          <span class="tag tag-i">Modal UI</span><span class="tag tag-c">6 Sections</span><span class="tag tag-e">Print Optimized</span>
+        </div>
+      </td>
+      <td>식</td><td>1</td><td>2,000,000</td><td>2,000,000</td>
+    </tr>
+    <tr>
+      <td>E4</td>
+      <td>
+        <div class="iname">보고서 Admin 관리 대시보드</div>
+        <div class="idesc">보고서 목록 조회·검색·필터(드론별·날짜별)·정렬 대시보드 (SQLite 연동)<br>
+          보고서 상세 모달 · 메모 편집(PATCH) · 삭제(DELETE) · 통계 차트<br>
+          <span class="tag tag-i">Admin Panel</span><span class="tag tag-c">CRUD</span><span class="tag tag-e">Chart.js</span><span class="tag tag-a">Pagination</span>
+        </div>
+      </td>
+      <td>식</td><td>1</td><td>3,000,000</td><td>3,000,000</td>
+    </tr>
+    <tr>
+      <td>E5</td>
+      <td>
+        <div class="iname">다중 내보내기 시스템 (Print/JSON/Text)</div>
+        <div class="idesc">재스캔 목록 텍스트 내보내기 · 전체 ERP 비교 보고서 다운로드<br>
+          JSON 전체 데이터 내보내기 · 인쇄 최적화 팝업 · ERP API Push 버튼<br>
+          <span class="tag tag-i">Export</span><span class="tag tag-c">JSON</span><span class="tag tag-e">Print API</span><span class="tag tag-r">ERP Push</span>
+        </div>
+      </td>
+      <td>식</td><td>1</td><td>1,500,000</td><td>1,500,000</td>
+    </tr>
+    <tr>
+      <td>E6</td>
+      <td>
+        <div class="iname">이메일 알림 시스템 (SMTP)</div>
+        <div class="idesc">순찰 완료·이상 감지 시 담당자 이메일 자동 발송<br>
+          HTML 이메일 템플릿 (KPI·분실목록·AI권고 포함) · 텍스트 폴백<br>
+          <span class="tag tag-i">SMTP</span><span class="tag tag-c">HTML Email</span><span class="tag tag-e">Text Fallback</span>
+        </div>
+      </td>
+      <td>식</td><td>1</td><td>1,500,000</td><td>1,500,000</td>
+    </tr>
+    <tr class="subtotal-row">
+      <td colspan="5" style="text-align:right;">E. 소계 (ERP 연동 & 보고서)</td>
+      <td>13,000,000</td>
+    </tr>
+
+    <!-- ═══════ CAT F ═══════ -->
+    <tr class="cat-row">
+      <td colspan="6">F. 백엔드 서버 & REST API 인프라</td>
+    </tr>
+    <tr>
+      <td>F1</td>
+      <td>
+        <div class="iname">Flask 웹 서버 아키텍처 설계 및 구축</div>
+        <div class="idesc">Flask RESTful 서버 전체 아키텍처 · Blueprint 모듈화<br>
+          정적 파일 최적화 서빙 · 멀티 템플릿 렌더링 구조<br>
+          <span class="tag tag-i">Python</span><span class="tag tag-c">Flask</span><span class="tag tag-e">Blueprint</span>
+        </div>
+      </td>
+      <td>식</td><td>1</td><td>2,000,000</td><td>2,000,000</td>
+    </tr>
+    <tr>
+      <td>F2</td>
+      <td>
+        <div class="iname">전체 REST API 설계 및 개발 — 20개 엔드포인트</div>
+        <div class="idesc">보고서 CRUD · MCP 설정 · 프린터 상태 · 순찰 신호 · 아카이브 등<br>
+          GET/POST/PATCH/DELETE 메서드 완전 구현 · JSON 응답 표준화<br>
+          <span class="tag tag-i">REST API</span><span class="tag tag-c">20 Endpoints</span><span class="tag tag-e">JSON Standard</span>
+        </div>
+      </td>
+      <td>개</td><td>20</td><td>200,000</td><td>4,000,000</td>
+    </tr>
+    <tr>
+      <td>F3</td>
+      <td>
+        <div class="iname">SQLite 보고서 아카이브 DB 설계</div>
+        <div class="idesc">보고서 영속 SQLite DB 스키마 설계 · 인덱스 최적화<br>
+          검색·필터·정렬 쿼리 최적화 · JSON→SQLite 마이그레이션 스크립트<br>
+          <span class="tag tag-i">SQLite</span><span class="tag tag-c">SQL Optimize</span><span class="tag tag-e">Migration</span>
+        </div>
+      </td>
+      <td>식</td><td>1</td><td>1,500,000</td><td>1,500,000</td>
+    </tr>
+    <tr>
+      <td>F4</td>
+      <td>
+        <div class="iname">시스템 보안 및 인증 기본 설계</div>
+        <div class="idesc">API 키 기반 인증 · CORS 정책 설정<br>
+          .env 환경변수 분리 · 민감정보 보안 처리 · 로그 마스킹<br>
+          <span class="tag tag-i">Security</span><span class="tag tag-r">Auth</span><span class="tag tag-a">CORS</span><span class="tag tag-c">ENV</span>
+        </div>
+      </td>
+      <td>식</td><td>1</td><td>1,200,000</td><td>1,200,000</td>
+    </tr>
+    <tr class="subtotal-row">
+      <td colspan="5" style="text-align:right;">F. 소계 (백엔드 & API)</td>
+      <td>8,700,000</td>
+    </tr>
+
+    <!-- ═══════ CAT G ═══════ -->
+    <tr class="cat-row">
+      <td colspan="6">G. Archive Intelligence & 데이터 분석 모듈</td>
+    </tr>
+    <tr>
+      <td>G1</td>
+      <td>
+        <div class="iname">Archive Intelligence 대시보드</div>
+        <div class="idesc">장기 보고서 아카이브 분석 · 날짜별 정확도 트렌드 차트<br>
+          드론별 성능 분석 · 이상 발생 패턴 히트맵 시각화<br>
+          <span class="tag tag-i">Archive Analysis</span><span class="tag tag-c">Chart.js</span><span class="tag tag-e">Trend Analysis</span>
+        </div>
+      </td>
+      <td>식</td><td>1</td><td>2,000,000</td><td>2,000,000</td>
+    </tr>
+    <tr>
+      <td>G2</td>
+      <td>
+        <div class="iname">보고서 통계 API 및 집계 엔진</div>
+        <div class="idesc">GET /api/reports/stats — 정확도 평균·분실 총계·드론별 통계 집계<br>
+          기간별·드론별·정확도 구간별 통계 필터링 지원<br>
+          <span class="tag tag-i">Stats API</span><span class="tag tag-c">Aggregation</span><span class="tag tag-a">Filter</span>
+        </div>
+      </td>
+      <td>식</td><td>1</td><td>1,200,000</td><td>1,200,000</td>
+    </tr>
+    <tr>
+      <td>G3</td>
+      <td>
+        <div class="iname">CSV/Excel 보고서 일괄 내보내기</div>
+        <div class="idesc">GET /api/reports/export — 전체 보고서 CSV/Excel 일괄 다운로드<br>
+          날짜 범위·드론 필터 적용 내보내기 · 한글 컬럼명 지원<br>
+          <span class="tag tag-i">Export API</span><span class="tag tag-c">CSV</span><span class="tag tag-e">한글 지원</span>
+        </div>
+      </td>
+      <td>식</td><td>1</td><td>800,000</td><td>800,000</td>
+    </tr>
+    <tr class="subtotal-row">
+      <td colspan="5" style="text-align:right;">G. 소계 (Archive Intelligence)</td>
+      <td>4,000,000</td>
+    </tr>
+
+    <!-- ═══════ CAT H ═══════ -->
+    <tr class="cat-row">
+      <td colspan="6">H. 품질보증 (QA) · 테스트 · 검증</td>
+    </tr>
+    <tr>
+      <td>H1</td>
+      <td>
+        <div class="iname">단위 테스트 설계 및 실행</div>
+        <div class="idesc">핵심 모듈별 단위 테스트 케이스 작성 및 실행 (pytest)<br>
+          AI 판정 로직·스케줄러·API 응답·온톨로지 매핑 검증<br>
+          <span class="tag tag-i">pytest</span><span class="tag tag-c">Unit Test</span><span class="tag tag-e">Coverage 80%+</span>
+        </div>
+      </td>
+      <td>식</td><td>1</td><td>1,500,000</td><td>1,500,000</td>
+    </tr>
+    <tr>
+      <td>H2</td>
+      <td>
+        <div class="iname">통합 테스트 및 E2E 시나리오 검증</div>
+        <div class="idesc">야간 순찰 → AI 분석 → 보고서 저장 → 자동 출력 E2E 완전 검증<br>
+          Rescan 흐름·ERP 비교·MCP 스케줄러 통합 시나리오 테스트<br>
+          <span class="tag tag-i">E2E Test</span><span class="tag tag-c">Integration</span><span class="tag tag-a">Scenario</span>
+        </div>
+      </td>
+      <td>식</td><td>1</td><td>2,000,000</td><td>2,000,000</td>
+    </tr>
+    <tr>
+      <td>H3</td>
+      <td>
+        <div class="iname">성능 테스트 및 부하 검증</div>
+        <div class="idesc">2대 드론 동시 실행 시 렌더링 성능 측정 · API 응답 시간 검증<br>
+          24시간 연속 운영 안정성 테스트 · 메모리 누수 점검<br>
+          <span class="tag tag-i">Performance</span><span class="tag tag-c">Load Test</span><span class="tag tag-e">Stability</span>
+        </div>
+      </td>
+      <td>식</td><td>1</td><td>1,000,000</td><td>1,000,000</td>
+    </tr>
+    <tr>
+      <td>H4</td>
+      <td>
+        <div class="iname">사용자 수락 테스트 (UAT) 지원</div>
+        <div class="idesc">고객사 담당자 UAT 시나리오 작성 및 현장 지원<br>
+          피드백 수집 및 수정사항 반영 (최대 2회 포함)<br>
+          <span class="tag tag-i">UAT</span><span class="tag tag-a">On-site</span><span class="tag tag-e">2 Rounds</span>
+        </div>
+      </td>
+      <td>회</td><td>2</td><td>800,000</td><td>1,600,000</td>
+    </tr>
+    <tr class="subtotal-row">
+      <td colspan="5" style="text-align:right;">H. 소계 (QA & 테스트)</td>
+      <td>6,100,000</td>
+    </tr>
+
+    <!-- ═══════ CAT I ═══════ -->
+    <tr class="cat-row">
+      <td colspan="6">I. 배포 · 운영 지원 · 기술 문서화</td>
+    </tr>
+    <tr>
+      <td>I1</td>
+      <td>
+        <div class="iname">Ubuntu 서버 배포 스크립트 및 자동화</div>
+        <div class="idesc">nohup / PM2 / systemd 서비스 배포 구성 스크립트 완전 작성<br>
+          Python 의존성 설치 · SQLite DB 초기화 · 환경변수 세팅 자동화<br>
+          <span class="tag tag-i">Ubuntu</span><span class="tag tag-c">Bash Script</span><span class="tag tag-e">systemd</span><span class="tag tag-a">PM2</span>
+        </div>
+      </td>
+      <td>식</td><td>1</td><td>1,500,000</td><td>1,500,000</td>
+    </tr>
+    <tr>
+      <td>I2</td>
+      <td>
+        <div class="iname">GitHub 버전 관리 및 CI/CD 파이프라인</div>
+        <div class="idesc">Git 브랜치 전략 수립 · PR 워크플로우 · 코드 리뷰 프로세스 설정<br>
+          자동 배포 브랜치(main) 반영 스크립트 · GitHub Actions 기반 CI 기초<br>
+          <span class="tag tag-i">GitHub</span><span class="tag tag-c">CI/CD</span><span class="tag tag-e">Git Flow</span>
+        </div>
+      </td>
+      <td>식</td><td>1</td><td>1,000,000</td><td>1,000,000</td>
+    </tr>
+    <tr>
+      <td>I3</td>
+      <td>
+        <div class="iname">기술 문서화 (개발자·운영자 매뉴얼)</div>
+        <div class="idesc">API 명세서 (Swagger/Markdown) · 시스템 아키텍처 문서<br>
+          운영자 사용 매뉴얼 (MCP 설정·프린터 연결·일상 운영 절차)<br>
+          <span class="tag tag-i">API Docs</span><span class="tag tag-c">Architecture</span><span class="tag tag-e">User Manual</span>
+        </div>
+      </td>
+      <td>식</td><td>1</td><td>1,500,000</td><td>1,500,000</td>
+    </tr>
+    <tr>
+      <td>I4</td>
+      <td>
+        <div class="iname">운영 안정화 기술 지원 (3개월)</div>
+        <div class="idesc">납품 후 3개월 버그 수정·운영 질의 대응 포함<br>
+          원격 지원 월 4회 · SLA: 장애 발생 시 24시간 내 대응<br>
+          <span class="tag tag-i">Support 3M</span><span class="tag tag-c">Remote</span><span class="tag tag-e">SLA 24H</span>
+        </div>
+      </td>
+      <td>개월</td><td>3</td><td>1,300,000</td><td>3,900,000</td>
+    </tr>
+    <tr>
+      <td>I5</td>
+      <td>
+        <div class="iname">현장 설치 및 담당자 교육</div>
+        <div class="idesc">최종 납품 데모 시연 · 담당자 교육 2회 (2시간/회)<br>
+          현장 서버 설치 지원 · 초기 운영 설정 완료 확인<br>
+          <span class="tag tag-i">On-site</span><span class="tag tag-c">Training</span><span class="tag tag-a">2 Sessions</span>
+        </div>
+      </td>
+      <td>회</td><td>2</td><td>700,000</td><td>1,400,000</td>
+    </tr>
+    <tr class="subtotal-row">
+      <td colspan="5" style="text-align:right;">I. 소계 (배포 & 운영지원)</td>
+      <td>9,300,000</td>
+    </tr>
+
+    <!-- ═══════ CAT J ═══════ -->
+    <tr class="cat-row">
+      <td colspan="6">J. 프로젝트 관리 (PM) & 기획</td>
+    </tr>
+    <tr>
+      <td>J1</td>
+      <td>
+        <div class="iname">요구사항 분석 및 시스템 아키텍처 설계</div>
+        <div class="idesc">창고 환경 현장 조사·인터뷰·요구사항 문서화 (BRD/SRS)<br>
+          Ontology·AI·MCP 통합 소프트웨어 아키텍처 완전 설계<br>
+          <span class="tag tag-i">BRD/SRS</span><span class="tag tag-c">Architecture Design</span>
+        </div>
+      </td>
+      <td>식</td><td>1</td><td>2,000,000</td><td>2,000,000</td>
+    </tr>
+    <tr>
+      <td>J2</td>
+      <td>
+        <div class="iname">프로젝트 관리 (PM) — 16주 전기간</div>
+        <div class="idesc">주간 진행 보고·일정 관리·리스크 대응·이슈 트래킹<br>
+          고객사 커뮤니케이션 창구 운영 · 마일스톤 관리<br>
+          <span class="tag tag-i">PM</span><span class="tag tag-c">Agile Scrum</span><span class="tag tag-a">16주</span>
+        </div>
+      </td>
+      <td>주</td><td>16</td><td>250,000</td><td>4,000,000</td>
+    </tr>
+    <tr>
+      <td>J3</td>
+      <td>
+        <div class="iname">UI/UX 기획 및 프로토타입 설계</div>
+        <div class="idesc">창고 시각화·보고서·MCP 대시보드 UX 흐름 설계<br>
+          와이어프레임 · 인터랙션 정의 · 담당자 피드백 반영<br>
+          <span class="tag tag-i">UX Design</span><span class="tag tag-c">Wireframe</span><span class="tag tag-e">Prototyping</span>
+        </div>
+      </td>
+      <td>식</td><td>1</td><td>1,000,000</td><td>1,000,000</td>
+    </tr>
+    <tr class="subtotal-row">
+      <td colspan="5" style="text-align:right;">J. 소계 (PM & 기획)</td>
+      <td>7,000,000</td>
+    </tr>
+
+    <!-- ═══════ CAT K ═══════ -->
+    <tr class="cat-row">
+      <td colspan="6">K. 기술 혁신 프리미엄 — 세계 최초 Ontology + Agentic AI + MCP 통합 가치</td>
+    </tr>
+    <tr>
+      <td>K1</td>
+      <td>
+        <div class="iname">세계 최초 3기술 통합 아키텍처 설계 프리미엄</div>
+        <div class="idesc">Operational Ontology + Agentic AI + MCP 동시 통합은 업계 전례 없는 구현<br>
+          Gartner Hype Cycle 2025/2026 선도 기술 3종 동시 실무 적용<br>
+          재현 불가 독자 아키텍처 IP 가치 반영<br>
+          <span class="tag tag-r">First-Mover</span><span class="tag tag-i">IP Value</span><span class="tag tag-a">Gartner Tech</span>
+        </div>
+      </td>
+      <td>식</td><td>1</td><td>3,500,000</td><td>3,500,000</td>
+    </tr>
+    <tr>
+      <td>K2</td>
+      <td>
+        <div class="iname">Zero-Touch 야간 자동화 워크플로우 특허 준비</div>
+        <div class="idesc">22:00 순찰 트리거 → AI 분석 → 06:00 자동 출력의 완전 자동화 플로우<br>
+          기술 차별성 문서화 · 특허 출원 준비 자료 작성 지원<br>
+          <span class="tag tag-r">Patent Ready</span><span class="tag tag-i">Innovation</span><span class="tag tag-e">Zero-Touch</span>
+        </div>
+      </td>
+      <td>식</td><td>1</td><td>3,000,000</td><td>3,000,000</td>
+    </tr>
+    <tr class="subtotal-row">
+      <td colspan="5" style="text-align:right;">K. 소계 (기술 혁신 프리미엄)</td>
+      <td>6,500,000</td>
+    </tr>
+
+    </tbody>
+  </table>
+  </div><!-- /qt-wrap -->
+
+  <!-- 합계 박스 -->
+  <div class="total-wrap">
+    <div class="total-box">
+      <div class="tl"><span class="tl-l">A. Operational Ontology 설계</span><span class="tl-r">12,800,000</span></div>
+      <div class="tl"><span class="tl-l">B. Agentic AI 엔진 개발</span><span class="tl-r">21,200,000</span></div>
+      <div class="tl"><span class="tl-l">C. MCP 야간 자동화 시스템</span><span class="tl-r">13,800,000</span></div>
+      <div class="tl"><span class="tl-l">D. 드론 제어 & 시각화 UI</span><span class="tl-r">11,500,000</span></div>
+      <div class="tl"><span class="tl-l">E. ERP 연동 & 보고서 시스템</span><span class="tl-r">13,000,000</span></div>
+      <div class="tl"><span class="tl-l">F. 백엔드 서버 & API</span><span class="tl-r">8,700,000</span></div>
+      <div class="tl"><span class="tl-l">G. Archive Intelligence</span><span class="tl-r">4,000,000</span></div>
+      <div class="tl"><span class="tl-l">H. QA & 테스트</span><span class="tl-r">6,100,000</span></div>
+      <div class="tl"><span class="tl-l">I. 배포 & 운영지원</span><span class="tl-r">9,300,000</span></div>
+      <div class="tl"><span class="tl-l">J. PM & 기획</span><span class="tl-r">7,000,000</span></div>
+      <div class="tl"><span class="tl-l">K. 기술 혁신 프리미엄</span><span class="tl-r">6,500,000</span></div>
+      <hr class="tl-divider">
+      <div class="tl" style="padding:8px 0;">
+        <span class="tl-l" style="color:#a5b4fc;font-weight:700;">공급가액 합계</span>
+        <span class="tl-r" style="color:#c7d2fe;font-size:14px;">113,900,000</span>
+      </div>
+      <div class="tl" style="font-size:11.5px;color:#64748b;">
+        <span class="tl-l">조정 할인 (볼륨 할인 + 프로모션)</span>
+        <span class="tl-r" style="color:#f87171;">▲ -33,900,000</span>
+      </div>
+      <hr class="tl-divider">
+      <div class="tl" style="padding:8px 0;">
+        <span class="tl-l" style="color:#a5b4fc;font-weight:700;">최종 공급가액</span>
+        <span class="tl-r" style="color:#c7d2fe;font-size:14px;">80,000,000</span>
+      </div>
+      <div class="tl" style="font-size:12px;">
+        <span class="tl-l">부가가치세 (VAT 10%)</span>
+        <span class="tl-r">8,000,000</span>
+      </div>
+      <div class="tl-grand">
+        <span class="tl-l">최종 합계 (VAT 포함)</span>
+        <span class="tl-r">₩ 88,000,000</span>
+      </div>
+    </div>
+  </div>
+</div><!-- /section 3 -->
+
+
+<!-- ④ 가치 제안 -->
+<div class="section page-break no-break">
+  <div class="section-hd amber">
+    <div class="section-num sn-amber">4</div>
+    <div class="section-title st-amber">ROI 분석 및 도입 가치 제안</div>
+  </div>
+  <div class="value-grid">
+    <div class="value-card">
+      <div class="vc-icon">⏰</div>
+      <div class="vc-title">Zero-Touch 야간 자동화</div>
+      <div class="vc-body">22:00 드론 자동 출발 → 새벽 스캔 완료 → 06:00 담당자 책상에 출력된 보고서. 인력 투입 없이 완전 자동 운영. MCP가 모든 것을 오케스트레이션.</div>
+      <div class="vc-metric">100%</div>
+      <div class="vc-metric-label">야간 자동화율</div>
+    </div>
+    <div class="value-card">
+      <div class="vc-icon">🎯</div>
+      <div class="vc-title">AI 기반 정확도 향상</div>
+      <div class="vc-body">Agentic AI의 자율 재스캔·이상 감지·ERP 비교로 수작업 대비 재고 정확도 대폭 향상. 분실품 조기 발견 → 반도체 부품 손실 최소화.</div>
+      <div class="vc-metric">97%+</div>
+      <div class="vc-metric-label">목표 재고 정확도</div>
+    </div>
+    <div class="value-card">
+      <div class="vc-icon">🧠</div>
+      <div class="vc-title">Operational Ontology</div>
+      <div class="vc-body">창고 도메인 지식을 형식화하여 AI가 '이해하는' 창고를 구현. SKU 분류·위상 관계·이상 패턴이 모두 지식 그래프로 표현되어 지속적 학습 기반 확보.</div>
+      <div class="vc-metric">세계 최초</div>
+      <div class="vc-metric-label">통합 적용 사례</div>
+    </div>
+    <div class="value-card">
+      <div class="vc-icon">📊</div>
+      <div class="vc-title">실시간 ERP 대조</div>
+      <div class="vc-body">삼성 ERP Day1/Day2 데이터와 드론 스캔 데이터를 실시간 대조. 차이 발생 즉시 AI 분석·권고·재스캔 자동 실행. ERP 데이터 신뢰성 획기적 향상.</div>
+      <div class="vc-metric">&lt; 1초</div>
+      <div class="vc-metric-label">이상 감지 응답 시간</div>
+    </div>
+    <div class="value-card">
+      <div class="vc-icon">🚁</div>
+      <div class="vc-title">Tethered 드론 최적화</div>
+      <div class="vc-body">유선 전원으로 배터리 교체 없이 야간 내내 운영. 직선 경로 강제로 케이블 꼬임 방지. 2대 동시 운영으로 4,500 위치 (15×20×15) 완전 커버.</div>
+      <div class="vc-metric">4,500</div>
+      <div class="vc-metric-label">스캔 가능 위치 수</div>
+    </div>
+    <div class="value-card">
+      <div class="vc-icon">🖨️</div>
+      <div class="vc-title">담당자 출근 전 보고서</div>
+      <div class="vc-body">MCP가 06:00에 프린터 온라인 확인 후 자동 출력. 담당자는 출근하자마자 전날 밤 재고 현황 보고서를 손에 쥐고 즉시 의사결정 가능.</div>
+      <div class="vc-metric">06:00</div>
+      <div class="vc-metric-label">자동 출력 시각</div>
+    </div>
+  </div>
+</div>
+
+<!-- ⑤ 개발 일정 -->
+<div class="section no-break">
+  <div class="section-hd indigo">
+    <div class="section-num sn-indigo">5</div>
+    <div class="section-title st-indigo">개발 일정 — 16주 (4개월) 마일스톤 계획</div>
+  </div>
+  <div class="gantt-wrap">
+  <table class="gantt">
+    <thead>
+      <tr>
+        <th style="width:70px">단계</th>
+        <th style="width:170px">구분</th>
+        <th style="width:80px">기간</th>
+        <th>주요 산출물 및 납품물</th>
+        <th style="width:80px">마일스톤</th>
+        <th style="width:80px">납부 조건</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="phase-badge ph1">Phase 1</span></td>
+        <td style="font-weight:700;color:#334155;">요구사항 분석 · 아키텍처 설계</td>
+        <td><span class="week-badge">1~2주</span></td>
+        <td>
+          <div class="deliverable">• BRD/SRS 요구사항 정의서<br>• 시스템 아키텍처 설계서<br>• Ontology 초안 (OWL 스케치)<br>• UI/UX 와이어프레임</div>
+          <div class="gantt-bar gb1" style="width:12.5%"></div>
+        </td>
+        <td style="font-size:11px;color:#64748b;text-align:center;font-weight:700;">M1<br>설계 완료</td>
+        <td style="text-align:center;"><span class="payment-badge pay-green">계약금 30%</span></td>
+      </tr>
+      <tr>
+        <td><span class="phase-badge ph2">Phase 2</span></td>
+        <td style="font-weight:700;color:#334155;">Ontology + AI 엔진 개발</td>
+        <td><span class="week-badge">3~6주</span></td>
+        <td>
+          <div class="deliverable">• OWL/RDF 온톨로지 완성<br>• ERP 시맨틱 매핑 엔진<br>• 이상 감지 AI 모듈<br>• Agentic 경로 결정 알고리즘</div>
+          <div class="gantt-bar gb2" style="width:25%"></div>
+        </td>
+        <td style="font-size:11px;color:#64748b;text-align:center;font-weight:700;">M2<br>AI 엔진 완성</td>
+        <td style="text-align:center;"><span class="payment-badge pay-blue">중도금 30%</span></td>
+      </tr>
+      <tr>
+        <td><span class="phase-badge ph3">Phase 3</span></td>
+        <td style="font-weight:700;color:#334155;">UI + 드론 제어 개발</td>
+        <td><span class="week-badge">7~10주</span></td>
+        <td>
+          <div class="deliverable">• SVG 창고 맵 + 드론 애니메이션<br>• ERP 비교 뷰 + Rescan UI<br>• 라이브 스캔 피드 로그<br>• 일일 보고서 모달</div>
+          <div class="gantt-bar gb3" style="width:25%"></div>
+        </td>
+        <td style="font-size:11px;color:#64748b;text-align:center;font-weight:700;">M3<br>UI 완성</td>
+        <td style="text-align:center;"><span class="payment-badge pay-blue">중도금 20%</span></td>
+      </tr>
+      <tr>
+        <td><span class="phase-badge ph4">Phase 4</span></td>
+        <td style="font-weight:700;color:#334155;">MCP + 보고서 시스템 + DB</td>
+        <td><span class="week-badge">11~13주</span></td>
+        <td>
+          <div class="deliverable">• MCP 스케줄러 + 자동 출력<br>• 프린터 연동 테스트 완료<br>• Admin 보고서 대시보드<br>• SQLite 아카이브 DB</div>
+          <div class="gantt-bar gb4" style="width:18.75%"></div>
+        </td>
+        <td style="font-size:11px;color:#64748b;text-align:center;font-weight:700;">M4<br>MCP 완성</td>
+        <td style="text-align:center;"><span class="payment-badge" style="background:rgba(245,158,11,.12);color:#b45309;">–</span></td>
+      </tr>
+      <tr>
+        <td><span class="phase-badge ph5">Phase 5</span></td>
+        <td style="font-weight:700;color:#334155;">QA · UAT · 배포 · 교육</td>
+        <td><span class="week-badge">14~16주</span></td>
+        <td>
+          <div class="deliverable">• 테스트 완료 보고서<br>• 운영자 매뉴얼 최종본<br>• 현장 서버 배포 완료<br>• 담당자 교육 2회 완료</div>
+          <div class="gantt-bar gb5" style="width:18.75%"></div>
+        </td>
+        <td style="font-size:11px;color:#64748b;text-align:center;font-weight:700;">M5<br>최종 납품</td>
+        <td style="text-align:center;"><span class="payment-badge pay-green">잔금 20%</span></td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<!-- ⑥ 납부 조건 -->
+<div class="section no-break page-break">
+  <div class="section-hd cyan">
+    <div class="section-num sn-cyan">6</div>
+    <div class="section-title st-cyan">납부 일정 및 계약 조건</div>
+  </div>
+
+  <div class="payment-grid">
+    <div class="pay-card pc1">
+      <div class="pc-stage">1차 납부</div>
+      <div class="pc-trigger">계약 체결 시<br>(Phase 1 착수)</div>
+      <div class="pc-pct">30%</div>
+      <div class="pc-amount">₩ 24,000,000</div>
+    </div>
+    <div class="pay-card pc2">
+      <div class="pc-stage">2차 납부</div>
+      <div class="pc-trigger">M2 완료 시<br>(AI 엔진 납품)</div>
+      <div class="pc-pct">30%</div>
+      <div class="pc-amount">₩ 24,000,000</div>
+    </div>
+    <div class="pay-card pc3">
+      <div class="pc-stage">3차 납부</div>
+      <div class="pc-trigger">M3 완료 시<br>(UI 완성 납품)</div>
+      <div class="pc-pct">20%</div>
+      <div class="pc-amount">₩ 16,000,000</div>
+    </div>
+    <div class="pay-card pc4">
+      <div class="pc-stage">4차 납부 (잔금)</div>
+      <div class="pc-trigger">M5 완료 시<br>(최종 납품)</div>
+      <div class="pc-pct">20%</div>
+      <div class="pc-amount">₩ 16,000,000</div>
+    </div>
+  </div>
+  <p style="font-size:11px;color:#94a3b8;text-align:center;margin-bottom:20px;">
+    * VAT 별도 각 단계별 세금계산서 발행 &nbsp;|&nbsp; 합계 ₩80,000,000 (VAT 포함 ₩88,000,000)
+  </p>
+
+  <div class="terms-grid">
+    <div class="term-card">
+      <div class="term-title">📦 납품 범위</div>
+      <div class="term-item">소스코드 전체 (GitHub Private Repository)</div>
+      <div class="term-item">실행 파일 및 Ubuntu 서버 배포 패키지</div>
+      <div class="term-item">REST API 명세서 (Markdown/Swagger)</div>
+      <div class="term-item">시스템 아키텍처 문서 · DB 스키마</div>
+      <div class="term-item">운영자 매뉴얼 (한글) · 설정 가이드</div>
+      <div class="term-item">설치 지원 및 운영 교육 2회 (현장)</div>
+    </div>
+    <div class="term-card">
+      <div class="term-title">🛡️ 보증 및 유지보수</div>
+      <div class="term-item">납품 후 3개월 무상 A/S (버그 수정 포함)</div>
+      <div class="term-item">SLA: 장애 발생 시 24시간 내 대응</div>
+      <div class="term-item">원격 지원 월 4회 포함</div>
+      <div class="term-item">15레벨 전체 확장 시 추가 견적 협의</div>
+      <div class="term-item">삼성 ERP API 정식 연동 시 별도 협의</div>
+      <div class="term-item">기능 추가·확장은 별도 협의 처리</div>
+    </div>
+    <div class="term-card">
+      <div class="term-title">⚖️ 계약 일반 조건</div>
+      <div class="term-item">견적 유효기간: 발행일로부터 30일</div>
+      <div class="term-item">소스코드 저작권: 최종 잔금 납부 후 이전</div>
+      <div class="term-item">하드웨어(드론·프린터·서버) 비용 미포함</div>
+      <div class="term-item">고객 요구 변경사항은 추가 견적 협의</div>
+      <div class="term-item">천재지변·고객 귀책 지연은 납기 조정</div>
+      <div class="term-item">비밀유지계약(NDA) 체결 후 착수</div>
+    </div>
+    <div class="term-card">
+      <div class="term-title">🔧 기술 사양 전제 조건</div>
+      <div class="term-item">창고 내 Wi-Fi 또는 유선 네트워크 제공</div>
+      <div class="term-item">Ubuntu 20.04+ 서버 환경 제공</div>
+      <div class="term-item">삼성 ERP CSV/API 샘플 데이터 제공</div>
+      <div class="term-item">네트워크 프린터 IP·포트 정보 제공</div>
+      <div class="term-item">드론 하드웨어 SDK/API 접근 권한 제공</div>
+      <div class="term-item">현장 테스트 환경 및 접근 권한 협조</div>
+    </div>
+  </div>
+</div>
+
+<!-- ⑦ 서명란 -->
+<div class="section no-break">
+  <div class="section-hd amber">
+    <div class="section-num sn-amber">7</div>
+    <div class="section-title st-amber">확인 및 서명 (Acceptance & Signature)</div>
+  </div>
+  <div style="font-size:12px;color:#64748b;margin-bottom:20px;line-height:1.8;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px 18px;">
+    본 견적서의 내용을 검토하고 동의하는 경우, 아래 서명란에 서명·날인하여 주시기 바랍니다.
+    서명된 견적서는 계약서 체결의 전 단계로서 본 견적 조건에 기반한 정식 계약서를 별도 작성합니다.
+    견적 유효기간: <strong>2026년 5월 9일</strong>까지
+  </div>
+  <div class="sig-grid">
+    <div class="sig-box">
+      <div class="sig-title">발주처 (Client)</div>
+      <div class="sig-name">삼성반도체 주식회사</div>
+      <div class="sig-role">DS부문 스마트팩토리팀</div>
+      <div class="sig-fields">
+        <div class="sig-field">
+          <span class="sig-field-label">담당자</span>
+          <span class="sig-line-blank"></span>
+          <span style="font-size:11px;color:#94a3b8;margin-left:8px;">(인)</span>
+        </div>
+        <div class="sig-field">
+          <span class="sig-field-label">직위</span>
+          <span class="sig-line-blank"></span>
+        </div>
+        <div class="sig-field">
+          <span class="sig-field-label">날짜</span>
+          <span style="font-size:12px;color:#64748b;">2026년 &nbsp;&nbsp;&nbsp;&nbsp; 월 &nbsp;&nbsp;&nbsp;&nbsp; 일</span>
+        </div>
+      </div>
+    </div>
+    <div class="sig-box">
+      <div class="sig-title">공급사 (Vendor)</div>
+      <div class="sig-name">Warehouse AI Solutions</div>
+      <div class="sig-role">대표이사 / AI 솔루션 사업부</div>
+      <div class="sig-fields">
+        <div class="sig-field">
+          <span class="sig-field-label">대표이사</span>
+          <span class="sig-line-blank"></span>
+          <span style="font-size:11px;color:#94a3b8;margin-left:8px;">(인)</span>
+        </div>
+        <div class="sig-field">
+          <span class="sig-field-label">사업자번호</span>
+          <span style="font-size:12px;color:#64748b;">000-00-00000</span>
+        </div>
+        <div class="sig-field">
+          <span class="sig-field-label">날짜</span>
+          <span style="font-size:12px;color:#64748b;">2026년 4월 9일</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /body -->
+
+<!-- ══ FOOTER ══ -->
+<div class="doc-footer">
+  <div class="footer-brand">
+    <span style="color:#475569;font-weight:800;">Warehouse AI Solutions</span><br>
+    <span style="color:#1e293b;">📧 contact@warehouse-ai.kr &nbsp;|&nbsp; ☎ 02-0000-0000 &nbsp;|&nbsp; 🌐 warehouse.exko.kr</span><br>
+    <span style="color:#0f172a;">GitHub: myungdae/warehouse-ai-safety &nbsp;|&nbsp; QT-2026-0409-SW-001</span>
+  </div>
+  <div>
+    <div class="footer-conf" style="color:#1e293b;">⛔ CONFIDENTIAL</div>
+    <div style="font-size:10px;color:#0f172a;text-align:right;margin-top:4px;">본 문서는 영업 비밀 및 기술 기밀을 포함합니다<br>무단 배포·복제를 금합니다</div>
+  </div>
+</div>
+
+</div><!-- /doc -->
+
+<script>
+// Dynamic date display
+document.addEventListener('DOMContentLoaded', () => {
+  // Could dynamically update dates if needed
+  console.log('Quotation QT-2026-0409-SW-001 loaded');
+});
+</script>
+</body>
+</html>

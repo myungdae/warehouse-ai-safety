@@ -143,6 +143,10 @@ def admin_reports():
 def archive_intelligence():
     return render_template('archive_intelligence.html')
 
+@app.route('/quotation')
+def quotation():
+    return render_template('quotation.html')
+
 @app.route('/static/<path:filename>')
 def serve_static(filename):
     return send_from_directory('backend/static', filename)
