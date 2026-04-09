@@ -323,7 +323,6 @@ function buildTaskQueue(dockId) {
         });
         
         // ─── Side A 완료 후 하단 끝으로 이동 (물리적 제약: 직접 넘어갈 수 없음) ───
-        const aisleBottomY = aisle.y + aisle.h - 10;
         tasks.push({
             type: 'move',
             desc: `Move to bottom end of ${aisle.label} (Side A complete, preparing Side B)`,
