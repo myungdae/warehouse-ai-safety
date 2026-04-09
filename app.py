@@ -4,7 +4,7 @@ Warehouse AI Safety System - Flask Application
 Real-time sensor monitoring dashboard + Drone Inventory Intelligence
 """
 
-from flask import Flask, render_template, send_from_directory, request, jsonify
+from flask import Flask, render_template, send_from_directory, request, jsonify, send_file
 import os
 import smtplib
 import json
@@ -146,6 +146,22 @@ def archive_intelligence():
 @app.route('/quotation')
 def quotation():
     return render_template('quotation.html')
+
+@app.route('/quotation/download-excel')
+def download_quotation_excel():
+    """견적서 Excel 다운로드"""
+    import subprocess, os
+    xlsx_path = os.path.join(os.path.dirname(__file__), 'quotation_QT-2026-0409-SW-001.xlsx')
+    # 파일이 없으면 재생성
+    if not os.path.exists(xlsx_path):
+        script = os.path.join(os.path.dirname(__file__), 'generate_quotation_excel.py')
+        subprocess.run(['python3', script], check=True)
+    return send_file(
+        xlsx_path,
+        as_attachment=True,
+        download_name='견적서_QT-2026-0409-SW-001.xlsx',
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
 
 @app.route('/static/<path:filename>')
 def serve_static(filename):
