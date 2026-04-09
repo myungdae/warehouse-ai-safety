@@ -119,6 +119,12 @@ def index():
 
 @app.route('/drone')
 def drone_inventory():
+    """Tethered drone system (wired power, 2 docks)"""
+    return render_template('drone_tethered.html')
+
+@app.route('/drone/multi')
+def drone_inventory_multi():
+    """Multi-drone system (battery, 3 docks, 9 drones)"""
     return render_template('drone_inventory_multi.html')
 
 @app.route('/drone/single')

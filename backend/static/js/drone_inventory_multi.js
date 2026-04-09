@@ -392,9 +392,14 @@ function buildTaskQueue(dockId) {
 // ══════════════════════════════════════════════════════════════
 
 function startPatrol() {
-    if (state.patrolActive) return;
+    console.log('▶️ startPatrol called');
+    if (state.patrolActive) {
+        console.log('⚠️ Patrol already active, returning');
+        return;
+    }
     
     state.patrolActive = true;
+    console.log('🔧 Initializing drones...');
     initializeDrones();
     
     // Build task queues for each dock
@@ -408,11 +413,13 @@ function startPatrol() {
     assignNextTask('H');
     
     // Start animation loops
+    console.log('🎬 Starting animation loops for drones:', Object.keys(state.drones));
     Object.keys(state.drones).forEach(droneId => {
         state.animFrames[droneId] = requestAnimationFrame(() => droneLoop(droneId));
     });
     
     addFeed('🚁 Multi-Drone Patrol Started — 9 drones across 3 docks', 'system');
+    console.log('✅ Patrol started successfully');
 }
 
 function assignNextTask(droneId) {
@@ -882,6 +889,7 @@ function addFeed(msg, type) {
 // ══════════════════════════════════════════════════════════════
 
 function togglePatrol() {
+    console.log('🔘 togglePatrol called, patrolActive:', state.patrolActive);
     if (state.patrolActive) {
         stopPatrol();
     } else {
