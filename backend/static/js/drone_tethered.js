@@ -8,6 +8,12 @@
    - Tethered (wired) power: No battery management
    - Simultaneous Side A + Side B scanning
    - Sequential aisle navigation (no cross-aisle flight)
+   
+   Level Pass Strategy (CORRECT):
+   - PASS 1 (L1): Dock → all aisles (Rack 1~20, L1 only) → Return to Dock
+   - PASS 2 (L2): Dock → all aisles (Rack 1~20, L2 only) → Return to Dock
+   - ... → PASS N (L15) : complete
+   - Each level is a FULL sweep before returning to dock
    ============================================================ */
 
 'use strict';
@@ -16,12 +22,27 @@
 // CONFIGURATION
 // ══════════════════════════════════════════════════════════════
 
+// All 15 levels — demo shows L1~L2 (first 2 passes)
 const LAYERS = [
-    { id: 'L1', label: 'Layer 1', height_m: 0.5, color: '#34d399' },
-    { id: 'L2', label: 'Layer 2', height_m: 1.5, color: '#22d3ee' },
+    { id: 'L1',  label: 'Level 1',  height_m:  0.5,  color: '#34d399' },
+    { id: 'L2',  label: 'Level 2',  height_m:  1.5,  color: '#22d3ee' },
+    { id: 'L3',  label: 'Level 3',  height_m:  2.5,  color: '#818cf8' },
+    { id: 'L4',  label: 'Level 4',  height_m:  3.5,  color: '#f59e0b' },
+    { id: 'L5',  label: 'Level 5',  height_m:  4.5,  color: '#f87171' },
+    { id: 'L6',  label: 'Level 6',  height_m:  5.5,  color: '#a78bfa' },
+    { id: 'L7',  label: 'Level 7',  height_m:  6.5,  color: '#34d399' },
+    { id: 'L8',  label: 'Level 8',  height_m:  7.5,  color: '#22d3ee' },
+    { id: 'L9',  label: 'Level 9',  height_m:  8.5,  color: '#818cf8' },
+    { id: 'L10', label: 'Level 10', height_m:  9.5,  color: '#f59e0b' },
+    { id: 'L11', label: 'Level 11', height_m: 10.5,  color: '#f87171' },
+    { id: 'L12', label: 'Level 12', height_m: 11.5,  color: '#a78bfa' },
+    { id: 'L13', label: 'Level 13', height_m: 12.5,  color: '#34d399' },
+    { id: 'L14', label: 'Level 14', height_m: 13.5,  color: '#22d3ee' },
+    { id: 'L15', label: 'Level 15', height_m: 14.5,  color: '#818cf8' },
 ];
 
-// Demo: Only scan 2 layers (L1, L2) instead of all 15
+// DEMO: show only first 2 level passes (L1, L2) for simulation speed
+// In production this would be LAYERS (all 15)
 const DEMO_LAYERS = LAYERS.slice(0, 2);
 
 const WAREHOUSE = {
@@ -59,7 +80,7 @@ for (let i = 0; i < 15; i++) {
     });
 }
 
-// Generate Shelves (15 aisles × 20 racks × 1 level × 2 sides)
+// Generate Shelves (15 aisles × 20 racks × 15 levels × 2 sides)
 WAREHOUSE.aisles.forEach(aisle => {
     const rackCount = 20;
     for (let rack = 0; rack < rackCount; rack++) {
@@ -201,106 +222,112 @@ const state = {
 };
 
 // ══════════════════════════════════════════════════════════════
-// TASK BUILDER (Tethered: Enter → Scan Both Sides → Return)
+// TASK BUILDER — Level-Pass Strategy (CORRECT)
+//
+// Real tethered drone operation:
+//   PASS L1: Dock → Aisle1(Rack1~20,L1) → Aisle2 → ... → AisleN → Dock
+//   PASS L2: Dock → Aisle1(Rack1~20,L2) → Aisle2 → ... → AisleN → Dock
+//   ...
+//   PASS L15: Dock → all aisles (L15) → Dock  ← complete
+//
+// Each PASS = one full sweep of all assigned aisles at ONE level only.
+// The drone returns to dock between passes (cable management).
 // ══════════════════════════════════════════════════════════════
 
 function buildTaskQueue(dockId) {
     const dock = WAREHOUSE.docks.find(d => d.id === dockId);
     const tasks = [];
-    
-    dock.aisles.forEach((aisleId, idx) => {
-        const aisle = WAREHOUSE.aisles.find(a => a.id === aisleId);
-        const aisleCenter = aisle.x + aisle.w / 2;
-        const aisleTop = aisle.y + 10;
-        const aisleBottom = aisle.y + aisle.h - 10;
-        
-        // 1. Move horizontally to aisle (maintaining dock Y)
+
+    // Iterate over each level PASS first (outer loop)
+    DEMO_LAYERS.forEach((layer, levelIdx) => {
+
+        // ── PASS START: Dock → first aisle entry (horizontal move at dock Y)
         tasks.push({
-            type: 'move',
-            desc: `Navigate to ${aisle.label}`,
-            x: aisleCenter,
+            type: 'level_pass_start',
+            desc: `▶ Level Pass ${layer.id} (${layer.label}) — all aisles`,
+            layerId: layer.id,
+            levelIdx: levelIdx,
+            x: dock.x + dock.w / 2,
             y: dock.y + dock.h / 2,
-            straightLineOnly: true
         });
-        
-        // 2. Move vertically to aisle top
-        tasks.push({
-            type: 'move',
-            desc: `Enter ${aisle.label}`,
-            x: aisleCenter,
-            y: aisleTop,
-            straightLineOnly: true
-        });
-        
-        // 2. Scan Side A + Side B simultaneously (Rack 1→20)
-        const shelvesLeft = WAREHOUSE.shelves.filter(s => 
-            s.aisle === aisleId && s.side === 'L' && s.layerIdx === 0
-        );
-        const shelvesRight = WAREHOUSE.shelves.filter(s => 
-            s.aisle === aisleId && s.side === 'R' && s.layerIdx === 0
-        );
-        
-        const racksLeft = {};
-        shelvesLeft.forEach(s => {
-            if (!racksLeft[s.rack]) racksLeft[s.rack] = [];
-            racksLeft[s.rack].push(s);
-        });
-        
-        const racksRight = {};
-        shelvesRight.forEach(s => {
-            if (!racksRight[s.rack]) racksRight[s.rack] = [];
-            racksRight[s.rack].push(s);
-        });
-        
-        // Scan both sides at each rack position (L1, L2 only for demo)
-        for (let rack = 1; rack <= 20; rack++) {
-            // Collect only 2 layers (L1, L2) for this rack
-            const shelvesLeftAllLayers = WAREHOUSE.shelves.filter(s => 
-                s.aisle === aisleId && s.side === 'L' && s.rack === rack && s.layerIdx < 2
-            );
-            const shelvesRightAllLayers = WAREHOUSE.shelves.filter(s => 
-                s.aisle === aisleId && s.side === 'R' && s.rack === rack && s.layerIdx < 2
-            );
-            
+
+        // ── Scan every assigned aisle at this level
+        dock.aisles.forEach((aisleId, idx) => {
+            const aisle = WAREHOUSE.aisles.find(a => a.id === aisleId);
+            const aisleCenter = aisle.x + aisle.w / 2;
+            const aisleTop    = aisle.y + 10;
+
+            // 1. Move horizontally to aisle column (at dock height)
             tasks.push({
-                type: 'scan',
-                aisleId: aisleId,
-                rack: rack,
-                shelvesLeft: shelvesLeftAllLayers,
-                shelvesRight: shelvesRightAllLayers,
+                type: 'move',
+                desc: `[${layer.id}] Navigate to Aisle ${aisleId}`,
                 x: aisleCenter,
-                y: aisle.y + 10 + (rack - 1) * 25 + 10,
-            });
-        }
-        
-        // 3. Return to top
-        tasks.push({
-            type: 'move',
-            desc: `Return to top of ${aisle.label}`,
-            x: aisleCenter,
-            y: aisleTop,
-            straightLineOnly: true
-        });
-        
-        // 4. Move horizontally back to dock (only at the end of all aisles)
-        if (idx === dock.aisles.length - 1) {
-            tasks.push({
-                type: 'move',
-                desc: `Navigate to dock`,
-                x: dock.x + dock.w / 2,
-                y: aisleTop,
-                straightLineOnly: true
-            });
-            tasks.push({
-                type: 'move',
-                desc: `Return to ${dock.name}`,
-                x: dock.x + dock.w / 2,
                 y: dock.y + dock.h / 2,
                 straightLineOnly: true
             });
-        }
+
+            // 2. Descend into aisle top
+            tasks.push({
+                type: 'move',
+                desc: `[${layer.id}] Enter Aisle ${aisleId}`,
+                x: aisleCenter,
+                y: aisleTop,
+                straightLineOnly: true
+            });
+
+            // 3. Scan Rack 1 → 20 at THIS LEVEL ONLY
+            for (let rack = 1; rack <= 20; rack++) {
+                const shelvesLeft = WAREHOUSE.shelves.filter(s =>
+                    s.aisle === aisleId && s.side === 'L' &&
+                    s.rack === rack && s.layerIdx === levelIdx
+                );
+                const shelvesRight = WAREHOUSE.shelves.filter(s =>
+                    s.aisle === aisleId && s.side === 'R' &&
+                    s.rack === rack && s.layerIdx === levelIdx
+                );
+                tasks.push({
+                    type: 'scan',
+                    aisleId: aisleId,
+                    rack: rack,
+                    layerId: layer.id,
+                    levelIdx: levelIdx,
+                    shelvesLeft:  shelvesLeft,
+                    shelvesRight: shelvesRight,
+                    x: aisleCenter,
+                    y: aisle.y + 10 + (rack - 1) * 25 + 10,
+                });
+            }
+
+            // 4. Return to aisle top after rack scan
+            tasks.push({
+                type: 'move',
+                desc: `[${layer.id}] Exit Aisle ${aisleId}`,
+                x: aisleCenter,
+                y: aisleTop,
+                straightLineOnly: true
+            });
+        });
+
+        // ── PASS END: return to dock (horizontal at dock Y)
+        // Move to dock column
+        tasks.push({
+            type: 'move',
+            desc: `[${layer.id}] Return to dock column`,
+            x: dock.x + dock.w / 2,
+            y: dock.y + dock.h / 2 + 5,  // slight offset for visibility
+            straightLineOnly: true
+        });
+        // Dock
+        tasks.push({
+            type: 'level_pass_end',
+            desc: `✅ ${layer.id} Pass complete — returning to ${dock.name}`,
+            layerId: layer.id,
+            levelIdx: levelIdx,
+            x: dock.x + dock.w / 2,
+            y: dock.y + dock.h / 2,
+        });
     });
-    
+
     return tasks;
 }
 
@@ -434,6 +461,23 @@ function droneLoop(droneId) {
                         addFeed(`Drone ${droneId}: ${target.desc}`, 'system');
                     }
                     drone.pathIndex++;
+                } else if (target.type === 'level_pass_start') {
+                    drone.x = target.x;
+                    drone.y = target.y;
+                    drone.currentLevel = target.layerId;
+                    updatePassBarStatus(target.layerId, 'active', 0);
+                    addFeed(`Drone ${droneId}: ${target.desc}`, 'system');
+                    drone.pathIndex++;
+                } else if (target.type === 'level_pass_end') {
+                    drone.x = target.x;
+                    drone.y = target.y;
+                    drone.currentLevel = null;
+                    updatePassBarStatus(target.layerId, 'done', 100);
+                    addFeed(`Drone ${droneId}: ${target.desc}`, 'success');
+                    drone.pathIndex++;
+                } else {
+                    // Unknown task type — skip
+                    drone.pathIndex++;
                 }
             } else {
                 // Move towards target
@@ -481,7 +525,11 @@ async function processScanWithDelay(droneId, task, onComplete) {
     addFeed(`Drone ${droneId}: 📍 Reading Rack ID: ${rackId}`, 'system');
     await sleep(DRONE_CONFIG.scanDelay);
     
-    // Step 2: Scan Side A items (L1, L2)
+    // Update current level display at start of scan
+    drone.currentLevel = task.layerId;
+    updateDroneElement(droneId);
+    
+    // Step 2: Scan Side A items
     for (let i = 0; i < task.shelvesLeft.length; i++) {
         const shelf = task.shelvesLeft[i];
         
@@ -572,12 +620,18 @@ async function processScanWithDelay(droneId, task, onComplete) {
     // Step 4: Rack complete
     const totalItems = task.shelvesLeft.length + task.shelvesRight.length;
     const tag = task.isRescan ? ' [RE-SCAN]' : '';
-    addFeed(`Drone ${droneId}: ✅ Rack ${task.rack} complete${tag} — ${totalItems} items scanned (both sides, 2 layers)`, 'success');
+    const layerLabel = task.layerId || drone.currentLevel || '?';
+    addFeed(`Drone ${droneId}: ✅ Rack ${task.rack} [${layerLabel}] complete${tag} — ${totalItems} items scanned (Side A + Side B)`, 'success');
     await sleep(DRONE_CONFIG.scanDelay);
 
     // If this was a re-scan task, mark it done in the compare view
     if (task.isRescan && task.originalShelfId) {
         markRescanDone(task.originalShelfId, droneId);
+    }
+
+    // Update level pass bar progress
+    if (task.layerId) {
+        updatePassBarProgress(task.layerId);
     }
 
     updateGlobalStats();
@@ -606,7 +660,21 @@ function renderPatrolView(content) {
             
             <div style="display:flex;gap:10px">
                 <!-- Dock Status Panel -->
-                <div style="width:180px;display:flex;flex-direction:column;gap:8px;padding:10px;background:rgba(15,23,42,0.8);border-radius:8px">
+                <div style="width:200px;display:flex;flex-direction:column;gap:8px;padding:10px;background:rgba(15,23,42,0.8);border-radius:8px">
+                    <!-- Level Pass Progress -->
+                    <div style="padding:8px;background:rgba(30,41,59,0.8);border-radius:6px;border:1px solid rgba(99,102,241,0.2)">
+                        <div style="font-size:0.7rem;color:#818cf8;font-weight:700;margin-bottom:4px">📊 Level Pass Progress</div>
+                        <div id="levelPassBars" style="display:flex;flex-direction:column;gap:2px">
+                            ${DEMO_LAYERS.map((layer, i) => `
+                            <div style="display:flex;align-items:center;gap:4px;font-size:0.6rem">
+                                <div style="width:28px;color:${layer.color};font-weight:700">${layer.id}</div>
+                                <div style="flex:1;height:6px;background:rgba(30,41,59,0.8);border-radius:3px;overflow:hidden">
+                                    <div id="passBar-${layer.id}" style="height:100%;width:0%;background:${layer.color};border-radius:3px;transition:width 0.3s"></div>
+                                </div>
+                                <div id="passStatus-${layer.id}" style="width:40px;color:#475569">waiting</div>
+                            </div>`).join('')}
+                        </div>
+                    </div>
                     ${WAREHOUSE.docks.map(dock => `
                     <div class="dock-card" style="border-left:3px solid ${dock.color};padding:8px;background:rgba(15,23,42,0.5);border-radius:4px">
                         <div style="font-weight:700;color:${dock.color};font-size:0.8rem">${dock.name}</div>
@@ -614,7 +682,7 @@ function renderPatrolView(content) {
                             <div>Drone: <span style="color:${dock.color}">${dock.id}</span></div>
                             <div>Aisles: ${dock.aisles.join(', ')}</div>
                             <div id="drone${dock.id}-aisle" style="color:#94a3b8">Current: -</div>
-                            <div id="drone${dock.id}-level" style="color:#fbbf24;font-weight:600">Level: -</div>
+                            <div id="drone${dock.id}-level" style="color:#fbbf24;font-weight:600">Pass: -</div>
                             <div id="drone${dock.id}-status">Status: Standby</div>
                         </div>
                     </div>
@@ -750,24 +818,27 @@ function updateDroneElement(droneId) {
         aisleEl.textContent = drone.currentAisle ? `Current: Aisle ${drone.currentAisle}` : 'Current: -';
     }
     
-    // Update current level with color
+    // Update current level with color (use layer's defined color)
     const levelEl = document.getElementById(`drone${droneId}-level`);
     if (levelEl) {
         if (drone.currentLevel) {
-            const levelColor = drone.currentLevel === 'L1' ? '#34d399' : '#22d3ee';
+            const layerDef = LAYERS.find(l => l.id === drone.currentLevel);
+            const levelColor = layerDef ? layerDef.color : '#fbbf24';
             levelEl.style.color = levelColor;
-            levelEl.textContent = `Level: ${drone.currentLevel}`;
+            const layerLabel = layerDef ? layerDef.label : drone.currentLevel;
+            levelEl.textContent = `Pass: ${drone.currentLevel} (${layerLabel})`;
         } else {
             levelEl.style.color = '#64748b';
-            levelEl.textContent = 'Level: -';
+            levelEl.textContent = 'Pass: -';
         }
     }
 }
 
 function updateGlobalStats() {
-    const totalL1 = WAREHOUSE.shelves.filter(s => s.layerIdx === 0).length;
+    // Total shelves across all DEMO layers (L1+L2)
+    const totalDemo = WAREHOUSE.shelves.filter(s => s.layerIdx < DEMO_LAYERS.length).length;
     const scanned = state.scannedShelves.size;
-    const coverage = totalL1 > 0 ? (scanned / totalL1 * 100) : 0;
+    const coverage = totalDemo > 0 ? (scanned / totalDemo * 100) : 0;
     
     const scannedEl = document.getElementById('totalScanned');
     const coverageEl = document.getElementById('coveragePct');
@@ -808,6 +879,38 @@ function createSVG(tag, attrs) {
     const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
     Object.entries(attrs).forEach(([k, v]) => el.setAttribute(k, v));
     return el;
+}
+
+// ── Level Pass Progress Bar updater ──────────────────────────
+function updatePassBarStatus(layerId, status, pct) {
+    const bar = document.getElementById(`passBar-${layerId}`);
+    const label = document.getElementById(`passStatus-${layerId}`);
+    const layerDef = LAYERS.find(l => l.id === layerId);
+    const color = layerDef ? layerDef.color : '#818cf8';
+    if (bar) {
+        bar.style.width = pct + '%';
+        if (status === 'done') {
+            bar.style.background = '#34d399';
+        } else if (status === 'active') {
+            bar.style.background = color;
+        }
+    }
+    if (label) {
+        const texts = { active: '▶ run', done: '✅ done', waiting: 'waiting' };
+        label.textContent = texts[status] || status;
+        label.style.color = status === 'done' ? '#34d399' : status === 'active' ? color : '#475569';
+    }
+}
+
+// ── Update pass bar progress during scanning ─────────────────
+function updatePassBarProgress(layerId) {
+    // Calculate how many shelves of this layer have been scanned
+    const total = WAREHOUSE.shelves.filter(s => s.layer === layerId).length;
+    if (total === 0) return;
+    const scanned = [...state.scannedShelves].filter(id => id.endsWith(`-${layerId}`)).length;
+    const pct = Math.round((scanned / total) * 100);
+    const bar = document.getElementById(`passBar-${layerId}`);
+    if (bar) bar.style.width = pct + '%';
 }
 
 // ══════════════════════════════════════════════════════════════
