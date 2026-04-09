@@ -162,12 +162,12 @@
         </div>
         
         <div class="stats-bar">
-            <div class="stat-card">
-                <div class="stat-label">Total Drones</div>
-                <div class="stat-value" style="color:#22d3ee">2</div>
+            <div class="stat-card" style="cursor:pointer" onclick="switchDay(state.currentDay === 1 ? 2 : 1)">
+                <div class="stat-label">Current Day</div>
+                <div class="stat-value" id="currentDay" style="color:#22d3ee">Day 1</div>
             </div>
             <div class="stat-card">
-                <div class="stat-label">Active Docks</div>
+                <div class="stat-label">Total Drones</div>
                 <div class="stat-value" style="color:#a78bfa">2</div>
             </div>
             <div class="stat-card">
@@ -177,6 +177,10 @@
             <div class="stat-card">
                 <div class="stat-label">Coverage</div>
                 <div class="stat-value" id="coveragePct">0%</div>
+            </div>
+            <div class="stat-card" style="cursor:pointer;transition:all 0.3s" onclick="showCompareView()" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'" id="compareCard">
+                <div class="stat-label">📊 ERP Compare</div>
+                <div class="stat-value" style="font-size:0.9rem;color:#fbbf24">Day1 vs Day2</div>
             </div>
         </div>
         

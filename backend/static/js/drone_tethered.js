@@ -18,7 +18,11 @@
 
 const LAYERS = [
     { id: 'L1', label: 'Layer 1', height_m: 0.5, color: '#34d399' },
+    { id: 'L2', label: 'Layer 2', height_m: 1.5, color: '#22d3ee' },
 ];
+
+// Demo: Only scan 2 layers (L1, L2) instead of all 15
+const DEMO_LAYERS = LAYERS.slice(0, 2);
 
 const WAREHOUSE = {
     width: 1400,
@@ -28,15 +32,15 @@ const WAREHOUSE = {
     docks: [
         { 
             id: 'A', 
-            name: 'Dock A (Left)', 
-            x: 20, y: 50, w: 40, h: 80,
+            name: 'Dock A (Top-Left)', 
+            x: 65, y: 10, w: 50, h: 30,
             color: '#22d3ee',
             aisles: ['1','2','3','4','5','6','7']
         },
         { 
             id: 'B', 
-            name: 'Dock B (Right)', 
-            x: 20, y: 490, w: 40, h: 80,
+            name: 'Dock B (Top-Right)', 
+            x: 1285, y: 10, w: 50, h: 30,
             color: '#a78bfa',
             aisles: ['8','9','10','11','12','13','14','15']
         },
@@ -97,8 +101,9 @@ WAREHOUSE.aisles.forEach(aisle => {
 
 const DRONE_CONFIG = {
     size: 12,
-    speed: 3.0,
+    speed: 3.0,  // Increased speed (was 2.5)
     scanRadius: 40,
+    scanDelay: 800,  // ms delay for rack ID and completion pause
 };
 
 // ══════════════════════════════════════════════════════════════
@@ -125,20 +130,71 @@ function buildInventory() {
     return db;
 }
 
-const inventory = buildInventory();
+function buildDay2Inventory(day1) {
+    const day2 = JSON.parse(JSON.stringify(day1));
+    const shelfIds = Object.keys(day2);
+    
+    // Simulate changes
+    const changes = [];
+    
+    // Decrease quantity (10 shelves)
+    for (let i = 0; i < 10; i++) {
+        const id = shelfIds[Math.floor(Math.random() * shelfIds.length)];
+        if (day2[id].qty > 0) {
+            const oldQty = day2[id].qty;
+            day2[id].qty = Math.max(0, oldQty - Math.floor(Math.random() * 5 + 1));
+            changes.push({ type: 'decreased', shelfId: id, oldQty, newQty: day2[id].qty });
+        }
+    }
+    
+    // Increase quantity (5 shelves)
+    for (let i = 0; i < 5; i++) {
+        const id = shelfIds[Math.floor(Math.random() * shelfIds.length)];
+        if (day2[id].sku) {
+            const oldQty = day2[id].qty;
+            day2[id].qty += Math.floor(Math.random() * 8 + 2);
+            changes.push({ type: 'increased', shelfId: id, oldQty, newQty: day2[id].qty });
+        }
+    }
+    
+    // Missing items (3 shelves)
+    for (let i = 0; i < 3; i++) {
+        const id = shelfIds[Math.floor(Math.random() * shelfIds.length)];
+        if (day2[id].qty > 0) {
+            changes.push({ type: 'missing', shelfId: id, oldQty: day2[id].qty });
+            day2[id].qty = 0;
+            day2[id].sku = null;
+        }
+    }
+    
+    return { inventory: day2, changes };
+}
+
+const inventoryDay1 = buildInventory();
+const day2Result = buildDay2Inventory(inventoryDay1);
+const inventoryDay2 = day2Result.inventory;
+const inventoryChanges = day2Result.changes;
+
+function getCurrentInventory() {
+    return state.currentDay === 1 ? inventoryDay1 : inventoryDay2;
+}
 
 // ══════════════════════════════════════════════════════════════
 // STATE
 // ══════════════════════════════════════════════════════════════
 
 const state = {
+    view: 'patrol',  // 'patrol' | 'compare' | 'report'
+    currentDay: 1,
     patrolActive: false,
     drones: {
-        A: { id: 'A', dockId: 'A', x: 40, y: 90, angle: 0, status: 'standby', currentAisle: null, path: [], pathIndex: 0, scannedCount: 0 },
-        B: { id: 'B', dockId: 'B', x: 40, y: 530, angle: 0, status: 'standby', currentAisle: null, path: [], pathIndex: 0, scannedCount: 0 },
+        A: { id: 'A', dockId: 'A', x: 90, y: 25, angle: 0, status: 'standby', currentAisle: null, currentLevel: null, path: [], pathIndex: 0, scannedCount: 0, isScanning: false },
+        B: { id: 'B', dockId: 'B', x: 1310, y: 25, angle: 0, status: 'standby', currentAisle: null, currentLevel: null, path: [], pathIndex: 0, scannedCount: 0, isScanning: false },
     },
     scannedShelves: new Set(),
     scanEvents: [],
+    scanEventsDay2: [],
+    changeEvents: [],
     feedLog: [],
     svg: null,
     animFrames: {},
@@ -158,12 +214,22 @@ function buildTaskQueue(dockId) {
         const aisleTop = aisle.y + 10;
         const aisleBottom = aisle.y + aisle.h - 10;
         
-        // 1. Enter aisle (top)
+        // 1. Move horizontally to aisle (maintaining dock Y)
+        tasks.push({
+            type: 'move',
+            desc: `Navigate to ${aisle.label}`,
+            x: aisleCenter,
+            y: dock.y + dock.h / 2,
+            straightLineOnly: true
+        });
+        
+        // 2. Move vertically to aisle top
         tasks.push({
             type: 'move',
             desc: `Enter ${aisle.label}`,
             x: aisleCenter,
             y: aisleTop,
+            straightLineOnly: true
         });
         
         // 2. Scan Side A + Side B simultaneously (Rack 1→20)
@@ -186,14 +252,22 @@ function buildTaskQueue(dockId) {
             racksRight[s.rack].push(s);
         });
         
-        // Scan both sides at each rack position
+        // Scan both sides at each rack position (L1, L2 only for demo)
         for (let rack = 1; rack <= 20; rack++) {
+            // Collect only 2 layers (L1, L2) for this rack
+            const shelvesLeftAllLayers = WAREHOUSE.shelves.filter(s => 
+                s.aisle === aisleId && s.side === 'L' && s.rack === rack && s.layerIdx < 2
+            );
+            const shelvesRightAllLayers = WAREHOUSE.shelves.filter(s => 
+                s.aisle === aisleId && s.side === 'R' && s.rack === rack && s.layerIdx < 2
+            );
+            
             tasks.push({
                 type: 'scan',
                 aisleId: aisleId,
                 rack: rack,
-                shelvesLeft: racksLeft[rack] || [],
-                shelvesRight: racksRight[rack] || [],
+                shelvesLeft: shelvesLeftAllLayers,
+                shelvesRight: shelvesRightAllLayers,
                 x: aisleCenter,
                 y: aisle.y + 10 + (rack - 1) * 25 + 10,
             });
@@ -205,15 +279,24 @@ function buildTaskQueue(dockId) {
             desc: `Return to top of ${aisle.label}`,
             x: aisleCenter,
             y: aisleTop,
+            straightLineOnly: true
         });
         
-        // 4. Return to dock (only at the end of all aisles)
+        // 4. Move horizontally back to dock (only at the end of all aisles)
         if (idx === dock.aisles.length - 1) {
+            tasks.push({
+                type: 'move',
+                desc: `Navigate to dock`,
+                x: dock.x + dock.w / 2,
+                y: aisleTop,
+                straightLineOnly: true
+            });
             tasks.push({
                 type: 'move',
                 desc: `Return to ${dock.name}`,
                 x: dock.x + dock.w / 2,
                 y: dock.y + dock.h / 2,
+                straightLineOnly: true
             });
         }
     });
@@ -275,6 +358,8 @@ function resetPatrol() {
         drone.x = dock.x + dock.w / 2;
         drone.y = dock.y + dock.h / 2;
         drone.status = 'standby';
+        drone.currentAisle = null;
+        drone.currentLevel = null;
         drone.path = [];
         drone.pathIndex = 0;
         drone.scannedCount = 0;
@@ -299,35 +384,71 @@ function droneLoop(droneId) {
     
     if (!state.patrolActive || drone.status !== 'working') return;
     
+    // If currently scanning, don't move
+    if (drone.isScanning) {
+        state.animFrames[droneId] = requestAnimationFrame(() => droneLoop(droneId));
+        return;
+    }
+    
     if (drone.path.length > 0 && drone.pathIndex < drone.path.length) {
         const target = drone.path[drone.pathIndex];
-        const dx = target.x - drone.x;
-        const dy = target.y - drone.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
         
-        if (dist < 2) {
+        // For straight-line movement, move to targetX/targetY in two phases
+        if (target.straightLineOnly) {
+            // Phase 1: Move horizontally if X doesn't match
+            if (Math.abs(drone.x - target.x) > 2) {
+                drone.x += (target.x > drone.x ? 1 : -1) * DRONE_CONFIG.speed;
+                drone.angle = target.x > drone.x ? 0 : 180;
+            }
+            // Phase 2: Move vertically if Y doesn't match
+            else if (Math.abs(drone.y - target.y) > 2) {
+                drone.y += (target.y > drone.y ? 1 : -1) * DRONE_CONFIG.speed;
+                drone.angle = target.y > drone.y ? 90 : -90;
+            }
             // Reached target
-            if (target.type === 'scan') {
-                processScan(droneId, target);
-            } else if (target.type === 'move') {
+            else {
+                drone.x = target.x;
+                drone.y = target.y;
                 if (target.desc) {
                     addFeed(`Drone ${droneId}: ${target.desc}`, 'system');
                 }
-            }
-            drone.pathIndex++;
-            
-            // Check if all tasks completed
-            if (drone.pathIndex >= drone.path.length) {
-                drone.status = 'standby';
-                addFeed(`✅ Drone ${droneId} patrol complete — ${drone.scannedCount} items scanned`, 'success');
-                updateDroneElement(droneId);
-                return;
+                drone.pathIndex++;
             }
         } else {
-            // Move towards target
-            drone.x += (dx / dist) * DRONE_CONFIG.speed;
-            drone.y += (dy / dist) * DRONE_CONFIG.speed;
-            drone.angle = Math.atan2(dy, dx) * 180 / Math.PI;
+            // Regular movement (for scan targets)
+            const dx = target.x - drone.x;
+            const dy = target.y - drone.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            
+            if (dist < 2) {
+                // Reached target
+                if (target.type === 'scan') {
+                    // Start scanning (async)
+                    drone.isScanning = true;
+                    processScanWithDelay(droneId, target, () => {
+                        drone.isScanning = false;
+                        drone.pathIndex++;
+                    });
+                } else if (target.type === 'move') {
+                    if (target.desc) {
+                        addFeed(`Drone ${droneId}: ${target.desc}`, 'system');
+                    }
+                    drone.pathIndex++;
+                }
+            } else {
+                // Move towards target
+                drone.x += (dx / dist) * DRONE_CONFIG.speed;
+                drone.y += (dy / dist) * DRONE_CONFIG.speed;
+                drone.angle = Math.atan2(dy, dx) * 180 / Math.PI;
+            }
+        }
+        
+        // Check if all tasks completed
+        if (drone.pathIndex >= drone.path.length) {
+            drone.status = 'standby';
+            addFeed(`✅ Drone ${droneId} patrol complete — ${drone.scannedCount} items scanned`, 'success');
+            updateDroneElement(droneId);
+            return;
         }
     }
     
@@ -338,21 +459,32 @@ function droneLoop(droneId) {
     state.animFrames[droneId] = requestAnimationFrame(() => droneLoop(droneId));
 }
 
-function processScan(droneId, task) {
+async function processScanWithDelay(droneId, task, onComplete) {
     const drone = state.drones[droneId];
+    const inv = getCurrentInventory();
     const scanTime = new Date().toLocaleTimeString('ko-KR');
     
-    // Read Rack ID first
-    const rackId = `${task.aisleId}-${task.rack}`;
-    addFeed(`Drone ${droneId}: 📍 Reading Rack ${rackId} (Both Sides)`, 'system');
+    // Update current aisle
+    drone.currentAisle = task.aisleId;
     
-    // Scan Side A (Left)
-    task.shelvesLeft.forEach((shelf, idx) => {
-        if (state.scannedShelves.has(shelf.id)) return;
-        state.scannedShelves.add(shelf.id);
+    // Step 1: Read Rack ID
+    const rackId = `Aisle-${task.aisleId} / Rack-${task.rack}`;
+    addFeed(`Drone ${droneId}: 📍 Reading Rack ID: ${rackId}`, 'system');
+    await sleep(DRONE_CONFIG.scanDelay);
+    
+    // Step 2: Scan Side A items (L1, L2)
+    for (let i = 0; i < task.shelvesLeft.length; i++) {
+        const shelf = task.shelvesLeft[i];
         
-        const item = inventory[shelf.id];
-        state.scanEvents.push({
+        // Update current level
+        drone.currentLevel = shelf.layer;
+        updateDroneElement(droneId);
+        if (state.scannedShelves.has(shelf.id)) continue;
+        
+        state.scannedShelves.add(shelf.id);
+        const item = inv[shelf.id];
+        
+        const event = {
             id: `SE-${Date.now()}-${shelf.id}`,
             timestamp: scanTime,
             droneId: droneId,
@@ -360,28 +492,43 @@ function processScan(droneId, task) {
             aisle: shelf.aisle,
             rack: shelf.rack,
             side: 'A',
+            layer: shelf.layer,
             sku: item?.sku || null,
             qty: item?.qty || 0,
-        });
+        };
+        
+        if (state.currentDay === 1) {
+            state.scanEvents.push(event);
+        } else {
+            state.scanEventsDay2.push(event);
+        }
         
         drone.scannedCount++;
         
         const shelfEl = document.getElementById(`shelf-${shelf.id}`);
         if (shelfEl) {
-            shelfEl.setAttribute('fill', item?.sku ? 'rgba(52,211,153,0.3)' : 'rgba(248,113,113,0.2)');
+            shelfEl.setAttribute('fill', item?.sku ? 'rgba(52,211,153,0.4)' : 'rgba(248,113,113,0.2)');
             shelfEl.setAttribute('stroke', item?.sku ? '#34d399' : '#f87171');
+            shelfEl.setAttribute('stroke-width', '2');
         }
         
-        addFeed(`Drone ${droneId}: 📦 Side A Item ${idx + 1}/5 — ${item?.sku ? item.sku + ' × ' + item.qty : 'Empty'}`, 'scan');
-    });
+        addFeed(`Drone ${droneId}: 📦 Side A ${shelf.layer} — ${item?.sku ? item.sku + ' × ' + item.qty : 'Empty'}`, 'scan');
+        await sleep(DRONE_CONFIG.scanDelay / 2);
+    }
     
-    // Scan Side B (Right)
-    task.shelvesRight.forEach((shelf, idx) => {
-        if (state.scannedShelves.has(shelf.id)) return;
-        state.scannedShelves.add(shelf.id);
+    // Step 3: Scan Side B items (L1, L2)
+    for (let i = 0; i < task.shelvesRight.length; i++) {
+        const shelf = task.shelvesRight[i];
         
-        const item = inventory[shelf.id];
-        state.scanEvents.push({
+        // Update current level
+        drone.currentLevel = shelf.layer;
+        updateDroneElement(droneId);
+        if (state.scannedShelves.has(shelf.id)) continue;
+        
+        state.scannedShelves.add(shelf.id);
+        const item = inv[shelf.id];
+        
+        const event = {
             id: `SE-${Date.now()}-${shelf.id}`,
             timestamp: scanTime,
             droneId: droneId,
@@ -389,22 +536,47 @@ function processScan(droneId, task) {
             aisle: shelf.aisle,
             rack: shelf.rack,
             side: 'B',
+            layer: shelf.layer,
             sku: item?.sku || null,
             qty: item?.qty || 0,
-        });
+        };
+        
+        if (state.currentDay === 1) {
+            state.scanEvents.push(event);
+        } else {
+            state.scanEventsDay2.push(event);
+        }
         
         drone.scannedCount++;
         
         const shelfEl = document.getElementById(`shelf-${shelf.id}`);
         if (shelfEl) {
-            shelfEl.setAttribute('fill', item?.sku ? 'rgba(52,211,153,0.3)' : 'rgba(248,113,113,0.2)');
+            shelfEl.setAttribute('fill', item?.sku ? 'rgba(52,211,153,0.4)' : 'rgba(248,113,113,0.2)');
             shelfEl.setAttribute('stroke', item?.sku ? '#34d399' : '#f87171');
+            shelfEl.setAttribute('stroke-width', '2');
         }
         
-        addFeed(`Drone ${droneId}: 📦 Side B Item ${idx + 1}/5 — ${item?.sku ? item.sku + ' × ' + item.qty : 'Empty'}`, 'scan');
-    });
+        addFeed(`Drone ${droneId}: 📦 Side B ${shelf.layer} — ${item?.sku ? item.sku + ' × ' + item.qty : 'Empty'}`, 'scan');
+        await sleep(DRONE_CONFIG.scanDelay / 2);
+    }
     
-    addFeed(`Drone ${droneId}: ✅ Rack ${task.rack} complete — Both sides scanned`, 'success');
+    // Step 4: Rack complete
+    const totalItems = task.shelvesLeft.length + task.shelvesRight.length;
+    const tag = task.isRescan ? ' [RE-SCAN]' : '';
+    addFeed(`Drone ${droneId}: ✅ Rack ${task.rack} complete${tag} — ${totalItems} items scanned (both sides, 2 layers)`, 'success');
+    await sleep(DRONE_CONFIG.scanDelay);
+
+    // If this was a re-scan task, mark it done in the compare view
+    if (task.isRescan && task.originalShelfId) {
+        markRescanDone(task.originalShelfId, droneId);
+    }
+
+    updateGlobalStats();
+    onComplete();
+}
+
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -432,6 +604,8 @@ function renderPatrolView(content) {
                         <div style="font-size:0.65rem;color:#64748b;margin-top:4px">
                             <div>Drone: <span style="color:${dock.color}">${dock.id}</span></div>
                             <div>Aisles: ${dock.aisles.join(', ')}</div>
+                            <div id="drone${dock.id}-aisle" style="color:#94a3b8">Current: -</div>
+                            <div id="drone${dock.id}-level" style="color:#fbbf24;font-weight:600">Level: -</div>
                             <div id="drone${dock.id}-status">Status: Standby</div>
                         </div>
                     </div>
@@ -495,17 +669,26 @@ function renderWarehouseElements() {
         aislesG.appendChild(label);
     });
     
-    // Render shelves (L1 only)
-    WAREHOUSE.shelves.filter(s => s.layerIdx === 0).forEach(shelf => {
-        const item = inventory[shelf.id];
+    // Render shelves (L1, L2 only)
+    const inv = getCurrentInventory();
+    WAREHOUSE.shelves.forEach(shelf => {
+        // Only render L1 and L2
+        if (shelf.layerIdx >= 2) return;
+        
+        const item = inv[shelf.id];
         const hasItem = item && item.qty > 0;
+        
+        // Layer-based opacity and color
+        const opacity = shelf.layerIdx === 0 ? 1.0 : 0.7;
+        const layerColor = shelf.layer === 'L1' ? '#34d399' : '#22d3ee';
         
         const rect = createSVG('rect', {
             id: `shelf-${shelf.id}`,
             x: shelf.x, y: shelf.y, width: shelf.w, height: shelf.h,
-            fill: hasItem ? 'rgba(99,102,241,0.1)' : 'rgba(255,255,255,0.02)',
-            stroke: hasItem ? 'rgba(99,102,241,0.3)' : 'rgba(100,116,139,0.2)',
-            'stroke-width': '1', rx: '2'
+            fill: hasItem ? `rgba(99,102,241,${0.1 * opacity})` : 'rgba(255,255,255,0.02)',
+            stroke: hasItem ? `rgba(99,102,241,${0.3 * opacity})` : 'rgba(100,116,139,0.2)',
+            'stroke-width': '1', rx: '2',
+            opacity: opacity
         });
         shelvesG.appendChild(rect);
     });
@@ -551,6 +734,25 @@ function updateDroneElement(droneId) {
     if (statusEl) {
         statusEl.textContent = `Status: ${drone.status === 'working' ? 'Working' : 'Standby'}`;
     }
+    
+    // Update current aisle
+    const aisleEl = document.getElementById(`drone${droneId}-aisle`);
+    if (aisleEl) {
+        aisleEl.textContent = drone.currentAisle ? `Current: Aisle ${drone.currentAisle}` : 'Current: -';
+    }
+    
+    // Update current level with color
+    const levelEl = document.getElementById(`drone${droneId}-level`);
+    if (levelEl) {
+        if (drone.currentLevel) {
+            const levelColor = drone.currentLevel === 'L1' ? '#34d399' : '#22d3ee';
+            levelEl.style.color = levelColor;
+            levelEl.textContent = `Level: ${drone.currentLevel}`;
+        } else {
+            levelEl.style.color = '#64748b';
+            levelEl.textContent = 'Level: -';
+        }
+    }
 }
 
 function updateGlobalStats() {
@@ -574,6 +776,7 @@ function addFeed(message, type) {
     
     const colors = {
         system: '#64748b',
+        rack: '#a78bfa',
         scan: '#34d399',
         success: '#22d3ee',
         alert: '#fbbf24'
@@ -596,6 +799,869 @@ function createSVG(tag, attrs) {
     const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
     Object.entries(attrs).forEach(([k, v]) => el.setAttribute(k, v));
     return el;
+}
+
+// ══════════════════════════════════════════════════════════════
+// RESCAN LOGIC
+// ══════════════════════════════════════════════════════════════
+
+// Parse shelfId like "2-L13-L2" → { aisleId:'2', side:'L', rack:13, layer:'L2' }
+// or "14-R8-L2" → { aisleId:'14', side:'R', rack:8, layer:'L2' }
+function parseShelfId(shelfId) {
+    const m = shelfId.match(/^(\d+)-([LR])(\d+)-(.+)$/);
+    if (!m) return null;
+    return { aisleId: m[1], side: m[2], rack: parseInt(m[3]), layer: m[4] };
+}
+
+// Rescan state
+const rescanStatus = {};   // shelfId → 'pending' | 'scanning' | 'done' | 'failed'
+const rescanResults = {};  // shelfId → { before, after, droneId, timestamp, verdict }
+
+function dispatchRescan(shelfId) {
+    const parsed = parseShelfId(shelfId);
+    if (!parsed) {
+        addFeed(`⛔ Cannot parse shelf ID: ${shelfId}`, 'alert');
+        return;
+    }
+
+    const { aisleId, rack } = parsed;
+
+    // Pick the best drone: the one whose dock covers this aisle, preferably standby
+    const dockForAisle = WAREHOUSE.docks.find(d => d.aisles.includes(aisleId));
+    if (!dockForAisle) {
+        addFeed(`⛔ No dock covers Aisle ${aisleId}`, 'alert');
+        return;
+    }
+
+    // Choose drone from that dock (there's only 1 per dock in this system)
+    const droneId = dockForAisle.id;
+    const drone = state.drones[droneId];
+
+    if (!drone) {
+        addFeed(`⛔ Drone ${droneId} not found`, 'alert');
+        return;
+    }
+
+    // Mark as pending
+    rescanStatus[shelfId] = 'pending';
+    refreshRescanCardUI(shelfId, 'pending');
+
+    addFeed(`🔁 Re-scan dispatched → Drone ${droneId} → Aisle ${aisleId} / Rack ${rack}`, 'alert');
+
+    // Capture BEFORE snapshot from current day2 inventory
+    const invBefore = getCurrentInventory();
+    const beforeSnap = {};
+    WAREHOUSE.shelves
+        .filter(s => s.aisle === aisleId && s.rack === rack && s.layerIdx < 2)
+        .forEach(s => { beforeSnap[s.id] = { ...invBefore[s.id] }; });
+    rescanResults[shelfId] = { before: beforeSnap, after: null, droneId, timestamp: new Date().toISOString(), verdict: 'scanning' };
+
+    // Build a mini task queue: go to rack, scan, return to dock
+    const aisle = WAREHOUSE.aisles.find(a => a.id === aisleId);
+    const dock  = dockForAisle;
+    const aisleCenter = aisle.x + aisle.w / 2;
+    const aisleTop    = aisle.y + 10;
+    const rackY       = aisle.y + 10 + (rack - 1) * 25 + 10;
+
+    // Collect shelves for this rack (both sides, layers 0-1)
+    const shelvesLeft  = WAREHOUSE.shelves.filter(s =>
+        s.aisle === aisleId && s.side === 'L' && s.rack === rack && s.layerIdx < 2);
+    const shelvesRight = WAREHOUSE.shelves.filter(s =>
+        s.aisle === aisleId && s.side === 'R' && s.rack === rack && s.layerIdx < 2);
+
+    const rescanTasks = [
+        { type:'move', desc:`Re-scan: move to Aisle ${aisleId} entry`, x: aisleCenter, y: dock.y + dock.h / 2, straightLineOnly: true },
+        { type:'move', desc:`Re-scan: enter Aisle ${aisleId}`, x: aisleCenter, y: aisleTop, straightLineOnly: true },
+        { type:'move', desc:`Re-scan: position at Rack ${rack}`, x: aisleCenter, y: rackY, straightLineOnly: true },
+        { type:'scan', aisleId, rack, shelvesLeft, shelvesRight, x: aisleCenter, y: rackY, isRescan: true, originalShelfId: shelfId },
+        { type:'move', desc:`Re-scan: return to aisle top`, x: aisleCenter, y: aisleTop, straightLineOnly: true },
+        { type:'move', desc:`Re-scan: return to dock`, x: dock.x + dock.w / 2, y: aisleTop, straightLineOnly: true },
+        { type:'move', desc:`Re-scan: dock`, x: dock.x + dock.w / 2, y: dock.y + dock.h / 2, straightLineOnly: true },
+    ];
+
+    // Interrupt current patrol, prepend rescan tasks
+    state.patrolActive = true;
+    if (state.animFrames[droneId]) cancelAnimationFrame(state.animFrames[droneId]);
+
+    drone.path = [...rescanTasks, ...drone.path.slice(drone.pathIndex)];
+    drone.pathIndex = 0;
+    drone.status = 'working';
+    drone.isScanning = false;
+
+    rescanStatus[shelfId] = 'scanning';
+    refreshRescanCardUI(shelfId, 'scanning');
+
+    // Restart drone loop
+    state.animFrames[droneId] = requestAnimationFrame(() => droneLoop(droneId));
+
+    // Switch back to patrol view so user can watch
+    showPatrolView();
+}
+
+// Update the re-scan card badge in compare view (if visible)
+function refreshRescanCardUI(shelfId, status) {
+    const el = document.getElementById(`rescan-badge-${CSS.escape(shelfId)}`);
+    if (!el) return;
+    const cfg = {
+        pending:  { bg:'#78350f', color:'#fbbf24', text:'⏳ Pending' },
+        scanning: { bg:'#1e3a5f', color:'#22d3ee', text:'🔁 Scanning...' },
+        done:     { bg:'#064e3b', color:'#34d399', text:'✅ Done' },
+        failed:   { bg:'#7f1d1d', color:'#f87171', text:'❌ Failed' },
+    };
+    const c = cfg[status] || cfg.pending;
+    el.style.background = c.bg;
+    el.style.color = c.color;
+    el.textContent = c.text;
+}
+
+// Called from processScanWithDelay when isRescan flag is set
+function markRescanDone(shelfId, droneId) {
+    rescanStatus[shelfId] = 'done';
+    refreshRescanCardUI(shelfId, 'done');
+
+    // Capture AFTER snapshot
+    const invAfter = getCurrentInventory();
+    const parsed   = parseShelfId(shelfId);
+    if (parsed && rescanResults[shelfId]) {
+        const afterSnap = {};
+        WAREHOUSE.shelves
+            .filter(s => s.aisle === parsed.aisleId && s.rack === parsed.rack && s.layerIdx < 2)
+            .forEach(s => { afterSnap[s.id] = { ...invAfter[s.id] }; });
+
+        // Determine verdict
+        const before = rescanResults[shelfId].before;
+        let verdict = 'confirmed_missing';   // default: still missing
+        let foundItems = 0, missingItems = 0;
+        Object.keys(afterSnap).forEach(sid => {
+            const a = afterSnap[sid];
+            const b = before[sid] || { qty: 0 };
+            if (a && a.qty > 0) foundItems++;
+            else missingItems++;
+        });
+        if (foundItems > 0 && missingItems === 0) verdict = 'all_found';
+        else if (foundItems > 0) verdict = 'partial_found';
+        else verdict = 'confirmed_missing';
+
+        rescanResults[shelfId] = {
+            ...rescanResults[shelfId],
+            after:     afterSnap,
+            droneId:   droneId,
+            doneAt:    new Date().toISOString(),
+            verdict,
+            foundItems,
+            missingItems,
+        };
+    }
+
+    addFeed(`✅ Re-scan complete: ${shelfId} → ${_verdictLabel(rescanResults[shelfId]?.verdict)}`, 'success');
+
+    // Refresh compare view badge if still open
+    refreshRescanCardUI(shelfId, 'done');
+    // Refresh the result detail if compare view is visible
+    const detailEl = document.getElementById(`rescan-detail-${shelfId}`);
+    if (detailEl) renderRescanResultDetail(shelfId, detailEl);
+}
+
+function _verdictLabel(v) {
+    return { all_found:'✅ 재고 확인됨', partial_found:'⚠️ 일부 확인', confirmed_missing:'🚨 재고 없음 확인', scanning:'🔁 스캔 중' }[v] || v;
+}
+
+function renderRescanResultDetail(shelfId, el) {
+    const r = rescanResults[shelfId];
+    if (!r || !r.after) { el.innerHTML = '<span style="color:#64748b;font-size:0.75rem">스캔 중…</span>'; return; }
+    const verdictColor = { all_found:'#34d399', partial_found:'#fbbf24', confirmed_missing:'#f87171' }[r.verdict] || '#94a3b8';
+    const verdictText  = _verdictLabel(r.verdict);
+    const doneTime     = r.doneAt ? new Date(r.doneAt).toLocaleTimeString('ko-KR') : '';
+
+    // Build before/after comparison
+    const allShelfIds  = [...new Set([...Object.keys(r.before), ...Object.keys(r.after)])];
+    const rows = allShelfIds.map(sid => {
+        const b = r.before[sid] || { sku: null, qty: 0 };
+        const a = r.after[sid]  || { sku: null, qty: 0 };
+        const changed = b.qty !== a.qty || b.sku !== a.sku;
+        const parts = sid.split('-');  // e.g. "2-L13-L1"
+        const sideLayer = parts.slice(1).join('-');
+        let diff = '';
+        if (!b.sku && a.sku)        diff = `<span style="color:#34d399">+입고 (${a.sku}×${a.qty})</span>`;
+        else if (b.sku && !a.sku)   diff = `<span style="color:#f87171">소진 확인</span>`;
+        else if (b.qty !== a.qty)   diff = `<span style="color:#fbbf24">${b.qty}→${a.qty}</span>`;
+        else                        diff = `<span style="color:#475569">변화 없음</span>`;
+        return `<div style="display:flex;justify-content:space-between;font-size:0.72rem;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.04)">
+            <span style="color:#64748b;font-family:monospace">${sideLayer}</span>
+            <span style="color:#94a3b8">${b.sku || 'Empty'} ×${b.qty}</span>
+            <span style="color:#475569">→</span>
+            <span>${diff}</span>
+        </div>`;
+    }).join('');
+
+    el.innerHTML = `
+    <div style="margin-top:8px;padding:10px;background:rgba(0,0,0,0.3);border-radius:6px;border-left:3px solid ${verdictColor}">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <span style="font-weight:700;font-size:0.8rem;color:${verdictColor}">${verdictText}</span>
+            <span style="font-size:0.68rem;color:#475569">완료: ${doneTime}</span>
+        </div>
+        <div style="font-size:0.68rem;color:#64748b;margin-bottom:6px">드론 ${r.droneId} · 확인된 위치: ${r.foundItems}/${r.foundItems + r.missingItems}</div>
+        <div style="margin-top:4px">${rows}</div>
+    </div>`;
+}
+
+// ══════════════════════════════════════════════════════════════
+// COMPARE VIEW
+// ══════════════════════════════════════════════════════════════
+
+function _buildCompareData() {
+    const missing = [], decreased = [], increased = [], unchanged = [], needsRescan = [];
+    Object.keys(inventoryDay1).forEach(shelfId => {
+        const day1 = inventoryDay1[shelfId];
+        const day2 = inventoryDay2[shelfId];
+        if (day1.qty > 0 && day2.qty === 0) {
+            missing.push({ shelfId, day1, day2 });
+            needsRescan.push({ shelfId, reason: 'Missing item — physical verification required', severity: 'high' });
+        } else if (day1.qty > day2.qty) {
+            const delta = day1.qty - day2.qty;
+            decreased.push({ shelfId, day1, day2, delta });
+            if (delta > 5) needsRescan.push({ shelfId, reason: `Large decrease (−${delta}) — possible scan error`, severity: 'medium' });
+        } else if (day1.qty < day2.qty) {
+            increased.push({ shelfId, day1, day2, delta: day2.qty - day1.qty });
+        } else if (day1.qty === day2.qty && day1.qty > 0) {
+            unchanged.push({ shelfId, day1 });
+        }
+    });
+    const totalItems  = Object.keys(inventoryDay1).length;
+    const changedPct  = ((missing.length + decreased.length + increased.length) / totalItems * 100).toFixed(1);
+    const accuracyRate = (100 - parseFloat(changedPct)).toFixed(1);
+    return { missing, decreased, increased, unchanged, needsRescan, totalItems, changedPct, accuracyRate };
+}
+
+function showCompareView() {
+    state.view = 'compare';
+    const content = document.getElementById('dashboardContent');
+    const { missing, decreased, increased, needsRescan, totalItems, accuracyRate } = _buildCompareData();
+
+    // Count completed rescans
+    const rescanDone    = Object.values(rescanStatus).filter(s => s === 'done').length;
+    const rescanTotal   = Object.keys(rescanStatus).length;
+    const rescanPending = rescanTotal - rescanDone;
+
+    content.innerHTML = `
+    <div style="background:rgba(15,23,42,0.8);border-radius:12px;padding:20px;border:1px solid rgba(99,102,241,0.2)">
+
+        <!-- Header -->
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px">
+            <div>
+                <h2 style="color:#6366f1;font-size:1.2rem;margin:0">📊 ERP 비교 보고서 — Day 1 vs Day 2</h2>
+                <div style="color:#64748b;font-size:0.75rem;margin-top:4px">Samsung Semiconductor Warehouse · 15 Aisles × 20 Racks × 15 Levels</div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button class="btn-start" onclick="switchDay(1)">Day 1</button>
+                <button class="btn-start" onclick="switchDay(2)">Day 2</button>
+                <button class="btn-start" onclick="showDailyReportModal()" style="background:linear-gradient(135deg,#34d399,#059669)">📄 일일 종합보고서</button>
+                <button class="btn-start" onclick="showPatrolView()">← 순찰 뷰로</button>
+            </div>
+        </div>
+
+        <!-- Summary Cards -->
+        <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:20px">
+            <div style="background:rgba(99,102,241,0.1);border:1px solid #6366f1;border-radius:8px;padding:12px;text-align:center">
+                <div style="color:#6366f1;font-size:1.6rem;font-weight:700">${totalItems}</div>
+                <div style="color:#94a3b8;font-size:0.7rem">총 위치</div>
+            </div>
+            <div style="background:rgba(248,113,113,0.1);border:1px solid #f87171;border-radius:8px;padding:12px;text-align:center">
+                <div style="color:#f87171;font-size:1.6rem;font-weight:700">${missing.length}</div>
+                <div style="color:#94a3b8;font-size:0.7rem">분실</div>
+            </div>
+            <div style="background:rgba(251,191,36,0.1);border:1px solid #fbbf24;border-radius:8px;padding:12px;text-align:center">
+                <div style="color:#fbbf24;font-size:1.6rem;font-weight:700">${decreased.length}</div>
+                <div style="color:#94a3b8;font-size:0.7rem">수량 감소</div>
+            </div>
+            <div style="background:rgba(52,211,153,0.1);border:1px solid #34d399;border-radius:8px;padding:12px;text-align:center">
+                <div style="color:#34d399;font-size:1.6rem;font-weight:700">${increased.length}</div>
+                <div style="color:#94a3b8;font-size:0.7rem">수량 증가</div>
+            </div>
+            <div style="background:rgba(34,211,238,0.1);border:1px solid #22d3ee;border-radius:8px;padding:12px;text-align:center">
+                <div style="color:#22d3ee;font-size:1.6rem;font-weight:700">${accuracyRate}%</div>
+                <div style="color:#94a3b8;font-size:0.7rem">정확도</div>
+            </div>
+            <div style="background:rgba(167,139,250,0.1);border:1px solid #a78bfa;border-radius:8px;padding:12px;text-align:center">
+                <div style="color:#a78bfa;font-size:1.6rem;font-weight:700">${rescanDone}/${rescanTotal || '–'}</div>
+                <div style="color:#94a3b8;font-size:0.7rem">재스캔 완료</div>
+            </div>
+        </div>
+
+        <!-- Action Required (Re-scan Queue) -->
+        ${needsRescan.length > 0 ? `
+        <div style="background:rgba(251,191,36,0.08);border:2px solid #fbbf24;border-radius:8px;padding:15px;margin-bottom:20px">
+            <h3 style="color:#fbbf24;font-size:0.95rem;margin-bottom:10px;display:flex;align-items:center;gap:8px">
+                ⚠️ 재스캔 필요 — ${needsRescan.length}개 위치
+                <span style="font-size:0.72rem;color:#94a3b8;font-weight:400">🔁 클릭하면 드론 즉시 출동</span>
+            </h3>
+            <div style="max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:6px">
+                ${needsRescan.map(item => `
+                <div id="rescan-row-${item.shelfId}" style="background:rgba(0,0,0,0.25);padding:10px 14px;border-radius:6px;border-left:3px solid ${item.severity === 'high' ? '#f87171' : '#fbbf24'};display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
+                    <div style="flex:1;min-width:0">
+                        <div style="font-size:0.82rem;color:#e2e8f0;font-weight:700;font-family:monospace">${item.shelfId}</div>
+                        <div style="font-size:0.7rem;color:#94a3b8;margin-top:2px">
+                            ${item.reason}
+                            <span style="background:${item.severity === 'high' ? '#7f1d1d' : '#78350f'};padding:1px 6px;border-radius:3px;margin-left:6px;font-size:0.65rem;color:${item.severity === 'high' ? '#fca5a5' : '#fde68a'}">${item.severity.toUpperCase()}</span>
+                        </div>
+                        <!-- Rescan Result Detail (injected after rescan) -->
+                        <div id="rescan-detail-${item.shelfId}"></div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;margin-top:2px">
+                        <span id="rescan-badge-${item.shelfId}" style="background:#78350f;color:#fbbf24;padding:3px 10px;border-radius:4px;font-size:0.68rem;font-weight:700;white-space:nowrap">⏸ 대기</span>
+                        <button onclick="dispatchRescan('${item.shelfId}')"
+                            style="background:linear-gradient(135deg,#6366f1,#22d3ee);color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.75rem;font-weight:700;white-space:nowrap;transition:transform 0.15s"
+                            onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                            🔁 재스캔
+                        </button>
+                    </div>
+                </div>
+                `).join('')}
+            </div>
+        </div>
+        ` : `<div style="background:rgba(52,211,153,0.08);border:1px solid #34d399;border-radius:8px;padding:12px;margin-bottom:20px;text-align:center;color:#34d399;font-size:0.85rem">✅ 모든 위치 정상 — 재스캔 필요 없음</div>`}
+
+        <!-- Rescan Results Summary (shown only if rescan was done) -->
+        ${rescanTotal > 0 ? `
+        <div id="rescanResultsSection" style="background:rgba(167,139,250,0.08);border:1px solid rgba(167,139,250,0.4);border-radius:8px;padding:15px;margin-bottom:20px">
+            <h3 style="color:#a78bfa;font-size:0.95rem;margin-bottom:12px">🔁 재스캔 결과 요약</h3>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px">
+                <div style="background:rgba(0,0,0,0.2);border-radius:6px;padding:10px;text-align:center">
+                    <div style="color:#34d399;font-size:1.4rem;font-weight:700">${Object.values(rescanResults).filter(r=>r.verdict==='all_found').length}</div>
+                    <div style="color:#94a3b8;font-size:0.7rem">✅ 재고 확인됨</div>
+                </div>
+                <div style="background:rgba(0,0,0,0.2);border-radius:6px;padding:10px;text-align:center">
+                    <div style="color:#fbbf24;font-size:1.4rem;font-weight:700">${Object.values(rescanResults).filter(r=>r.verdict==='partial_found').length}</div>
+                    <div style="color:#94a3b8;font-size:0.7rem">⚠️ 일부 확인</div>
+                </div>
+                <div style="background:rgba(0,0,0,0.2);border-radius:6px;padding:10px;text-align:center">
+                    <div style="color:#f87171;font-size:1.4rem;font-weight:700">${Object.values(rescanResults).filter(r=>r.verdict==='confirmed_missing').length}</div>
+                    <div style="color:#94a3b8;font-size:0.7rem">🚨 재고 없음 확인</div>
+                </div>
+            </div>
+            ${Object.keys(rescanResults).map(shelfId => {
+                const r = rescanResults[shelfId];
+                if (!r || !r.after) return '';
+                const vColor = { all_found:'#34d399', partial_found:'#fbbf24', confirmed_missing:'#f87171' }[r.verdict] || '#94a3b8';
+                const vText  = _verdictLabel(r.verdict);
+                const doneTime = r.doneAt ? new Date(r.doneAt).toLocaleString('ko-KR') : '';
+                return `
+                <div style="background:rgba(0,0,0,0.2);border-radius:6px;padding:12px;margin-bottom:8px;border-left:3px solid ${vColor}">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                        <span style="font-family:monospace;font-size:0.82rem;color:#e2e8f0;font-weight:700">${shelfId}</span>
+                        <div style="display:flex;align-items:center;gap:10px">
+                            <span style="font-size:0.78rem;font-weight:700;color:${vColor}">${vText}</span>
+                            <span style="font-size:0.68rem;color:#475569">드론 ${r.droneId} · ${doneTime}</span>
+                        </div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                        <div style="background:rgba(248,113,113,0.06);border-radius:4px;padding:8px">
+                            <div style="font-size:0.65rem;color:#94a3b8;margin-bottom:4px;font-weight:600">재스캔 전 (Day 2)</div>
+                            ${Object.keys(r.before).map(sid => {
+                                const b = r.before[sid];
+                                return `<div style="font-size:0.7rem;color:#cbd5e1;font-family:monospace">${sid.split('-').slice(1).join('-')}: ${b.sku || 'Empty'} ×${b.qty}</div>`;
+                            }).join('')}
+                        </div>
+                        <div style="background:rgba(52,211,153,0.06);border-radius:4px;padding:8px">
+                            <div style="font-size:0.65rem;color:#94a3b8;margin-bottom:4px;font-weight:600">재스캔 후 (결과)</div>
+                            ${Object.keys(r.after).map(sid => {
+                                const a = r.after[sid];
+                                const b = (r.before[sid] || { qty: 0 });
+                                const diffColor = a.qty > b.qty ? '#34d399' : a.qty < b.qty ? '#f87171' : '#94a3b8';
+                                return `<div style="font-size:0.7rem;color:${diffColor};font-family:monospace">${sid.split('-').slice(1).join('-')}: ${a.sku || 'Empty'} ×${a.qty}</div>`;
+                            }).join('')}
+                        </div>
+                    </div>
+                </div>`;
+            }).join('')}
+        </div>
+        ` : ''}
+
+        <!-- Detailed Changes Grid -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:15px;margin-bottom:20px">
+            <!-- Missing Items -->
+            <div style="background:rgba(15,23,42,0.5);border-radius:8px;padding:15px;border:1px solid rgba(248,113,113,0.3)">
+                <h3 style="color:#f87171;font-size:0.9rem;margin-bottom:10px">🚨 분실 항목 (${missing.length})</h3>
+                <div style="max-height:250px;overflow-y:auto;display:flex;flex-direction:column;gap:5px">
+                    ${missing.slice(0, 15).map(item => `
+                    <div style="background:rgba(248,113,113,0.05);border-left:3px solid #f87171;padding:8px;border-radius:4px">
+                        <div style="font-size:0.78rem;color:#e2e8f0;font-weight:600;font-family:monospace">${item.shelfId}</div>
+                        <div style="font-size:0.68rem;color:#64748b;margin-top:2px">${item.day1.location || ''}</div>
+                        <div style="font-size:0.72rem;color:#94a3b8;margin-top:3px">
+                            Day1: <span style="color:#e2e8f0">${item.day1.sku} ×${item.day1.qty}</span>
+                            → Day2: <span style="color:#f87171;font-weight:600">MISSING</span>
+                        </div>
+                    </div>`).join('')}
+                    ${missing.length > 15 ? `<div style="text-align:center;color:#64748b;font-size:0.72rem;padding:4px">+${missing.length-15}개 더…</div>` : ''}
+                </div>
+            </div>
+            <!-- Decreased Items -->
+            <div style="background:rgba(15,23,42,0.5);border-radius:8px;padding:15px;border:1px solid rgba(251,191,36,0.3)">
+                <h3 style="color:#fbbf24;font-size:0.9rem;margin-bottom:10px">📉 수량 감소 (${decreased.length})</h3>
+                <div style="max-height:250px;overflow-y:auto;display:flex;flex-direction:column;gap:5px">
+                    ${decreased.slice(0, 15).map(item => `
+                    <div style="background:rgba(251,191,36,0.05);border-left:3px solid #fbbf24;padding:8px;border-radius:4px">
+                        <div style="font-size:0.78rem;color:#e2e8f0;font-weight:600;font-family:monospace">${item.shelfId}</div>
+                        <div style="font-size:0.68rem;color:#64748b;margin-top:2px">${item.day1.sku}</div>
+                        <div style="font-size:0.72rem;color:#94a3b8;margin-top:3px">
+                            ${item.day1.qty} → ${item.day2.qty} <span style="color:#fbbf24;font-weight:600">(−${item.delta})</span>
+                        </div>
+                    </div>`).join('')}
+                    ${decreased.length > 15 ? `<div style="text-align:center;color:#64748b;font-size:0.72rem;padding:4px">+${decreased.length-15}개 더…</div>` : ''}
+                </div>
+            </div>
+        </div>
+
+        <!-- Export / Save Actions -->
+        <div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap">
+            <button class="btn-start" onclick="exportReport('rescan')">📋 재스캔 목록 내보내기</button>
+            <button class="btn-start" onclick="exportReport('full')">📊 전체 보고서 내보내기</button>
+            <button class="btn-start" onclick="sendToERP()">🔄 Samsung ERP 전송</button>
+            <button onclick="showDailyReportModal()"
+                style="background:linear-gradient(135deg,#34d399,#059669);color:#fff;border:none;padding:8px 18px;border-radius:8px;cursor:pointer;font-size:0.82rem;font-weight:700;transition:transform 0.15s"
+                onmouseover="this.style.transform='scale(1.03)'" onmouseout="this.style.transform='scale(1)'">
+                📄 일일 종합보고서 생성 & 저장
+            </button>
+        </div>
+    </div>
+
+    <!-- Daily Report Modal -->
+    <div id="dailyReportModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9999;overflow-y:auto;padding:20px">
+        <div style="max-width:900px;margin:0 auto;background:#0f172a;border-radius:16px;border:1px solid rgba(99,102,241,0.4);overflow:hidden">
+            <div id="dailyReportContent"></div>
+        </div>
+    </div>
+    `;
+}
+
+// ══════════════════════════════════════════════════════════════
+// DAILY REPORT MODAL
+// ══════════════════════════════════════════════════════════════
+
+function showDailyReportModal() {
+    const modal = document.getElementById('dailyReportModal');
+    if (!modal) return;
+    modal.style.display = 'block';
+
+    const { missing, decreased, increased, unchanged, needsRescan, totalItems, accuracyRate } = _buildCompareData();
+
+    const now       = new Date();
+    const dateStr   = now.toLocaleDateString('ko-KR', { year:'numeric', month:'long', day:'numeric' });
+    const timeStr   = now.toLocaleTimeString('ko-KR');
+    const reportId  = `RPT-${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}-${now.getHours().toString().padStart(2,'0')}${now.getMinutes().toString().padStart(2,'0')}`;
+
+    const totalScanned   = (state.scanEvents.length + state.scanEventsDay2.length);
+    const rescanDone     = Object.values(rescanStatus).filter(s => s === 'done').length;
+    const rescanTotal    = Object.keys(rescanStatus).length;
+    const allFound       = Object.values(rescanResults).filter(r => r.verdict === 'all_found').length;
+    const partialFound   = Object.values(rescanResults).filter(r => r.verdict === 'partial_found').length;
+    const confirmedMiss  = Object.values(rescanResults).filter(r => r.verdict === 'confirmed_missing').length;
+
+    // AI Recommendations
+    const recommendations = [];
+    if (confirmedMiss > 0)  recommendations.push({ level:'🔴 긴급', text:`${confirmedMiss}개 위치에서 재고 없음 확인 → 물리적 현장 점검 즉시 실시` });
+    if (partialFound > 0)   recommendations.push({ level:'🟡 주의', text:`${partialFound}개 위치 일부만 확인 → 추가 재스캔 또는 수동 검증 필요` });
+    if (missing.length > confirmedMiss) {
+        const unscanned = missing.length - confirmedMiss;
+        recommendations.push({ level:'🟡 주의', text:`${unscanned}개 분실 위치 미재스캔 → 순찰 후 재확인 권장` });
+    }
+    if (decreased.filter(d => d.delta > 5).length > 0)
+        recommendations.push({ level:'🟠 권고', text:`대량 감소(−5 초과) ${decreased.filter(d=>d.delta>5).length}건 → 출고 기록과 대조 확인` });
+    if (parseFloat(accuracyRate) >= 95)
+        recommendations.push({ level:'🟢 양호', text:`재고 정확도 ${accuracyRate}% — 현재 운영 상태 우수` });
+
+    // Top changed SKUs
+    const skuChanges = {};
+    [...missing, ...decreased].forEach(({ shelfId, day1, delta }) => {
+        const sku = day1.sku || 'Unknown';
+        if (!skuChanges[sku]) skuChanges[sku] = { missing: 0, decreased: 0, totalLoss: 0 };
+        if (!delta) { skuChanges[sku].missing++; skuChanges[sku].totalLoss += (day1.qty || 0); }
+        else        { skuChanges[sku].decreased++; skuChanges[sku].totalLoss += delta; }
+    });
+    const topSKUs = Object.entries(skuChanges).sort((a,b) => b[1].totalLoss - a[1].totalLoss).slice(0, 5);
+
+    const reportHTML = `
+    <!-- Report Header -->
+    <div style="background:linear-gradient(135deg,rgba(99,102,241,0.3),rgba(34,211,238,0.2));padding:28px 32px;border-bottom:1px solid rgba(255,255,255,0.08)">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
+            <div>
+                <div style="font-size:0.75rem;color:#22d3ee;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px">Samsung Semiconductor · 자동화 창고 드론 순찰 시스템</div>
+                <h1 style="color:#fff;font-size:1.6rem;font-weight:800;margin:0">📋 일일 재고 종합 보고서</h1>
+                <div style="color:#94a3b8;font-size:0.85rem;margin-top:6px">${dateStr} ${timeStr} 기준</div>
+            </div>
+            <div style="text-align:right">
+                <div style="font-size:0.7rem;color:#64748b;margin-bottom:4px">보고서 ID</div>
+                <div style="font-family:monospace;color:#a78bfa;font-size:0.95rem;font-weight:700">${reportId}</div>
+                <div style="font-size:0.7rem;color:#64748b;margin-top:8px">드론 편대</div>
+                <div style="color:#22d3ee;font-size:0.85rem">Drone A · Drone B</div>
+            </div>
+        </div>
+        <!-- KPI Row -->
+        <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px">
+            ${[
+                { v: totalItems,     l: '총 위치',     c: '#6366f1' },
+                { v: totalScanned,   l: '스캔 건수',   c: '#22d3ee' },
+                { v: accuracyRate+'%', l: '재고 정확도', c: parseFloat(accuracyRate)>=95?'#34d399':'#fbbf24' },
+                { v: missing.length, l: '분실',         c: '#f87171' },
+                { v: decreased.length,l: '수량 감소',  c: '#fbbf24' },
+                { v: `${rescanDone}/${rescanTotal||0}`, l: '재스캔 완료', c: '#a78bfa' },
+            ].map(k => `
+            <div style="background:rgba(0,0,0,0.3);border-radius:8px;padding:12px;text-align:center;border:1px solid rgba(255,255,255,0.07)">
+                <div style="color:${k.c};font-size:1.5rem;font-weight:800">${k.v}</div>
+                <div style="color:#64748b;font-size:0.65rem;margin-top:3px">${k.l}</div>
+            </div>`).join('')}
+        </div>
+    </div>
+
+    <!-- Body -->
+    <div style="padding:24px 32px;display:flex;flex-direction:column;gap:24px">
+
+        <!-- 1. AI 권고 사항 -->
+        <section>
+            <h2 style="color:#a78bfa;font-size:0.95rem;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:8px">
+                🤖 AI 분석 & 권고 사항
+            </h2>
+            <div style="display:flex;flex-direction:column;gap:8px">
+                ${recommendations.length > 0
+                    ? recommendations.map(r => `
+                    <div style="background:rgba(0,0,0,0.2);border-radius:6px;padding:10px 14px;display:flex;align-items:center;gap:12px;border:1px solid rgba(255,255,255,0.05)">
+                        <span style="font-size:0.95rem;flex-shrink:0">${r.level}</span>
+                        <span style="color:#cbd5e1;font-size:0.82rem">${r.text}</span>
+                    </div>`).join('')
+                    : '<div style="color:#34d399;font-size:0.82rem;padding:10px">✅ 이상 사항 없음 — 모든 재고 정상</div>'}
+            </div>
+        </section>
+
+        <!-- 2. 재스캔 결과 상세 -->
+        ${rescanTotal > 0 ? `
+        <section>
+            <h2 style="color:#22d3ee;font-size:0.95rem;font-weight:700;margin-bottom:12px">🔁 재스캔 수행 결과</h2>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px">
+                <div style="background:rgba(52,211,153,0.1);border:1px solid #34d399;border-radius:8px;padding:12px;text-align:center">
+                    <div style="color:#34d399;font-size:1.4rem;font-weight:800">${allFound}</div>
+                    <div style="color:#94a3b8;font-size:0.7rem">✅ 재고 확인됨</div>
+                </div>
+                <div style="background:rgba(251,191,36,0.1);border:1px solid #fbbf24;border-radius:8px;padding:12px;text-align:center">
+                    <div style="color:#fbbf24;font-size:1.4rem;font-weight:800">${partialFound}</div>
+                    <div style="color:#94a3b8;font-size:0.7rem">⚠️ 일부 확인</div>
+                </div>
+                <div style="background:rgba(248,113,113,0.1);border:1px solid #f87171;border-radius:8px;padding:12px;text-align:center">
+                    <div style="color:#f87171;font-size:1.4rem;font-weight:800">${confirmedMiss}</div>
+                    <div style="color:#94a3b8;font-size:0.7rem">🚨 재고 없음 확인</div>
+                </div>
+            </div>
+            ${Object.keys(rescanResults).map(shelfId => {
+                const r = rescanResults[shelfId];
+                if (!r || !r.after) return `<div style="color:#64748b;font-size:0.8rem;padding:8px;background:rgba(0,0,0,0.2);border-radius:6px;margin-bottom:6px">🔁 ${shelfId} — 스캔 중 또는 미완료</div>`;
+                const vColor = { all_found:'#34d399', partial_found:'#fbbf24', confirmed_missing:'#f87171' }[r.verdict] || '#94a3b8';
+                const vText  = _verdictLabel(r.verdict);
+                const doneTime = r.doneAt ? new Date(r.doneAt).toLocaleString('ko-KR') : '–';
+                // Build before/after rows
+                const allSids = [...new Set([...Object.keys(r.before), ...Object.keys(r.after)])];
+                return `
+                <div style="background:rgba(0,0,0,0.2);border-radius:8px;border-left:4px solid ${vColor};padding:14px;margin-bottom:10px">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                        <span style="font-family:monospace;font-size:0.85rem;color:#e2e8f0;font-weight:700">${shelfId}</span>
+                        <div style="display:flex;align-items:center;gap:12px">
+                            <span style="font-weight:700;font-size:0.82rem;color:${vColor}">${vText}</span>
+                            <span style="font-size:0.7rem;color:#475569">드론 ${r.droneId} · 완료: ${doneTime}</span>
+                        </div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:start;font-size:0.75rem">
+                        <div>
+                            <div style="color:#94a3b8;font-weight:600;margin-bottom:4px;font-size:0.65rem">재스캔 전</div>
+                            ${allSids.map(sid => {
+                                const b = r.before[sid] || { sku:null, qty:0 };
+                                return `<div style="color:#94a3b8;font-family:monospace;padding:2px 0">${sid.split('-').slice(1).join('-')}: ${b.sku || '빈 칸'} ×${b.qty}</div>`;
+                            }).join('')}
+                        </div>
+                        <div style="color:#475569;align-self:center;font-size:1.2rem">→</div>
+                        <div>
+                            <div style="color:#94a3b8;font-weight:600;margin-bottom:4px;font-size:0.65rem">재스캔 후</div>
+                            ${allSids.map(sid => {
+                                const a = r.after[sid]  || { sku:null, qty:0 };
+                                const b = r.before[sid] || { qty:0 };
+                                const dc = a.qty > b.qty ? '#34d399' : a.qty < b.qty ? '#f87171' : '#94a3b8';
+                                return `<div style="color:${dc};font-family:monospace;padding:2px 0">${sid.split('-').slice(1).join('-')}: ${a.sku || '빈 칸'} ×${a.qty}</div>`;
+                            }).join('')}
+                        </div>
+                    </div>
+                </div>`;
+            }).join('')}
+        </section>
+        ` : `<section><div style="background:rgba(0,0,0,0.2);border-radius:8px;padding:14px;color:#64748b;font-size:0.82rem;text-align:center">이번 순찰에서 재스캔이 수행되지 않았습니다.</div></section>`}
+
+        <!-- 3. 변동 내역 -->
+        <section>
+            <h2 style="color:#fbbf24;font-size:0.95rem;font-weight:700;margin-bottom:12px">📊 재고 변동 내역</h2>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+                <!-- Missing -->
+                <div style="background:rgba(248,113,113,0.07);border:1px solid rgba(248,113,113,0.3);border-radius:8px;padding:12px">
+                    <div style="color:#f87171;font-weight:700;font-size:0.85rem;margin-bottom:8px">🚨 분실 (${missing.length}건)</div>
+                    ${missing.map(i => `
+                    <div style="font-size:0.7rem;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.04);color:#94a3b8">
+                        <span style="font-family:monospace;color:#e2e8f0">${i.shelfId}</span><br>
+                        ${i.day1.sku} ×${i.day1.qty} → <span style="color:#f87171">MISSING</span>
+                    </div>`).join('')}
+                </div>
+                <!-- Decreased -->
+                <div style="background:rgba(251,191,36,0.07);border:1px solid rgba(251,191,36,0.3);border-radius:8px;padding:12px">
+                    <div style="color:#fbbf24;font-weight:700;font-size:0.85rem;margin-bottom:8px">📉 감소 (${decreased.length}건)</div>
+                    ${decreased.slice(0,10).map(i => `
+                    <div style="font-size:0.7rem;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.04);color:#94a3b8">
+                        <span style="font-family:monospace;color:#e2e8f0">${i.shelfId}</span><br>
+                        ${i.day1.qty} → ${i.day2.qty} <span style="color:#fbbf24">(−${i.delta})</span>
+                    </div>`).join('')}
+                    ${decreased.length > 10 ? `<div style="color:#64748b;font-size:0.68rem;margin-top:6px">+${decreased.length-10}건 더</div>` : ''}
+                </div>
+                <!-- Increased -->
+                <div style="background:rgba(52,211,153,0.07);border:1px solid rgba(52,211,153,0.3);border-radius:8px;padding:12px">
+                    <div style="color:#34d399;font-weight:700;font-size:0.85rem;margin-bottom:8px">📈 증가 (${increased.length}건)</div>
+                    ${increased.slice(0,10).map(i => `
+                    <div style="font-size:0.7rem;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.04);color:#94a3b8">
+                        <span style="font-family:monospace;color:#e2e8f0">${i.shelfId}</span><br>
+                        ${i.day1.qty} → ${i.day2.qty} <span style="color:#34d399">(+${i.delta})</span>
+                    </div>`).join('')}
+                    ${increased.length > 10 ? `<div style="color:#64748b;font-size:0.68rem;margin-top:6px">+${increased.length-10}건 더</div>` : ''}
+                </div>
+            </div>
+        </section>
+
+        <!-- 4. 주요 SKU 이상 -->
+        ${topSKUs.length > 0 ? `
+        <section>
+            <h2 style="color:#f87171;font-size:0.95rem;font-weight:700;margin-bottom:12px">🏷️ 주요 이상 SKU Top ${topSKUs.length}</h2>
+            <div style="display:flex;flex-direction:column;gap:6px">
+                ${topSKUs.map(([sku, data], idx) => `
+                <div style="background:rgba(0,0,0,0.2);border-radius:6px;padding:10px 14px;display:grid;grid-template-columns:auto 1fr auto auto auto;gap:12px;align-items:center;border:1px solid rgba(255,255,255,0.05)">
+                    <span style="background:rgba(99,102,241,0.3);color:#a78bfa;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:0.72rem;font-weight:700">${idx+1}</span>
+                    <span style="font-family:monospace;color:#e2e8f0;font-weight:600;font-size:0.82rem">${sku}</span>
+                    <span style="font-size:0.72rem;color:#f87171">${data.missing > 0 ? `분실 ${data.missing}건` : ''}</span>
+                    <span style="font-size:0.72rem;color:#fbbf24">${data.decreased > 0 ? `감소 ${data.decreased}건` : ''}</span>
+                    <span style="background:rgba(248,113,113,0.2);color:#f87171;padding:2px 8px;border-radius:4px;font-size:0.72rem;font-weight:700">−${data.totalLoss} units</span>
+                </div>`).join('')}
+            </div>
+        </section>
+        ` : ''}
+
+        <!-- 5. 드론 운영 요약 -->
+        <section>
+            <h2 style="color:#22d3ee;font-size:0.95rem;font-weight:700;margin-bottom:12px">🚁 드론 운영 현황</h2>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                ${WAREHOUSE.docks.map(dock => {
+                    const droneData = state.drones[dock.id];
+                    return `
+                    <div style="background:rgba(0,0,0,0.2);border-radius:8px;padding:14px;border:1px solid rgba(34,211,238,0.2)">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                            <span style="color:#22d3ee;font-weight:700;font-size:0.88rem">Drone ${dock.id}</span>
+                            <span style="background:rgba(52,211,153,0.2);color:#34d399;padding:2px 8px;border-radius:4px;font-size:0.7rem">${droneData?.status === 'standby' ? '✅ 완료' : '🔄 운영 중'}</span>
+                        </div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:0.75rem">
+                            <div><span style="color:#64748b">담당 구역:</span><br><span style="color:#cbd5e1">Aisle ${dock.aisles.join(', ')}</span></div>
+                            <div><span style="color:#64748b">스캔 건수:</span><br><span style="color:#22d3ee">${droneData?.scannedCount || 0}건</span></div>
+                            <div><span style="color:#64748b">도킹 위치:</span><br><span style="color:#cbd5e1">${dock.name}</span></div>
+                            <div><span style="color:#64748b">전원:</span><br><span style="color:#34d399">유선 (100%)</span></div>
+                        </div>
+                    </div>`;
+                }).join('')}
+            </div>
+        </section>
+
+        <!-- Footer Buttons -->
+        <div style="display:flex;gap:10px;justify-content:flex-end;padding-top:8px;border-top:1px solid rgba(255,255,255,0.06);flex-wrap:wrap">
+            <button onclick="closeDailyReportModal()" style="background:rgba(100,116,139,0.3);color:#94a3b8;border:1px solid rgba(100,116,139,0.4);padding:9px 20px;border-radius:8px;cursor:pointer;font-size:0.82rem;font-weight:600">✕ 닫기</button>
+            <button onclick="printDailyReport()" style="background:rgba(34,211,238,0.15);color:#22d3ee;border:1px solid rgba(34,211,238,0.4);padding:9px 20px;border-radius:8px;cursor:pointer;font-size:0.82rem;font-weight:600">🖨️ 인쇄</button>
+            <button onclick="exportDailyReportJSON('${reportId}')" style="background:rgba(99,102,241,0.15);color:#a78bfa;border:1px solid rgba(99,102,241,0.4);padding:9px 20px;border-radius:8px;cursor:pointer;font-size:0.82rem;font-weight:600">⬇️ JSON 내보내기</button>
+            <button onclick="saveDailyReport('${reportId}')"
+                style="background:linear-gradient(135deg,#34d399,#059669);color:#fff;border:none;padding:9px 24px;border-radius:8px;cursor:pointer;font-size:0.84rem;font-weight:700;transition:transform 0.15s"
+                onmouseover="this.style.transform='scale(1.03)'" onmouseout="this.style.transform='scale(1)'">
+                💾 보고서 저장 (Report DB)
+            </button>
+        </div>
+    </div>`;
+
+    document.getElementById('dailyReportContent').innerHTML = reportHTML;
+}
+
+function closeDailyReportModal() {
+    const m = document.getElementById('dailyReportModal');
+    if (m) m.style.display = 'none';
+}
+
+function printDailyReport() {
+    const content = document.getElementById('dailyReportContent');
+    if (!content) return;
+    const win = window.open('', '_blank');
+    win.document.write(`<!DOCTYPE html><html><head><title>일일 종합보고서</title>
+    <style>
+        body { background:#0f172a; color:#e2e8f0; font-family:'Segoe UI',sans-serif; padding:20px; }
+        * { box-sizing:border-box; }
+        @media print { body { print-color-adjust:exact; -webkit-print-color-adjust:exact; } }
+    </style></head><body>${content.innerHTML}
+    <script>window.onload=()=>window.print();<\/script></body></html>`);
+    win.document.close();
+}
+
+function exportDailyReportJSON(reportId) {
+    const { missing, decreased, increased, totalItems, accuracyRate } = _buildCompareData();
+    const now = new Date();
+    const report = {
+        report_id: reportId,
+        date: now.toLocaleDateString('ko-KR'),
+        time: now.toLocaleTimeString('ko-KR'),
+        warehouse: 'Samsung Semiconductor Warehouse',
+        drone_id: 'Drone-A & Drone-B',
+        total_locations: totalItems,
+        total_scanned: state.scanEvents.length + state.scanEventsDay2.length,
+        accuracy: parseFloat(accuracyRate),
+        missing: missing.length,
+        decreased: decreased.length,
+        increased: increased.length,
+        rescan_total: Object.keys(rescanStatus).length,
+        rescan_done: Object.values(rescanStatus).filter(s=>s==='done').length,
+        rescan_results: rescanResults,
+        changes: inventoryChanges,
+        feed_log: state.feedLog.slice(0, 100),
+    };
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type:'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${reportId}.json`;
+    a.click();
+    addFeed(`⬇️ 보고서 JSON 내보내기 완료: ${reportId}`, 'success');
+}
+
+async function saveDailyReport(reportId) {
+    const { missing, decreased, increased, totalItems, accuracyRate, needsRescan } = _buildCompareData();
+    const now = new Date();
+    const btnEls = document.querySelectorAll('[onclick*="saveDailyReport"]');
+    btnEls.forEach(b => { b.disabled = true; b.textContent = '⏳ 저장 중…'; });
+
+    const report = {
+        report_id: reportId,
+        date: now.toLocaleDateString('ko-KR'),
+        time: now.toLocaleTimeString('ko-KR'),
+        warehouse: 'Samsung-Warehouse-15A',
+        drone_id: 'Drone-A/B',
+        total_scanned: state.scanEvents.length + state.scanEventsDay2.length,
+        accuracy: parseFloat(accuracyRate),
+        total_changes: missing.length + decreased.length + increased.length,
+        agent_actions: Object.keys(rescanStatus).length,
+        missing: missing.length,
+        new_items: increased.length,
+        changed: decreased.length,
+        moved: 0,
+        rescan_total: Object.keys(rescanStatus).length,
+        rescan_done: Object.values(rescanStatus).filter(s=>s==='done').length,
+        rescan_results: rescanResults,
+        rescan_log: state.feedLog.filter(f => f.includes('Re-scan') || f.includes('재스캔')),
+        needs_rescan_list: needsRescan,
+        missing_details: missing.slice(0, 50),
+        decreased_details: decreased.slice(0, 50),
+        increased_details: increased.slice(0, 20),
+        ai_recommendations: [
+            Object.values(rescanResults).filter(r=>r.verdict==='confirmed_missing').length > 0
+                ? `${Object.values(rescanResults).filter(r=>r.verdict==='confirmed_missing').length}개 위치 재고 없음 확인 → 즉시 현장 점검` : null,
+            parseFloat(accuracyRate) >= 95 ? `재고 정확도 ${accuracyRate}% 우수` : `재고 정확도 ${accuracyRate}% — 개선 필요`,
+        ].filter(Boolean),
+        scan_events_sample: [...state.scanEvents.slice(0, 20), ...state.scanEventsDay2.slice(0, 20)],
+    };
+
+    try {
+        const resp = await fetch('/api/archive_report', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ report_data: report }),
+        });
+        const result = await resp.json();
+        if (result.ok) {
+            btnEls.forEach(b => { b.disabled = false; b.textContent = '✅ 저장 완료!'; b.style.background = 'linear-gradient(135deg,#34d399,#059669)'; });
+            addFeed(`💾 보고서 저장 완료: ${result.id}`, 'success');
+            setTimeout(() => {
+                closeDailyReportModal();
+                window.open('/admin/reports', '_blank');
+            }, 1200);
+        } else {
+            throw new Error(result.error || '저장 실패');
+        }
+    } catch(e) {
+        btnEls.forEach(b => { b.disabled = false; b.textContent = '❌ 저장 실패 — 재시도'; b.style.background = 'rgba(248,113,113,0.3)'; });
+        addFeed(`⛔ 보고서 저장 실패: ${e.message}`, 'alert');
+    }
+}
+
+// Close modal on backdrop click
+document.addEventListener('click', (e) => {
+    const modal = document.getElementById('dailyReportModal');
+    if (modal && e.target === modal) closeDailyReportModal();
+});
+
+function switchDay(day) {
+    state.currentDay = day;
+    const dayEl = document.getElementById('currentDay');
+    if (dayEl) dayEl.textContent = `Day ${day}`;
+    
+    addFeed(`📅 Switched to Day ${day} inventory`, 'system');
+    
+    // If in patrol view, re-render to show updated inventory
+    if (state.view === 'patrol') {
+        renderPatrolView(document.getElementById('dashboardContent'));
+    }
+}
+
+function exportReport(type) {
+    const timestamp = new Date().toISOString().split('T')[0];
+    let reportData = '';
+    
+    if (type === 'rescan') {
+        reportData = '=== Samsung Warehouse Re-scan Report ===\n';
+        reportData += `Generated: ${timestamp}\n\n`;
+        reportData += 'Locations requiring physical verification:\n\n';
+        
+        Object.keys(inventoryDay1).forEach(shelfId => {
+            const day1 = inventoryDay1[shelfId];
+            const day2 = inventoryDay2[shelfId];
+            if (day1.qty > 0 && day2.qty === 0) {
+                reportData += `${shelfId}: ${day1.sku} - MISSING (was ${day1.qty})\n`;
+            } else if (day1.qty > day2.qty && (day1.qty - day2.qty) > 5) {
+                reportData += `${shelfId}: ${day1.sku} - Large decrease (${day1.qty} → ${day2.qty})\n`;
+            }
+        });
+    } else {
+        reportData = '=== Samsung Warehouse Full Comparison Report ===\n';
+        reportData += `Generated: ${timestamp}\n\n`;
+        reportData += 'Summary:\n';
+        reportData += `Total locations: ${Object.keys(inventoryDay1).length}\n`;
+        reportData += `Changes detected: ${inventoryChanges.length}\n\n`;
+        reportData += 'Detailed changes:\n';
+        inventoryChanges.forEach(change => {
+            reportData += `${change.type.toUpperCase()}: ${change.shelfId}\n`;
+        });
+    }
+    
+    const blob = new Blob([reportData], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `warehouse_${type}_report_${timestamp}.txt`;
+    a.click();
+    
+    addFeed(`📥 Exported ${type} report`, 'success');
+}
+
+function sendToERP() {
+    addFeed('🔄 Connecting to Samsung ERP...', 'system');
+    
+    setTimeout(() => {
+        addFeed('✅ Data synchronized with ERP system', 'success');
+        addFeed(`📊 Sent ${state.scanEvents.length + state.scanEventsDay2.length} scan events`, 'success');
+    }, 1500);
+}
+
+function showPatrolView() {
+    state.view = 'patrol';
+    const content = document.getElementById('dashboardContent');
+    renderPatrolView(content);
 }
 
 // ══════════════════════════════════════════════════════════════
