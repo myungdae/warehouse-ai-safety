@@ -154,11 +154,34 @@
 <body>
     <div class="app-container">
         <div class="header">
-            <h1>
-                🔌 Tethered Drone Inventory System
-                <span class="badge">WIRED POWER</span>
-            </h1>
-            <p>Samsung Semiconductor Warehouse — 15 Aisles × 20 Racks × 15 Levels | 2 Docks (No Battery)</p>
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px">
+                <div>
+                    <h1>
+                        🔌 Tethered Drone Inventory System
+                        <span class="badge">WIRED POWER</span>
+                    </h1>
+                    <p>Samsung Semiconductor Warehouse — 15 Aisles × 20 Racks × 15 Levels | 2 Docks (No Battery)</p>
+                </div>
+                <!-- MCP Status Bar -->
+                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                    <div id="mcpBadge"
+                        style="background:rgba(100,116,139,.2);color:#64748b;padding:6px 14px;border-radius:8px;font-size:0.78rem;font-weight:700;border:1px solid rgba(100,116,139,.3);cursor:default;transition:all .3s">
+                        🖨️ MCP 대기
+                    </div>
+                    <button onclick="mcpManualPrint()"
+                        style="background:rgba(34,211,238,.12);color:#22d3ee;border:1px solid rgba(34,211,238,.35);padding:6px 14px;border-radius:8px;font-size:0.78rem;font-weight:700;cursor:pointer;transition:all .2s"
+                        onmouseover="this.style.background='rgba(34,211,238,.22)'" onmouseout="this.style.background='rgba(34,211,238,.12)'"
+                        title="현재 최신 보고서를 프린터로 즉시 출력">
+                        🖨️ 수동 출력
+                    </button>
+                    <a href="/mcp" target="_blank"
+                        style="background:rgba(167,139,250,.12);color:#a78bfa;border:1px solid rgba(167,139,250,.3);padding:6px 14px;border-radius:8px;font-size:0.78rem;font-weight:700;cursor:pointer;text-decoration:none;transition:all .2s"
+                        onmouseover="this.style.background='rgba(167,139,250,.22)'" onmouseout="this.style.background='rgba(167,139,250,.12)'"
+                        title="MCP 자동 출력 설정 페이지">
+                        ⚙️ MCP 설정
+                    </a>
+                </div>
+            </div>
         </div>
         
         <div class="stats-bar">
@@ -181,6 +204,12 @@
             <div class="stat-card" style="cursor:pointer;transition:all 0.3s" onclick="showCompareView()" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'" id="compareCard">
                 <div class="stat-label">📊 ERP Compare</div>
                 <div class="stat-value" style="font-size:0.9rem;color:#fbbf24">Day1 vs Day2</div>
+            </div>
+            <div class="stat-card" style="cursor:pointer;transition:all 0.3s;border-color:rgba(34,211,238,.3)"
+                onclick="window.open('/mcp','_blank')"
+                onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
+                <div class="stat-label">🖨️ MCP Auto-Print</div>
+                <div class="stat-value" style="font-size:0.85rem;color:#22d3ee" id="mcpStatVal">대기 중</div>
             </div>
         </div>
         

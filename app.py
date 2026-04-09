@@ -12,8 +12,11 @@ import sqlite3
 import contextlib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from datetime import datetime
+from datetime import datetime, time as dtime
 import uuid
+import threading
+import socket
+import subprocess
 
 try:
     from dotenv import load_dotenv
@@ -755,6 +758,433 @@ def export_reports():
         return jsonify({'ok': False, 'error': str(e)}), 500
 
 
+# ══════════════════════════════════════════════════════════════
+# MCP AUTO-PRINT SCHEDULER  (Agentic AI + MCP)
+# ══════════════════════════════════════════════════════════════
+
+MCP_CONFIG_FILE = os.path.join(REPORT_ARCHIVE_DIR, 'mcp_config.json')
+MCP_LOG_FILE    = os.path.join(REPORT_ARCHIVE_DIR, 'mcp_print_log.json')
+
+_DEFAULT_MCP_CONFIG = {
+    "auto_print_enabled": True,
+    "print_time": "06:00",           # HH:MM — default 6 AM (before staff arrive)
+    "printer_ip": "192.168.1.100",   # office network printer IP
+    "printer_port": 9100,            # RAW / IPP port
+    "printer_name": "Office-Printer",
+    "copies": 1,
+    "print_format": "A4",
+    "notify_email": True,
+    "patrol_auto_start": True,       # auto-start patrol at night
+    "patrol_start_time": "22:00",    # 10 PM nightly patrol
+    "last_auto_print": None,
+    "last_patrol_trigger": None,
+}
+
+def _load_mcp_config():
+    os.makedirs(REPORT_ARCHIVE_DIR, exist_ok=True)
+    if os.path.exists(MCP_CONFIG_FILE):
+        try:
+            with open(MCP_CONFIG_FILE) as f:
+                cfg = json.load(f)
+            # fill missing keys with defaults
+            for k, v in _DEFAULT_MCP_CONFIG.items():
+                cfg.setdefault(k, v)
+            return cfg
+        except Exception:
+            pass
+    return dict(_DEFAULT_MCP_CONFIG)
+
+def _save_mcp_config(cfg):
+    os.makedirs(REPORT_ARCHIVE_DIR, exist_ok=True)
+    with open(MCP_CONFIG_FILE, 'w') as f:
+        json.dump(cfg, f, ensure_ascii=False, indent=2)
+
+def _load_mcp_log():
+    if os.path.exists(MCP_LOG_FILE):
+        try:
+            with open(MCP_LOG_FILE) as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return []
+
+def _append_mcp_log(entry):
+    logs = _load_mcp_log()
+    logs.insert(0, entry)
+    logs = logs[:200]   # keep last 200 entries
+    os.makedirs(REPORT_ARCHIVE_DIR, exist_ok=True)
+    with open(MCP_LOG_FILE, 'w') as f:
+        json.dump(logs, f, ensure_ascii=False, indent=2)
+
+
+def _check_printer_online(ip, port=9100, timeout=3):
+    """TCP ping to RAW print port (9100) or IPP (631)."""
+    try:
+        with socket.create_connection((ip, port), timeout=timeout):
+            return True
+    except Exception:
+        return False
+
+
+def _send_to_printer_raw(ip, port, payload_bytes, timeout=10):
+    """Send raw bytes to a RAW/JetDirect printer port (9100)."""
+    with socket.create_connection((ip, port), timeout=timeout) as s:
+        s.sendall(payload_bytes)
+
+
+def _build_print_payload(report_data: dict) -> bytes:
+    """Build a plain-text print payload from report_data (ASCII-safe for RAW)."""
+    now     = datetime.now()
+    rpt_id  = report_data.get('report_id', 'N/A')
+    date_l  = report_data.get('date',  now.strftime('%Y-%m-%d'))
+    time_l  = report_data.get('time',  now.strftime('%H:%M:%S'))
+    accuracy = report_data.get('accuracy', 0)
+    missing  = report_data.get('missing',  0)
+    changed  = report_data.get('changed',  0)
+    new_items= report_data.get('new_items',0)
+    total_sc = report_data.get('total_scanned', 0)
+    rescan_t = report_data.get('rescan_total', 0)
+    rescan_d = report_data.get('rescan_done',  0)
+    ai_recs  = report_data.get('ai_recommendations', [])
+
+    lines = [
+        "\x1B%-12345X@PJL JOB",          # PJL header (ignored if not PCL printer)
+        "=" * 62,
+        "  SAMSUNG SEMICONDUCTOR WAREHOUSE",
+        "  DAILY DRONE INVENTORY REPORT  (AUTO-PRINT via MCP)",
+        "=" * 62,
+        f"  Report ID : {rpt_id}",
+        f"  Date/Time : {date_l}  {time_l}",
+        f"  Warehouse : Samsung-Warehouse-15A",
+        f"  Drone     : Drone-A (Aisles 1-7) + Drone-B (Aisles 8-15)",
+        "-" * 62,
+        "  KEY METRICS",
+        "-" * 62,
+        f"  Total Scanned  : {total_sc:>6} locations",
+        f"  Accuracy       : {accuracy:>6.1f} %",
+        f"  Missing Items  : {missing:>6}",
+        f"  Changed Items  : {changed:>6}",
+        f"  New Items      : {new_items:>6}",
+        f"  Re-scan Done   : {rescan_d:>3} / {rescan_t}",
+        "-" * 62,
+        "  AI RECOMMENDATIONS",
+        "-" * 62,
+    ]
+    for rec in (ai_recs or []):
+        lines.append(f"  * {rec}")
+    if not ai_recs:
+        lines.append("  * No critical issues detected.")
+
+    miss_det  = report_data.get('missing_details', [])
+    dec_det   = report_data.get('decreased_details', [])
+    rescan_res= report_data.get('rescan_results', {})
+
+    if miss_det:
+        lines += ["-" * 62, "  MISSING ITEMS (top 20)", "-" * 62]
+        for i, item in enumerate(miss_det[:20], 1):
+            sid  = item.get('shelfId', '')
+            sku  = item.get('day1', {}).get('sku', '') or ''
+            qty  = item.get('day1', {}).get('qty', 0)
+            lines.append(f"  {i:>2}. {sid:<30} {sku}  x{qty}")
+
+    if rescan_res:
+        lines += ["-" * 62, "  RE-SCAN RESULTS", "-" * 62]
+        verdicts = {'all_found':'CONFIRMED OK', 'partial_found':'PARTIAL',
+                    'confirmed_missing':'STILL MISSING', 'scanning':'IN PROGRESS'}
+        for shelfId, res in list(rescan_res.items())[:20]:
+            v = verdicts.get(res.get('verdict',''), res.get('verdict',''))
+            drone_id = res.get('droneId', '')
+            lines.append(f"  {shelfId:<35} [{v}]  Drone {drone_id}")
+
+    lines += [
+        "=" * 62,
+        f"  Printed by MCP Agentic Auto-Print  |  {now.strftime('%Y-%m-%d %H:%M:%S')}",
+        "=" * 62,
+        "\f",   # form feed — eject page
+        "\x1B%-12345X@PJL EOJ\n",
+    ]
+    return "\n".join(lines).encode('ascii', errors='replace')
+
+
+def mcp_auto_print(report_data: dict, triggered_by: str = 'scheduler') -> dict:
+    """
+    Core MCP print action:
+    1. Check printer online
+    2. Send payload via RAW TCP
+    3. Log result
+    Returns dict with ok, message
+    """
+    cfg  = _load_mcp_config()
+    ip   = cfg.get('printer_ip', '192.168.1.100')
+    port = int(cfg.get('printer_port', 9100))
+    now  = datetime.now().isoformat()
+
+    log_entry = {
+        "timestamp": now,
+        "triggered_by": triggered_by,
+        "printer_ip": ip,
+        "printer_port": port,
+        "report_id": report_data.get('report_id', 'N/A'),
+        "status": "unknown",
+        "message": "",
+    }
+
+    # Step 1: printer online check
+    if not _check_printer_online(ip, port):
+        # Try IPP port 631 as fallback
+        ipp_ok = _check_printer_online(ip, 631)
+        if not ipp_ok:
+            log_entry['status']  = 'printer_offline'
+            log_entry['message'] = f'Printer {ip}:{port} unreachable — print job skipped'
+            _append_mcp_log(log_entry)
+            print(f"[MCP] ⚠️  Printer offline: {ip}:{port}")
+            return {'ok': False, 'status': 'printer_offline',
+                    'message': log_entry['message']}
+        port = 631   # fallback to IPP raw port
+
+    # Step 2: build & send payload
+    try:
+        payload = _build_print_payload(report_data)
+        _send_to_printer_raw(ip, port, payload)
+        log_entry['status']  = 'sent'
+        log_entry['message'] = f'Print job sent successfully ({len(payload)} bytes) to {ip}:{port}'
+        _append_mcp_log(log_entry)
+        # update last_auto_print timestamp
+        cfg['last_auto_print'] = now
+        _save_mcp_config(cfg)
+        print(f"[MCP] ✅ Print job sent → {ip}:{port}  ({len(payload)} bytes)")
+        return {'ok': True, 'status': 'sent', 'message': log_entry['message'],
+                'bytes': len(payload)}
+    except Exception as e:
+        log_entry['status']  = 'error'
+        log_entry['message'] = str(e)
+        _append_mcp_log(log_entry)
+        print(f"[MCP] ❌ Print error: {e}")
+        return {'ok': False, 'status': 'error', 'message': str(e)}
+
+
+# ── MCP Background Scheduler Thread ───────────────────────────
+_scheduler_lock  = threading.Lock()
+_last_sched_date = {'print': None, 'patrol': None}
+
+def _mcp_scheduler_tick():
+    """Called every 30 s by background thread — checks if it's time to auto-print."""
+    cfg = _load_mcp_config()
+    now = datetime.now()
+    today_str = now.strftime('%Y-%m-%d')
+
+    # ── Auto-print check ──────────────────────────────────────
+    if cfg.get('auto_print_enabled'):
+        try:
+            pt_h, pt_m = map(int, cfg['print_time'].split(':'))
+            target = now.replace(hour=pt_h, minute=pt_m, second=0, microsecond=0)
+            diff_s = abs((now - target).total_seconds())
+            with _scheduler_lock:
+                already_done = _last_sched_date.get('print') == today_str
+            if diff_s < 60 and not already_done:
+                print(f"[MCP Scheduler] ⏰ Auto-print time reached ({cfg['print_time']}). Fetching latest report…")
+                # Fetch latest report from DB
+                try:
+                    with get_db() as conn:
+                        row = conn.execute(
+                            'SELECT payload FROM reports ORDER BY saved_at DESC LIMIT 1'
+                        ).fetchone()
+                    if row and row['payload']:
+                        report_data = json.loads(row['payload'])
+                        result = mcp_auto_print(report_data, triggered_by='scheduler')
+                        print(f"[MCP Scheduler] Print result: {result}")
+                    else:
+                        print("[MCP Scheduler] No reports found in DB — skipping print.")
+                        _append_mcp_log({
+                            "timestamp": now.isoformat(),
+                            "triggered_by": "scheduler",
+                            "status": "no_report",
+                            "message": "No report found in DB at scheduled print time",
+                        })
+                except Exception as e:
+                    print(f"[MCP Scheduler] DB error: {e}")
+                with _scheduler_lock:
+                    _last_sched_date['print'] = today_str
+        except Exception as e:
+            print(f"[MCP Scheduler] Error in print check: {e}")
+
+    # ── Nightly patrol auto-start signal (write to a signal file) ──
+    if cfg.get('patrol_auto_start'):
+        try:
+            ps_h, ps_m = map(int, cfg['patrol_start_time'].split(':'))
+            target_p = now.replace(hour=ps_h, minute=ps_m, second=0, microsecond=0)
+            diff_p   = abs((now - target_p).total_seconds())
+            with _scheduler_lock:
+                patrol_done = _last_sched_date.get('patrol') == today_str
+            if diff_p < 60 and not patrol_done:
+                signal_path = os.path.join(REPORT_ARCHIVE_DIR, 'patrol_trigger.json')
+                with open(signal_path, 'w') as f:
+                    json.dump({'triggered_at': now.isoformat(), 'date': today_str}, f)
+                print(f"[MCP Scheduler] 🚁 Patrol trigger signal written at {now.isoformat()}")
+                _append_mcp_log({
+                    "timestamp": now.isoformat(),
+                    "triggered_by": "scheduler",
+                    "status": "patrol_triggered",
+                    "message": f"Nightly patrol start signal at {cfg['patrol_start_time']}",
+                })
+                cfg['last_patrol_trigger'] = now.isoformat()
+                _save_mcp_config(cfg)
+                with _scheduler_lock:
+                    _last_sched_date['patrol'] = today_str
+        except Exception as e:
+            print(f"[MCP Scheduler] Error in patrol check: {e}")
+
+
+def _scheduler_loop():
+    import time
+    print("[MCP Scheduler] 🟢 Background scheduler started (30s tick)")
+    while True:
+        try:
+            _mcp_scheduler_tick()
+        except Exception as e:
+            print(f"[MCP Scheduler] Unexpected error: {e}")
+        time.sleep(30)
+
+# Start scheduler thread
+_sched_thread = threading.Thread(target=_scheduler_loop, daemon=True, name='mcp-scheduler')
+_sched_thread.start()
+
+
+# ══════════════════════════════════════════════════════════════
+# MCP / PRINTER API ROUTES
+# ══════════════════════════════════════════════════════════════
+
+@app.route('/mcp')
+def mcp_dashboard():
+    """MCP Auto-Print Control Dashboard"""
+    return render_template('mcp_print.html')
+
+
+@app.route('/api/mcp/config', methods=['GET'])
+def get_mcp_config():
+    """GET current MCP configuration"""
+    cfg = _load_mcp_config()
+    cfg_safe = {k: v for k, v in cfg.items()}   # sanitize if needed
+    return jsonify({'ok': True, 'config': cfg_safe})
+
+
+@app.route('/api/mcp/config', methods=['POST'])
+def set_mcp_config():
+    """POST — update MCP configuration"""
+    try:
+        body = request.get_json(force=True) or {}
+        cfg  = _load_mcp_config()
+        allowed = ['auto_print_enabled','print_time','printer_ip','printer_port',
+                   'printer_name','copies','print_format','notify_email',
+                   'patrol_auto_start','patrol_start_time']
+        for k in allowed:
+            if k in body:
+                cfg[k] = body[k]
+        _save_mcp_config(cfg)
+        return jsonify({'ok': True, 'config': cfg})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@app.route('/api/printer/status', methods=['GET'])
+def printer_status():
+    """GET — check if configured printer is reachable"""
+    cfg  = _load_mcp_config()
+    ip   = cfg.get('printer_ip', '192.168.1.100')
+    port = int(cfg.get('printer_port', 9100))
+    raw_ok = _check_printer_online(ip, port, timeout=2)
+    ipp_ok = _check_printer_online(ip, 631, timeout=2)
+    online = raw_ok or ipp_ok
+    return jsonify({
+        'ok': True,
+        'online': online,
+        'raw_port_ok': raw_ok,
+        'ipp_port_ok': ipp_ok,
+        'ip': ip,
+        'port': port,
+        'checked_at': datetime.now().isoformat(),
+    })
+
+
+@app.route('/api/print/manual', methods=['POST'])
+def manual_print():
+    """POST — manual print trigger (from UI button or MCP agent)
+    Body: { report_id: '...' }  OR  { report_data: {...} }
+    """
+    try:
+        body = request.get_json(force=True) or {}
+        report_data = body.get('report_data')
+
+        if not report_data:
+            # Load from DB by ID or take latest
+            report_id = body.get('report_id')
+            with get_db() as conn:
+                if report_id:
+                    row = conn.execute(
+                        'SELECT payload FROM reports WHERE id=?', (report_id,)
+                    ).fetchone()
+                else:
+                    row = conn.execute(
+                        'SELECT payload FROM reports ORDER BY saved_at DESC LIMIT 1'
+                    ).fetchone()
+            if not row or not row['payload']:
+                return jsonify({'ok': False, 'error': '보고서를 찾을 수 없습니다'}), 404
+            report_data = json.loads(row['payload'])
+
+        result = mcp_auto_print(report_data, triggered_by='manual')
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@app.route('/api/print/preview', methods=['POST'])
+def print_preview():
+    """POST — return the text payload that would be printed (for UI preview)"""
+    try:
+        body = request.get_json(force=True) or {}
+        report_data = body.get('report_data')
+        if not report_data:
+            with get_db() as conn:
+                row = conn.execute(
+                    'SELECT payload FROM reports ORDER BY saved_at DESC LIMIT 1'
+                ).fetchone()
+            if not row:
+                return jsonify({'ok': False, 'error': 'No report found'}), 404
+            report_data = json.loads(row['payload'])
+        payload_bytes = _build_print_payload(report_data)
+        return jsonify({
+            'ok': True,
+            'text': payload_bytes.decode('ascii', errors='replace'),
+            'bytes': len(payload_bytes),
+        })
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@app.route('/api/mcp/log', methods=['GET'])
+def get_mcp_log():
+    """GET — MCP print / patrol event log"""
+    logs = _load_mcp_log()
+    limit = int(request.args.get('limit', 50))
+    return jsonify({'ok': True, 'logs': logs[:limit], 'total': len(logs)})
+
+
+@app.route('/api/mcp/patrol-signal', methods=['GET'])
+def get_patrol_signal():
+    """GET — frontend polls this to know if nightly patrol should start"""
+    signal_path = os.path.join(REPORT_ARCHIVE_DIR, 'patrol_trigger.json')
+    if os.path.exists(signal_path):
+        try:
+            with open(signal_path) as f:
+                data = json.load(f)
+            # consume the signal (remove file)
+            os.remove(signal_path)
+            return jsonify({'ok': True, 'signal': True, 'data': data})
+        except Exception:
+            pass
+    return jsonify({'ok': True, 'signal': False})
+
+
 if __name__ == '__main__':
     print("=" * 60)
     print("🏭 Warehouse AI Safety System")
@@ -763,5 +1193,6 @@ if __name__ == '__main__':
     print("🌐 Access: http://localhost:5002")
     mail_status = "✅ 설정됨" if (MAIL_PASSWORD and MAIL_PASSWORD != 'placeholder_replace_with_apppassword') else "⚠️  데모 모드 (App Password 미설정)"
     print(f"📧 Email : {mail_status}")
+    print("🖨️  MCP   : Auto-print scheduler active (see /mcp)")
     print("=" * 60)
     app.run(host='0.0.0.0', port=5002, debug=False)

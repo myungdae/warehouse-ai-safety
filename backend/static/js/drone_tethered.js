@@ -448,6 +448,15 @@ function droneLoop(droneId) {
             drone.status = 'standby';
             addFeed(`✅ Drone ${droneId} patrol complete — ${drone.scannedCount} items scanned`, 'success');
             updateDroneElement(droneId);
+            // Check if ALL drones are now standby → trigger auto-report
+            const allDone = Object.values(state.drones).every(d => d.status === 'standby');
+            if (allDone && state.patrolActive) {
+                state.patrolActive = false;
+                const btn = document.getElementById('patrolBtn');
+                if (btn) btn.textContent = '▶ Start Patrol';
+                // Auto-save report and notify MCP
+                setTimeout(() => onPatrolComplete(), 800);
+            }
             return;
         }
     }
@@ -1665,6 +1674,133 @@ function showPatrolView() {
 }
 
 // ══════════════════════════════════════════════════════════════
+// MCP AUTO-PRINT INTEGRATION
+// ══════════════════════════════════════════════════════════════
+
+// Called when patrol completes (all drones standby) → auto-save + trigger MCP
+async function onPatrolComplete() {
+    addFeed('🎉 전체 순찰 완료 — 보고서 자동 저장 중…', 'success');
+
+    // Build reportId
+    const now = new Date();
+    const reportId = `RPT-${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}-${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
+
+    const { missing, decreased, increased, totalItems, accuracyRate, needsRescan } = _buildCompareData();
+
+    const report = {
+        report_id:  reportId,
+        date:       now.toLocaleDateString('ko-KR'),
+        time:       now.toLocaleTimeString('ko-KR'),
+        warehouse:  'Samsung-Warehouse-15A',
+        drone_id:   'Drone-A/B',
+        total_scanned: state.scanEvents.length + state.scanEventsDay2.length,
+        accuracy:   parseFloat(accuracyRate),
+        total_changes: missing.length + decreased.length + increased.length,
+        agent_actions: Object.keys(rescanStatus).length,
+        missing:    missing.length,
+        new_items:  increased.length,
+        changed:    decreased.length,
+        moved:      0,
+        rescan_total: Object.keys(rescanStatus).length,
+        rescan_done:  Object.values(rescanStatus).filter(s => s === 'done').length,
+        rescan_results: rescanResults,
+        rescan_log: state.feedLog.filter(f => f.includes('Re-scan') || f.includes('재스캔')),
+        needs_rescan_list: needsRescan,
+        missing_details:   missing.slice(0, 50),
+        decreased_details: decreased.slice(0, 50),
+        increased_details: increased.slice(0, 20),
+        ai_recommendations: [
+            Object.values(rescanResults).filter(r => r.verdict === 'confirmed_missing').length > 0
+                ? `${Object.values(rescanResults).filter(r => r.verdict === 'confirmed_missing').length}개 위치 재고 없음 확인 → 즉시 현장 점검`
+                : null,
+            parseFloat(accuracyRate) >= 95
+                ? `재고 정확도 ${accuracyRate}% 우수`
+                : `재고 정확도 ${accuracyRate}% — 개선 필요`,
+        ].filter(Boolean),
+        patrol_completed_at: now.toISOString(),
+        auto_generated: true,
+    };
+
+    try {
+        const resp = await fetch('/api/archive_report', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ report_data: report }),
+        });
+        const result = await resp.json();
+        if (result.ok) {
+            addFeed(`💾 보고서 자동 저장 완료: ${result.id}`, 'success');
+            // Update MCP floating badge
+            _updateMcpBadge('saved', result.id);
+        } else {
+            addFeed(`⚠️ 보고서 저장 실패: ${result.error}`, 'alert');
+        }
+    } catch(e) {
+        addFeed(`⚠️ 보고서 저장 오류: ${e.message}`, 'alert');
+    }
+}
+
+// Poll backend for nightly patrol start signal (MCP scheduler)
+async function _pollPatrolSignal() {
+    try {
+        const r = await fetch('/api/mcp/patrol-signal');
+        const d = await r.json();
+        if (d.ok && d.signal) {
+            addFeed(`🌙 MCP 스케줄러: 야간 순찰 자동 시작 신호 수신 (${d.data?.triggered_at || ''})`, 'system');
+            if (!state.patrolActive) {
+                startPatrol();
+                addFeed('🚁 야간 자동 순찰 시작!', 'success');
+            }
+        }
+    } catch(e) {/* silent */}
+}
+
+// Update floating MCP badge in header
+function _updateMcpBadge(status, info='') {
+    const el = document.getElementById('mcpBadge');
+    if (!el) return;
+    const cfg = {
+        idle:   { bg:'rgba(100,116,139,.2)',  color:'#64748b',  text:'🖨️ MCP 대기' },
+        saved:  { bg:'rgba(52,211,153,.15)',  color:'#34d399',  text:'💾 저장됨' },
+        printing:{ bg:'rgba(34,211,238,.15)', color:'#22d3ee',  text:'🖨️ 출력 중' },
+        printed:{ bg:'rgba(52,211,153,.2)',   color:'#34d399',  text:'✅ 출력 완료' },
+        offline:{ bg:'rgba(251,191,36,.15)',  color:'#fbbf24',  text:'⚠️ 프린터 오프라인' },
+    };
+    const c = cfg[status] || cfg.idle;
+    el.style.background = c.bg;
+    el.style.color      = c.color;
+    el.textContent      = info ? `${c.text} · ${info}` : c.text;
+}
+
+// Manual print from drone UI
+async function mcpManualPrint() {
+    _updateMcpBadge('printing');
+    addFeed('🖨️ MCP 수동 출력 요청 중…', 'system');
+    try {
+        const r = await fetch('/api/print/manual', {
+            method: 'POST', headers: {'Content-Type':'application/json'}, body:'{}',
+        });
+        const d = await r.json();
+        if (d.ok) {
+            _updateMcpBadge('printed');
+            addFeed(`✅ MCP 출력 완료 — ${d.bytes} bytes 전송`, 'success');
+        } else {
+            const st = d.status || '';
+            if (st === 'printer_offline') {
+                _updateMcpBadge('offline');
+                addFeed('⚠️ 프린터 오프라인 — 전원 및 네트워크 확인 필요', 'alert');
+            } else {
+                _updateMcpBadge('idle');
+                addFeed(`❌ 출력 실패: ${d.message}`, 'alert');
+            }
+        }
+    } catch(e) {
+        _updateMcpBadge('idle');
+        addFeed(`❌ 출력 오류: ${e.message}`, 'alert');
+    }
+}
+
+// ══════════════════════════════════════════════════════════════
 // INITIALIZATION
 // ══════════════════════════════════════════════════════════════
 
@@ -1673,4 +1809,38 @@ document.addEventListener('DOMContentLoaded', () => {
     if (content) {
         renderPatrolView(content);
     }
+    // Poll for nightly patrol signal every 60s
+    setInterval(_pollPatrolSignal, 60000);
+
+    // Refresh MCP config status in header every 30s
+    async function _refreshMcpStatus() {
+        try {
+            const r  = await fetch('/api/mcp/config');
+            const d  = await r.json();
+            const pr = await fetch('/api/printer/status');
+            const pd = await pr.json();
+            if (d.ok) {
+                const c    = d.config;
+                const on   = !!c.auto_print_enabled;
+                const pOn  = pd.online;
+                const statEl = document.getElementById('mcpStatVal');
+                if (statEl) {
+                    if (!on) {
+                        statEl.textContent = '비활성';
+                        statEl.style.color = '#64748b';
+                    } else if (!pOn) {
+                        statEl.textContent = '⚠️ 프린터 오프라인';
+                        statEl.style.color = '#fbbf24';
+                    } else {
+                        statEl.textContent = `✅ ${c.print_time} 자동 출력`;
+                        statEl.style.color = '#34d399';
+                    }
+                }
+                if (!pOn && on) _updateMcpBadge('offline');
+                else if (on)    _updateMcpBadge('idle');
+            }
+        } catch(e) { /* silent */ }
+    }
+    _refreshMcpStatus();
+    setInterval(_refreshMcpStatus, 30000);
 });
