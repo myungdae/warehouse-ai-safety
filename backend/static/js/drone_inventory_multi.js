@@ -256,9 +256,9 @@ function initializeDrones() {
     });
     
     // Set initial queue states
-    state.dockQueues[1] = { working: null, standby: 'A', charging: 'C', queue: [] };
-    state.dockQueues[2] = { working: null, standby: 'D', charging: 'F', queue: [] };
-    state.dockQueues[3] = { working: null, standby: 'G', charging: 'I', queue: [] };
+    state.dockQueues[1] = { working: null, standby: 'B', charging: 'C', queue: [] };
+    state.dockQueues[2] = { working: null, standby: 'E', charging: 'F', queue: [] };
+    state.dockQueues[3] = { working: null, standby: 'H', charging: 'I', queue: [] };
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -269,34 +269,120 @@ function buildTaskQueue(dockId) {
     const dock = WAREHOUSE.docks.find(d => d.id === dockId);
     const tasks = [];
     
-    dock.aisles.forEach(aisleId => {
+    dock.aisles.forEach((aisleId, aisleIdx) => {
         const aisle = WAREHOUSE.aisles.find(a => a.id === aisleId);
-        const shelvesInAisle = WAREHOUSE.shelves.filter(s => 
+        const aisleTopY = aisle.y + 10;
+        const aisleBottomY = aisle.y + aisle.h - 20;
+        const aisleCenter = aisle.x + aisle.w / 2;
+        
+        // ─── Aisle 진입 (상단으로) ───
+        if (aisleIdx === 0) {
+            // 첫 번째 aisle: Dock에서 직접 상단 진입
+            tasks.push({
+                type: 'move',
+                desc: `Enter ${aisle.label} (top)`,
+                x: aisleCenter,
+                y: aisleTopY,
+            });
+        } else {
+            // 이전 aisle 상단에서 수평 이동 (같은 높이)
+            const prevAisle = WAREHOUSE.aisles.find(a => a.id === dock.aisles[aisleIdx - 1]);
+            
+            // 수평 이동 (같은 높이로, 기둥 돌아가기)
+            tasks.push({
+                type: 'move',
+                desc: `Navigate to ${aisle.label} (same level)`,
+                x: aisleCenter,
+                y: aisleTopY,  // 상단 높이 유지
+            });
+        }
+        
+        // ─── Side A 스캔 (Left, Rack 1→20, 위→아래) ───
+        const shelvesLeftSide = WAREHOUSE.shelves.filter(s => 
             s.aisle === aisleId && 
-            s.layerIdx === SCAN_CONFIG.startLayer &&
-            (SCAN_CONFIG.scanMode === 'both' || 
-             (SCAN_CONFIG.scanMode === 'left' && s.side === 'L') ||
-             (SCAN_CONFIG.scanMode === 'right' && s.side === 'R'))
+            s.side === 'L' &&
+            s.layerIdx === SCAN_CONFIG.startLayer
         );
         
-        // Group by rack
-        const rackGroups = {};
-        shelvesInAisle.forEach(shelf => {
-            if (!rackGroups[shelf.rack]) rackGroups[shelf.rack] = [];
-            rackGroups[shelf.rack].push(shelf);
+        const racksLeft = {};
+        shelvesLeftSide.forEach(shelf => {
+            if (!racksLeft[shelf.rack]) racksLeft[shelf.rack] = [];
+            racksLeft[shelf.rack].push(shelf);
         });
         
-        // Create tasks
-        Object.keys(rackGroups).sort((a, b) => parseInt(a) - parseInt(b)).forEach(rack => {
+        Object.keys(racksLeft).sort((a, b) => parseInt(a) - parseInt(b)).forEach(rack => {
             tasks.push({
                 type: 'scan',
+                side: 'L',
                 aisleId: aisleId,
                 rack: parseInt(rack),
-                shelves: rackGroups[rack],
-                x: aisle.x + aisle.w / 2,
+                shelves: racksLeft[rack],
+                x: aisleCenter,
                 y: aisle.y + 10 + (parseInt(rack) - 1) * 26 + 11,
             });
         });
+        
+        // ─── Side A 완료 후 하단 끝으로 이동 (물리적 제약: 직접 넘어갈 수 없음) ───
+        const aisleBottomY = aisle.y + aisle.h - 10;
+        tasks.push({
+            type: 'move',
+            desc: `Move to bottom end of ${aisle.label} (Side A complete, preparing Side B)`,
+            x: aisleCenter,
+            y: aisleBottomY,
+        });
+        
+        // ─── 하단 끝에서 반대편(Side B)으로 회전 ───
+        tasks.push({
+            type: 'move',
+            desc: `Rotate to Side B at bottom of ${aisle.label}`,
+            x: aisleCenter + 15,  // 약간 오른쪽으로 이동 (회전 표현)
+            y: aisleBottomY,
+        });
+        
+        // ─── Side B 스캔 (Right, Rack 20→1, 하단→상단) ───
+        const shelvesRightSide = WAREHOUSE.shelves.filter(s => 
+            s.aisle === aisleId && 
+            s.side === 'R' &&
+            s.layerIdx === SCAN_CONFIG.startLayer
+        );
+        
+        const racksRight = {};
+        shelvesRightSide.forEach(shelf => {
+            if (!racksRight[shelf.rack]) racksRight[shelf.rack] = [];
+            racksRight[shelf.rack].push(shelf);
+        });
+        
+        // Side B는 Rack 20부터 1까지 역순 (하단→상단)
+        Object.keys(racksRight).sort((a, b) => parseInt(b) - parseInt(a)).forEach(rack => {
+            tasks.push({
+                type: 'scan',
+                side: 'R',
+                aisleId: aisleId,
+                rack: parseInt(rack),
+                shelves: racksRight[rack],
+                x: aisleCenter,
+                y: aisle.y + 10 + (parseInt(rack) - 1) * 26 + 11,
+            });
+        });
+        
+        // ─── Side B 완료 후 상단 끝으로 이동 (다음 aisle로 이동 준비) ───
+        tasks.push({
+            type: 'move',
+            desc: `Move to top end of ${aisle.label} (Side B complete)`,
+            x: aisleCenter,
+            y: aisleTopY,
+        });
+        
+        // ─── 다음 aisle로 이동 (수평 이동, 상단 끝→다음 aisle 상단 끝) ───
+        const nextAisle = dockAisles[idx + 1];
+        if (nextAisle) {
+            tasks.push({
+                type: 'move',
+                desc: `Navigate to ${nextAisle.label} top end (horizontal)`,
+                x: nextAisle.x + nextAisle.w / 2,
+                y: nextAisle.y + 10,
+            });
+        }
     });
     
     return tasks;
@@ -317,10 +403,10 @@ function startPatrol() {
         state.dockQueues[dockId].queue = buildTaskQueue(dockId);
     });
     
-    // Start working drones (A, D, G)
-    assignNextTask('A');
-    assignNextTask('D');
-    assignNextTask('G');
+    // Start with standby drones (B, E, H) - they become working
+    assignNextTask('B');
+    assignNextTask('E');
+    assignNextTask('H');
     
     // Start animation loops
     Object.keys(state.drones).forEach(droneId => {
@@ -342,15 +428,22 @@ function assignNextTask(droneId) {
     
     const task = dockQueue.queue.shift();
     drone.status = 'working';
-    drone.targetShelf = task;
+    drone.currentTask = task;
     
-    // Build path to task
-    const dock = WAREHOUSE.docks.find(d => d.id === drone.dockId);
-    drone.path = [
-        { x: task.x, y: task.y, type: 'scan', task: task }
-    ];
+    // Build path based on task type
+    if (task.type === 'move') {
+        // Simple move task
+        drone.path = [
+            { x: task.x, y: task.y, type: 'move', desc: task.desc }
+        ];
+    } else if (task.type === 'scan') {
+        // Scan task
+        drone.path = [
+            { x: task.x, y: task.y, type: 'scan', task: task }
+        ];
+    }
+    
     drone.pathIndex = 0;
-    
     dockQueue.working = droneId;
     
     updateDockUI(drone.dockId);
@@ -412,6 +505,18 @@ function droneLoop(droneId) {
             // Reached target
             if (target.type === 'scan') {
                 processScan(droneId, target.task);
+            } else if (target.type === 'move') {
+                // Just a waypoint, continue to next task
+                if (target.desc) {
+                    // 이동 타입별로 아이콘 추가
+                    let icon = '🛫';
+                    if (target.desc.includes('bottom')) icon = '⬇️';
+                    else if (target.desc.includes('top') || target.desc.includes('Return')) icon = '⬆️';
+                    else if (target.desc.includes('Navigate') || target.desc.includes('same level')) icon = '➡️';
+                    else if (target.desc.includes('Rotate')) icon = '🔄';
+                    
+                    addFeed(`Drone ${droneId}: ${icon} ${target.desc}`, 'system');
+                }
             } else if (target.type === 'dock') {
                 dockDrone(droneId);
             }
@@ -440,7 +545,12 @@ function processScan(droneId, task) {
     const inv = getCurrentInventory();
     const scanTime = new Date().toLocaleTimeString('ko-KR');
     
-    task.shelves.forEach(shelf => {
+    // 1️⃣ 먼저 Rack ID 읽기 (물리적 프로세스의 첫 단계)
+    const rackId = `${task.aisleId}-${task.side}${task.rack}`;
+    const sideName = task.side === 'L' ? 'Side A (Left)' : 'Side B (Right)';
+    addFeed(`Drone ${droneId}: 📍 Reading Rack ID: ${rackId} — ${sideName}`, 'system');
+    
+    task.shelves.forEach((shelf, itemIdx) => {
         if (state.scannedShelves.has(shelf.id)) return;
         state.scannedShelves.add(shelf.id);
         
@@ -475,8 +585,12 @@ function processScan(droneId, task) {
             shelfEl.setAttribute('stroke', event.sku ? '#34d399' : '#f87171');
         }
         
-        addFeed(`Drone ${droneId}: ${shelf.id} — ${event.sku ? event.sku + ' × ' + event.qty : 'Empty'}`, 'scan');
+        // 2️⃣ Item 단위 스캔 피드백 (1/5, 2/5, ...)
+        addFeed(`Drone ${droneId}: 📦 Item ${itemIdx + 1}/5 — ${event.sku ? event.sku + ' × ' + event.qty : 'Empty'}`, 'scan');
     });
+    
+    // 3️⃣ Rack 스캔 완료 피드백
+    addFeed(`Drone ${droneId}: ✅ Rack ${task.rack} complete — 5 items scanned`, 'success');
 }
 
 function dockDrone(droneId) {
@@ -494,21 +608,30 @@ function dockDrone(droneId) {
 function handoverToStandby(dockId) {
     const dockQueue = state.dockQueues[dockId];
     
-    if (!dockQueue.standby) return;
+    if (!dockQueue.standby) {
+        addFeed(`⚠️ No standby drone available at Dock ${dockId}`, 'alert');
+        return;
+    }
     
-    const standbyDrone = dockQueue.standby;
-    addFeed(`Handover at Dock ${dockId}: ${standbyDrone} taking over`, 'agent');
+    const standbyDroneId = dockQueue.standby;
+    const standbyDrone = state.drones[standbyDroneId];
     
-    // Assign next task to standby
-    assignNextTask(standbyDrone);
+    addFeed(`🔄 Handover at Dock ${dockId}: Drone ${standbyDroneId} taking over`, 'agent');
     
-    // Move charging to standby (if fully charged)
+    // Standby 드론이 다음 작업을 이어받음
+    assignNextTask(standbyDroneId);
+    
+    // Standby 슬롯 비우기
+    dockQueue.standby = null;
+    
+    // Charging 드론이 충전 완료되면 standby로 전환
     if (dockQueue.charging) {
         const chargingDrone = state.drones[dockQueue.charging];
         if (chargingDrone.battery >= 95) {
             dockQueue.standby = dockQueue.charging;
             dockQueue.charging = null;
             chargingDrone.status = 'standby';
+            addFeed(`🔋 Drone ${dockQueue.charging} charged → now standby`, 'system');
         }
     }
     
@@ -796,6 +919,129 @@ function showView(view) {
     if (view === 'patrol') {
         renderPatrolView(content);
     }
+}
+
+// ══════════════════════════════════════════════════════════════
+// SUMMARY REPORT
+// ══════════════════════════════════════════════════════════════
+
+function showSummaryReport() {
+    const totalL1Shelves = WAREHOUSE.shelves.filter(s => s.layerIdx === 0).length;
+    const scannedCount = state.scannedShelves.size;
+    const coverage = totalL1Shelves > 0 ? (scannedCount / totalL1Shelves * 100) : 0;
+    
+    // 드론별 통계
+    const droneStats = Object.keys(state.drones).map(droneId => {
+        const drone = state.drones[droneId];
+        return {
+            id: droneId,
+            dockId: drone.dockId,
+            status: drone.status,
+            battery: drone.battery.toFixed(1),
+            scanned: drone.scannedCount || 0
+        };
+    });
+    
+    // Dock별 통계
+    const dockStats = [1, 2, 3].map(dockId => {
+        const dock = WAREHOUSE.docks.find(d => d.id === dockId);
+        const dockDrones = droneStats.filter(d => d.dockId === dockId);
+        const totalScanned = dockDrones.reduce((sum, d) => sum + d.scanned, 0);
+        
+        return {
+            id: dockId,
+            name: dock.name,
+            color: dock.color,
+            totalScanned: totalScanned,
+            drones: dockDrones
+        };
+    });
+    
+    // Summary Card 생성
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+        position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.8); z-index: 9999;
+        display: flex; align-items: center; justify-content: center;
+        padding: 20px;
+    `;
+    
+    modal.innerHTML = `
+        <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+                    border-radius: 16px; padding: 30px; max-width: 900px; width: 100%;
+                    border: 1px solid rgba(99,102,241,0.3); box-shadow: 0 20px 60px rgba(0,0,0,0.5);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
+                <h2 style="font-size:1.5rem; color:#e2e8f0; margin:0;">📊 Multi-Drone Operation Summary</h2>
+                <button onclick="this.closest('div').parentElement.remove()" 
+                        style="background:rgba(248,113,113,0.15); border:1px solid rgba(248,113,113,0.3);
+                               color:#f87171; padding:8px 16px; border-radius:8px; cursor:pointer; font-weight:700;">
+                    ✕ Close
+                </button>
+            </div>
+            
+            <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:24px;">
+                <div style="background:rgba(34,211,238,0.1); border:1px solid rgba(34,211,238,0.3); 
+                            border-radius:12px; padding:16px; text-align:center;">
+                    <div style="font-size:0.7rem; color:#64748b; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:8px;">Total Scanned</div>
+                    <div style="font-size:2rem; font-weight:800; color:#22d3ee;">${scannedCount}</div>
+                    <div style="font-size:0.7rem; color:#64748b; margin-top:4px;">/ ${totalL1Shelves} shelves</div>
+                </div>
+                <div style="background:rgba(52,211,153,0.1); border:1px solid rgba(52,211,153,0.3); 
+                            border-radius:12px; padding:16px; text-align:center;">
+                    <div style="font-size:0.7rem; color:#64748b; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:8px;">Coverage</div>
+                    <div style="font-size:2rem; font-weight:800; color:#34d399;">${coverage.toFixed(1)}%</div>
+                    <div style="font-size:0.7rem; color:#64748b; margin-top:4px;">Level 1 (Demo)</div>
+                </div>
+                <div style="background:rgba(251,191,36,0.1); border:1px solid rgba(251,191,36,0.3); 
+                            border-radius:12px; padding:16px; text-align:center;">
+                    <div style="font-size:0.7rem; color:#64748b; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:8px;">Active Drones</div>
+                    <div style="font-size:2rem; font-weight:800; color:#fbbf24;">${droneStats.filter(d => d.status === 'working').length}</div>
+                    <div style="font-size:0.7rem; color:#64748b; margin-top:4px;">/ 9 total</div>
+                </div>
+            </div>
+            
+            <h3 style="font-size:1rem; color:#94a3b8; margin:20px 0 12px 0; font-weight:700;">Dock Performance</h3>
+            
+            <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:16px;">
+                ${dockStats.map(dock => `
+                <div style="background:rgba(15,23,42,0.6); border:1px solid ${dock.color}33; 
+                            border-left:3px solid ${dock.color}; border-radius:10px; padding:14px;">
+                    <div style="font-weight:700; color:${dock.color}; font-size:0.9rem; margin-bottom:10px;">
+                        ${dock.name}
+                    </div>
+                    <div style="font-size:0.7rem; color:#64748b; margin-bottom:8px;">
+                        Total Scanned: <b style="color:#e2e8f0">${dock.totalScanned}</b>
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:6px;">
+                        ${dock.drones.map(d => `
+                        <div style="display:flex; justify-content:space-between; font-size:0.75rem; 
+                                    padding:4px 8px; background:rgba(255,255,255,0.03); border-radius:6px;">
+                            <span style="color:#94a3b8;">Drone ${d.id}</span>
+                            <span style="color:${d.status === 'working' ? '#22d3ee' : d.status === 'charging' ? '#fbbf24' : '#64748b'}">
+                                ${d.status === 'working' ? '🔵 Working' : d.status === 'charging' ? '🟡 Charging' : '⚪ Standby'}
+                            </span>
+                            <span style="color:#e2e8f0; font-weight:700;">${d.battery}%</span>
+                        </div>
+                        `).join('')}
+                    </div>
+                </div>
+                `).join('')}
+            </div>
+            
+            <div style="margin-top:24px; padding:16px; background:rgba(99,102,241,0.1); 
+                        border:1px solid rgba(99,102,241,0.3); border-radius:10px;">
+                <div style="font-size:0.8rem; color:#94a3b8; line-height:1.6;">
+                    <b style="color:#a5b4fc;">📌 Demo Configuration:</b><br>
+                    • Scanning Level 1 only (expandable to all 15 levels)<br>
+                    • Battery: 27-minute cycle with 10% handover threshold<br>
+                    • Navigation: Realistic aisle-to-aisle path (no overhead flight)<br>
+                    • Path: Side A (top→bottom) → Side B (bottom→top) → Next aisle
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
 }
 
 // ══════════════════════════════════════════════════════════════
