@@ -9,13 +9,23 @@
 
 'use strict';
 
-// ── Layer 정의 (5m 높이, 5개 Layer, 1m 간격) ─────────────────
+// ── Layer 정의 (15개 Layer, 총 15m 높이) ─────────────────
 const LAYERS = [
-    { id: 'L1', label: 'Layer 1 (0–1m)',   height_m: 0.5,  color: '#f87171', colorAlpha: 'rgba(248,113,113,0.22)' },
-    { id: 'L2', label: 'Layer 2 (1–2m)',   height_m: 1.5,  color: '#fbbf24', colorAlpha: 'rgba(251,191,36,0.22)'  },
-    { id: 'L3', label: 'Layer 3 (2–3m)',   height_m: 2.5,  color: '#34d399', colorAlpha: 'rgba(52,211,153,0.22)'  },
-    { id: 'L4', label: 'Layer 4 (3–4m)',   height_m: 3.5,  color: '#22d3ee', colorAlpha: 'rgba(34,211,238,0.22)'  },
-    { id: 'L5', label: 'Layer 5 (4–5m)',   height_m: 4.5,  color: '#a78bfa', colorAlpha: 'rgba(167,139,250,0.22)' },
+    { id: 'L1',  label: 'Layer 1',   height_m: 0.5,   color: '#f87171', colorAlpha: 'rgba(248,113,113,0.15)' },
+    { id: 'L2',  label: 'Layer 2',   height_m: 1.5,   color: '#fb923c', colorAlpha: 'rgba(251,146,60,0.15)' },
+    { id: 'L3',  label: 'Layer 3',   height_m: 2.5,   color: '#fbbf24', colorAlpha: 'rgba(251,191,36,0.15)' },
+    { id: 'L4',  label: 'Layer 4',   height_m: 3.5,   color: '#a3e635', colorAlpha: 'rgba(163,230,53,0.15)' },
+    { id: 'L5',  label: 'Layer 5',   height_m: 4.5,   color: '#34d399', colorAlpha: 'rgba(52,211,153,0.15)' },
+    { id: 'L6',  label: 'Layer 6',   height_m: 5.5,   color: '#22d3ee', colorAlpha: 'rgba(34,211,238,0.15)' },
+    { id: 'L7',  label: 'Layer 7',   height_m: 6.5,   color: '#3b82f6', colorAlpha: 'rgba(59,130,246,0.15)' },
+    { id: 'L8',  label: 'Layer 8',   height_m: 7.5,   color: '#6366f1', colorAlpha: 'rgba(99,102,241,0.15)' },
+    { id: 'L9',  label: 'Layer 9',   height_m: 8.5,   color: '#8b5cf6', colorAlpha: 'rgba(139,92,246,0.15)' },
+    { id: 'L10', label: 'Layer 10',  height_m: 9.5,   color: '#a78bfa', colorAlpha: 'rgba(167,139,250,0.15)' },
+    { id: 'L11', label: 'Layer 11',  height_m: 10.5,  color: '#c084fc', colorAlpha: 'rgba(192,132,252,0.15)' },
+    { id: 'L12', label: 'Layer 12',  height_m: 11.5,  color: '#d946ef', colorAlpha: 'rgba(217,70,239,0.15)' },
+    { id: 'L13', label: 'Layer 13',  height_m: 12.5,  color: '#e879f9', colorAlpha: 'rgba(232,121,249,0.15)' },
+    { id: 'L14', label: 'Layer 14',  height_m: 13.5,  color: '#f0abfc', colorAlpha: 'rgba(240,171,252,0.15)' },
+    { id: 'L15', label: 'Layer 15',  height_m: 14.5,  color: '#fae8ff', colorAlpha: 'rgba(250,232,255,0.15)' },
 ];
 
 // ── 스캔 설정 (사용자 조절 가능) ─────────────────────────────
@@ -26,54 +36,67 @@ const SCAN_CONFIG = {
     activeLayerIdx: 0,        // 현재 순찰 중인 layer 인덱스 (런타임)
 };
 
-// ── 상수 ──────────────────────────────────────────────────────
+// ── 창고 구조 (15 aisles × 20 racks × 15 levels) ──────────────
 const WAREHOUSE = {
-    width: 820,
-    height: 480,
-    aisles: [
-        { id: 'A', x: 80,  y: 50, w: 110, h: 340, label: 'Aisle-A' },
-        { id: 'B', x: 240, y: 50, w: 110, h: 340, label: 'Aisle-B' },
-        { id: 'C', x: 400, y: 50, w: 110, h: 340, label: 'Aisle-C' },
-        { id: 'D', x: 560, y: 50, w: 110, h: 340, label: 'Aisle-D' },
-    ],
-    shelves: [] // 자동 생성
+    width: 1400,  // 15개 aisle을 수용하기 위해 확장
+    height: 620,  // 20 racks를 수용하기 위해 확장
+    aisles: [],   // 동적 생성
+    shelves: [],  // 동적 생성
+    docks: []     // 3개 Dock 위치
 };
 
-const DRONE = { size: 14, speed: 1.8, scanRadius: 50 };
+// 15개 Aisle 생성 (가로 배치)
+for (let i = 0; i < 15; i++) {
+    WAREHOUSE.aisles.push({
+        id: String(i + 1),
+        x: 60 + i * 88,
+        y: 50,
+        w: 70,
+        h: 540,
+        label: `Aisle-${i + 1}`,
+        dockId: i < 5 ? 1 : (i < 10 ? 2 : 3)  // Dock 할당
+    });
+}
 
-// ── 통로별 선반 자동 생성 (Row × Layer) ──────────────────────
-//   Row: 통로 따라 가로 방향 (6 rows)
-//   Layer: 높이 방향 (5 layers, L1=바닥~L5=5m)
-//   shelf ID = {aisle}{side}{row}-{layerId}  예: AL1-L3
+// 3개 Dock 위치 정의
+WAREHOUSE.docks = [
+    { id: 1, name: 'First Dock',  x: 20,  y: 280, w: 35, h: 60, color: '#22d3ee', aisles: [1,2,3,4,5] },
+    { id: 2, name: 'Second Dock', x: 20,  y: 360, w: 35, h: 60, color: '#34d399', aisles: [6,7,8,9,10] },
+    { id: 3, name: 'Third Dock',  x: 20,  y: 440, w: 35, h: 60, color: '#a78bfa', aisles: [11,12,13,14,15] },
+];
+
+const DRONE = { size: 12, speed: 2.0, scanRadius: 40, batteryDrainRate: 0.037 };  // 27분에 100% 소모
+
+// ── Shelves 자동 생성 (15 aisles × 20 racks × 15 levels × 2 sides) ──────────────────────
 WAREHOUSE.aisles.forEach(aisle => {
-    const rowCount = 6; // 통로 방향 6개 위치
-    for (let row = 0; row < rowCount; row++) {
-        const y = aisle.y + 20 + row * 52;
+    const rackCount = 20; // 각 aisle당 20개 rack
+    for (let rack = 0; rack < rackCount; rack++) {
+        const y = aisle.y + 10 + rack * 26;  // 20개 rack을 수직으로 배치
         LAYERS.forEach((layer, li) => {
             // 좌측 선반
             WAREHOUSE.shelves.push({
-                id:    `${aisle.id}L${row+1}-${layer.id}`,
+                id:    `${aisle.id}-L${rack+1}-${layer.id}`,
                 aisle: aisle.id,
                 side:  'L',
                 layer: layer.id,
                 layerIdx: li,
-                x: aisle.x - 34,
+                x: aisle.x - 28,
                 y: y,
-                w: 30, h: 28,
-                row: row + 1,
+                w: 24, h: 22,
+                rack: rack + 1,
                 height_m: layer.height_m,
             });
             // 우측 선반
             WAREHOUSE.shelves.push({
-                id:    `${aisle.id}R${row+1}-${layer.id}`,
+                id:    `${aisle.id}-R${rack+1}-${layer.id}`,
                 aisle: aisle.id,
                 side:  'R',
                 layer: layer.id,
                 layerIdx: li,
                 x: aisle.x + aisle.w + 4,
                 y: y,
-                w: 30, h: 28,
-                row: row + 1,
+                w: 24, h: 22,
+                rack: rack + 1,
                 height_m: layer.height_m,
             });
         });

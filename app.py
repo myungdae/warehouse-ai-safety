@@ -119,6 +119,11 @@ def index():
 
 @app.route('/drone')
 def drone_inventory():
+    return render_template('drone_inventory_multi.html')
+
+@app.route('/drone/single')
+def drone_inventory_single():
+    """Legacy single-drone system"""
     return render_template('drone_inventory.html')
 
 @app.route('/admin/reports')
