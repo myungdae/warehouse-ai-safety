@@ -331,6 +331,113 @@
       white-space:nowrap;
     }
 
+    /* ── BEI Auto-Control Panel ── */
+    .bei-control-panel{
+      background:linear-gradient(135deg,rgba(0,0,0,0.5),rgba(8,12,24,0.8));
+      border:1px solid rgba(0,212,255,0.2);
+      border-radius:14px; padding:18px;
+    }
+    .bei-ctrl-header{
+      display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;
+    }
+    .bei-ctrl-title{
+      font-size:11px; font-weight:700; letter-spacing:1.5px;
+      text-transform:uppercase; color:var(--cyan);
+    }
+    .bei-ctrl-badge{
+      font-size:9px; font-weight:700; padding:3px 10px; border-radius:20px;
+      background:rgba(0,212,255,0.1); border:1px solid rgba(0,212,255,0.3); color:var(--cyan);
+      letter-spacing:1px;
+    }
+    .bei-auto-tag{
+      display:inline-flex; align-items:center; gap:5px;
+      font-size:9px; padding:2px 8px; border-radius:20px;
+      background:rgba(0,255,136,0.08); border:1px solid rgba(0,255,136,0.2); color:var(--green);
+    }
+    .bei-auto-dot{
+      width:6px;height:6px;border-radius:50%;
+      background:var(--green); animation:blink 1.2s infinite;
+    }
+
+    /* Control rows */
+    .ctrl-grid{
+      display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:14px;
+    }
+    .ctrl-item{
+      background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06);
+      border-radius:8px; padding:10px 12px;
+      transition:border-color .3s, background .3s;
+    }
+    .ctrl-item.active-ctrl{
+      border-color:rgba(0,212,255,0.4); background:rgba(0,212,255,0.05);
+    }
+    .ctrl-item.active-warn{
+      border-color:rgba(255,144,32,0.4); background:rgba(255,144,32,0.05);
+    }
+    .ctrl-item.active-danger{
+      border-color:rgba(255,68,68,0.5); background:rgba(255,68,68,0.07);
+      animation:ctrl-pulse .8s infinite;
+    }
+    @keyframes ctrl-pulse{0%,100%{border-color:rgba(255,68,68,0.5)}50%{border-color:rgba(255,68,68,0.9)}}
+    .ctrl-label{font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;}
+    .ctrl-value-row{display:flex;align-items:center;justify-content:space-between;}
+    .ctrl-value{font-size:15px;font-weight:800;color:var(--text);transition:color .3s;}
+    .ctrl-status-pill{
+      font-size:9px;font-weight:700;padding:2px 8px;border-radius:20px;border:1px solid;
+      transition:all .3s;
+    }
+    .ctrl-status-pill.st-on  {color:var(--green);border-color:rgba(0,255,136,0.4);background:rgba(0,255,136,0.08);}
+    .ctrl-status-pill.st-off {color:var(--dim);border-color:rgba(255,255,255,0.1);background:rgba(255,255,255,0.02);}
+    .ctrl-status-pill.st-warn{color:var(--orange);border-color:rgba(255,144,32,0.4);background:rgba(255,144,32,0.08);}
+    .ctrl-status-pill.st-cut {color:var(--red);border-color:rgba(255,68,68,0.5);background:rgba(255,68,68,0.1);animation:blink .6s infinite;}
+
+    /* CAN Bus log */
+    .can-bus-log{
+      background:rgba(0,0,0,0.4); border:1px solid rgba(0,212,255,0.1);
+      border-radius:8px; padding:12px;
+      font-family:'Courier New',Courier,monospace;
+      max-height:160px; overflow-y:auto;
+    }
+    .can-bus-title{
+      font-size:9px; letter-spacing:2px; text-transform:uppercase;
+      color:rgba(0,212,255,0.6); margin-bottom:8px;
+      display:flex; justify-content:space-between; align-items:center;
+    }
+    .can-entry{
+      font-size:11px; line-height:1.6; padding:2px 0;
+      border-bottom:1px solid rgba(255,255,255,0.03);
+      display:flex; gap:10px; align-items:flex-start;
+    }
+    .can-entry:last-child{border-bottom:none;}
+    .can-ts{color:rgba(0,212,255,0.5); white-space:nowrap; min-width:56px;}
+    .can-id{color:rgba(255,215,0,0.8); white-space:nowrap; min-width:70px;}
+    .can-data{color:rgba(0,255,136,0.9); white-space:nowrap;}
+    .can-comment{color:rgba(255,255,255,0.35); font-style:italic; font-size:10px;}
+    .can-cmd{color:rgba(255,144,32,0.9);}
+    .can-alert{color:rgba(255,68,68,0.9);}
+
+    /* BEI action timeline */
+    .action-timeline{
+      display:flex; flex-direction:column; gap:6px; margin-bottom:12px;
+    }
+    .tl-step{
+      display:flex; gap:10px; align-items:flex-start;
+      opacity:0.35; transition:opacity .5s;
+    }
+    .tl-step.tl-done{ opacity:1; }
+    .tl-step.tl-active{ opacity:1; }
+    .tl-dot{
+      width:10px; height:10px; border-radius:50%;
+      background:var(--dim); border:2px solid rgba(255,255,255,0.1);
+      margin-top:2px; flex-shrink:0; transition:background .3s, border-color .3s;
+    }
+    .tl-done .tl-dot{background:var(--green); border-color:rgba(0,255,136,0.6); box-shadow:0 0 6px rgba(0,255,136,0.4);}
+    .tl-active .tl-dot{background:var(--cyan); border-color:rgba(0,212,255,0.6); box-shadow:0 0 8px rgba(0,212,255,0.5); animation:tl-pulse 1s infinite;}
+    @keyframes tl-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.4)}}
+    .tl-line{flex:1;}
+    .tl-label{font-size:11px;color:var(--text);font-weight:600;}
+    .tl-sub{font-size:10px;color:var(--muted);margin-top:1px;}
+
     /* ── MCP Action Log ── */
     .action-log{
       background:var(--card); border:1px solid var(--border);
@@ -446,7 +553,7 @@
   </div>
   <div class="hdr-right">
     <a class="hdr-link" href="/battery">← 제안서</a>
-    <a class="hdr-link" href="https://fpv.exko.kr/edge" target="_blank">Edge 규격</a>
+    <a class="hdr-link" href="/edge" target="_blank">BEI 코드 · 규격</a>
     <span class="sim-badge">LIVE SIM</span>
   </div>
 </header>
@@ -668,6 +775,102 @@
           <span class="ont-row-tag">MCP Action</span>
           <span class="ont-row-val" id="ont-act-val">충전 전류 유지 (2.1 A) — 개입 없음</span>
           <span class="ont-row-badge" id="ont-act-badge" style="color:var(--cyan);border-color:rgba(0,212,255,0.3);background:rgba(0,212,255,0.06);">모니터링</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- BEI Auto-Control Panel -->
+    <div class="bei-control-panel" id="bei-control-panel">
+      <div class="bei-ctrl-header">
+        <div class="bei-ctrl-title">🤖 BEI 자동 제어 — CAN/SMBus</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <div class="bei-auto-tag"><div class="bei-auto-dot"></div>AUTO</div>
+          <div class="bei-ctrl-badge">REAL-TIME</div>
+        </div>
+      </div>
+
+      <!-- Action Timeline -->
+      <div class="action-timeline" id="action-timeline">
+        <div class="tl-step tl-done" id="tl-0">
+          <div class="tl-dot"></div>
+          <div class="tl-line">
+            <div class="tl-label">센서 수집 완료</div>
+            <div class="tl-sub" id="tl-0-sub">셀 전압 ×12, 온도 ×16, 임피던스 EIS — 100ms 주기</div>
+          </div>
+        </div>
+        <div class="tl-step" id="tl-1">
+          <div class="tl-dot"></div>
+          <div class="tl-line">
+            <div class="tl-label">Ontology 추론</div>
+            <div class="tl-sub" id="tl-1-sub">5단계 계층 분석 (Observation→Intent) — NPU &lt;12ms</div>
+          </div>
+        </div>
+        <div class="tl-step" id="tl-2">
+          <div class="tl-dot"></div>
+          <div class="tl-line">
+            <div class="tl-label">MCP 명령 결정</div>
+            <div class="tl-sub" id="tl-2-sub">위험도 스코어 기반 제어 명령 생성</div>
+          </div>
+        </div>
+        <div class="tl-step" id="tl-3">
+          <div class="tl-dot"></div>
+          <div class="tl-line">
+            <div class="tl-label">CAN 버스 전송</div>
+            <div class="tl-sub" id="tl-3-sub">BMS → 충전기/냉각팬/MOSFET 제어</div>
+          </div>
+        </div>
+        <div class="tl-step" id="tl-4">
+          <div class="tl-dot"></div>
+          <div class="tl-line">
+            <div class="tl-label">클라우드 알림</div>
+            <div class="tl-sub" id="tl-4-sub">WiFi 6 → 제조사 서버 → 운영자 알림</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Control Status Grid -->
+      <div class="ctrl-grid">
+        <div class="ctrl-item" id="ctrl-current">
+          <div class="ctrl-label">충전 전류 (A)</div>
+          <div class="ctrl-value-row">
+            <div class="ctrl-value" id="cv-current">2.1 A</div>
+            <div class="ctrl-status-pill st-on" id="cs-current">정상</div>
+          </div>
+        </div>
+        <div class="ctrl-item" id="ctrl-fan">
+          <div class="ctrl-label">냉각 팬</div>
+          <div class="ctrl-value-row">
+            <div class="ctrl-value" id="cv-fan">OFF</div>
+            <div class="ctrl-status-pill st-off" id="cs-fan">대기</div>
+          </div>
+        </div>
+        <div class="ctrl-item" id="ctrl-balance">
+          <div class="ctrl-label">셀 밸런싱</div>
+          <div class="ctrl-value-row">
+            <div class="ctrl-value" id="cv-balance">OFF</div>
+            <div class="ctrl-status-pill st-off" id="cs-balance">대기</div>
+          </div>
+        </div>
+        <div class="ctrl-item" id="ctrl-mosfet">
+          <div class="ctrl-label">보호 MOSFET</div>
+          <div class="ctrl-value-row">
+            <div class="ctrl-value" id="cv-mosfet">ON</div>
+            <div class="ctrl-status-pill st-on" id="cs-mosfet">정상</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CAN Bus Live Log -->
+      <div class="can-bus-title">
+        <span>📡 CAN 버스 실시간 로그</span>
+        <span style="color:var(--green);font-size:9px;">● LIVE</span>
+      </div>
+      <div class="can-bus-log" id="can-log">
+        <div class="can-entry">
+          <span class="can-ts">00:00.000</span>
+          <span class="can-id">0x0CF11E05</span>
+          <span class="can-data">21 20 00 00 FF FF FF FF</span>
+          <span class="can-comment">// SOC 87%, 셀전압 OK</span>
         </div>
       </div>
     </div>
@@ -1173,6 +1376,9 @@
     // ── Heatmap ──
     updateHeatmap();
 
+    // ── BEI Auto-Control ──
+    updateBEIControl(SCENARIOS[scenario].alertLv);
+
     // ── Charts ──
     const tMin = Math.min(...tempHist)-2, tMax = Math.max(...tempHist)+5;
     drawLineChart(cvTemp, tempHist, tMin, tMax,
@@ -1196,6 +1402,145 @@
   // Set init time
   document.getElementById('init-time').textContent = '00:00';
   requestAnimationFrame(loop);
+
+  // ── CAN Bus Simulator ─────────────────────────────
+  let canTimeMs = 0;
+  const CAN_IDS = {
+    status:   '0x0CF11E05',
+    charge:   '0x18FF50E5',
+    fan:      '0x18FFA003',
+    balance:  '0x18FFA004',
+    mosfet:   '0x18FF1500',
+    alert:    '0x18FFFE00'
+  };
+
+  function msToCanTs(ms){
+    const s  = Math.floor(ms/1000);
+    const mm = Math.floor(s/60).toString().padStart(2,'0');
+    const ss = (s%60).toString().padStart(2,'0');
+    const fr = (ms%1000).toString().padStart(3,'0');
+    return `${mm}:${ss}.${fr}`;
+  }
+
+  function addCanLog(id, data, comment, cls){
+    canTimeMs += Math.round(Math.random()*20+10);
+    const el = document.createElement('div');
+    el.className='can-entry';
+    const dataSpan = cls ? `<span class="${cls}">${data}</span>` : `<span class="can-data">${data}</span>`;
+    el.innerHTML = `<span class="can-ts">${msToCanTs(canTimeMs)}</span><span class="can-id">${id}</span>${dataSpan}<span class="can-comment">// ${comment}</span>`;
+    const log = document.getElementById('can-log');
+    log.prepend(el);
+    if(log.children.length > 25) log.removeChild(log.lastChild);
+  }
+
+  let lastCanLv = 'ok';
+  let canTickCounter = 0;
+
+  function updateBEIControl(lv){
+    const score = Math.round(riskScore);
+    canTickCounter++;
+
+    // Timeline progress
+    const tlStep = canTickCounter % 20;
+    const tls = ['tl-0','tl-1','tl-2','tl-3','tl-4'];
+    tls.forEach((id,i)=>{
+      const el = document.getElementById(id);
+      el.className = 'tl-step';
+      if(i < Math.floor(tlStep/4)) el.classList.add('tl-done');
+      else if(i === Math.floor(tlStep/4)) el.classList.add('tl-active');
+    });
+
+    // Update timeline subtexts dynamically
+    if(lv !== 'ok'){
+      document.getElementById('tl-1-sub').textContent = `위험도 ${score}/100 판단 완료 — ${lv==='danger'?'ThermalRunawayRisk':'ThermalRiseEvent'}`;
+      document.getElementById('tl-2-sub').textContent = lv==='danger'
+        ? `긴급 제어 명령 생성 — 충전전류↓ 팬ON MOSFET감시`
+        : `경고 제어 명령 생성 — 충전전류 조정`;
+    } else {
+      document.getElementById('tl-1-sub').textContent = '5단계 계층 분석 완료 — 정상 운용 중';
+      document.getElementById('tl-2-sub').textContent = '개입 없음 — 정상 파라미터';
+    }
+
+    // Control items by scenario
+    if(lv === 'ok'){
+      setCtrl('ctrl-current','cv-current','cs-current', `${Math.abs(sensors.curr).toFixed(1)} A`, 'st-on', '정상', '');
+      setCtrl('ctrl-fan','cv-fan','cs-fan','OFF','st-off','대기','');
+      setCtrl('ctrl-balance','cv-balance','cs-balance','OFF','st-off','대기','');
+      setCtrl('ctrl-mosfet','cv-mosfet','cs-mosfet','ON','st-on','정상','');
+    } else if(lv === 'warn'){
+      const reduced = Math.max(0.5, sensors.curr * 0.75).toFixed(1);
+      setCtrl('ctrl-current','cv-current','cs-current', `${reduced} A ↓`, 'st-warn', '감소 중','active-warn');
+      setCtrl('ctrl-fan','cv-fan','cs-fan','준비중','st-warn','대기','active-warn');
+      setCtrl('ctrl-balance','cv-balance','cs-balance','OFF','st-off','대기','');
+      setCtrl('ctrl-mosfet','cv-mosfet','cs-mosfet','ON','st-on','정상','');
+    } else { // danger
+      const cut = Math.max(0.3, sensors.curr * 0.4).toFixed(1);
+      setCtrl('ctrl-current','cv-current','cs-current', `${cut} A ↓↓`, 'st-cut', '긴급 감소','active-danger');
+      setCtrl('ctrl-fan','cv-fan','cs-fan','ON 100%','st-cut','작동 중','active-danger');
+      setCtrl('ctrl-balance','cv-balance','cs-balance', scenario==='deep'?'ON':'OFF', scenario==='deep'?'st-cut':'st-off', scenario==='deep'?'밸런싱':'대기', scenario==='deep'?'active-danger':'');
+      setCtrl('ctrl-mosfet','cv-mosfet','cs-mosfet', riskScore>90?'OFF ⚠️':'ON 감시','riskScore>90?st-cut:st-warn', riskScore>90?'차단!':'감시', riskScore>90?'active-danger':'active-warn');
+    }
+
+    // CAN log generation (periodic & event-based)
+    if(canTickCounter % 3 === 0){
+      // Periodic status frame
+      const socHex = Math.round(sensors.soc).toString(16).padStart(2,'0').toUpperCase();
+      const tempHex= Math.round(sensors.temp+40).toString(16).padStart(2,'0').toUpperCase();
+      const currHex= Math.round(Math.abs(sensors.curr)*10).toString(16).padStart(2,'0').toUpperCase();
+      addCanLog(CAN_IDS.status,
+        `${socHex} ${tempHex} ${currHex} 00 FF FF FF FF`,
+        `SOC ${Math.round(sensors.soc)}%, 온도 ${sensors.temp.toFixed(1)}°C`);
+    }
+
+    if(lv !== lastCanLv){
+      if(lv === 'warn'){
+        const cur = Math.max(0.5, sensors.curr*0.75);
+        const curHex = Math.round(cur*10).toString(16).padStart(2,'0').toUpperCase();
+        addCanLog(CAN_IDS.charge, `01 ${curHex} 00 00 FF FF FF FF`, '충전전류 감소 명령', 'can-cmd');
+        addCanLog(CAN_IDS.fan,    '00 19 FF FF FF FF FF FF', '팬 25% 예비 ON 명령', 'can-cmd');
+      } else if(lv === 'danger'){
+        const cut = Math.max(0.3, sensors.curr*0.4);
+        const cutHex = Math.round(cut*10).toString(16).padStart(2,'0').toUpperCase();
+        addCanLog(CAN_IDS.alert,  'FF FF FF FF FF FF FF FF', '🚨 긴급 위험 알림 발송', 'can-alert');
+        addCanLog(CAN_IDS.charge, `01 ${cutHex} 00 00 FF FF FF FF`, '충전전류 40% 긴급 감소', 'can-cmd');
+        addCanLog(CAN_IDS.fan,    '01 64 FF FF FF FF FF FF', '냉각 팬 100% ON 명령', 'can-cmd');
+        if(scenario==='deep'){
+          addCanLog(CAN_IDS.balance,'01 FF FF FF FF FF FF FF', '셀 밸런싱 강제 시작', 'can-cmd');
+        }
+        if(riskScore > 90){
+          addCanLog(CAN_IDS.mosfet, '00 FF FF FF FF FF FF FF', '⚠️ MOSFET 차단 명령 전송!', 'can-alert');
+        }
+      } else { // back to ok
+        addCanLog(CAN_IDS.charge, '01 15 00 00 FF FF FF FF', '정상 전류 복구 (2.1A)', 'can-data');
+        addCanLog(CAN_IDS.fan,    '00 00 FF FF FF FF FF FF', '냉각 팬 OFF', 'can-data');
+      }
+      lastCanLv = lv;
+    }
+  }
+
+  function setCtrl(boxId, valId, pillId, val, pillCls, pillTxt, boxCls){
+    const box  = document.getElementById(boxId);
+    const vEl  = document.getElementById(valId);
+    const pEl  = document.getElementById(pillId);
+    box.className  = 'ctrl-item' + (boxCls ? ' '+boxCls : '');
+    vEl.textContent = val;
+    vEl.style.color = pillCls==='st-on'?'var(--green)': pillCls==='st-off'?'var(--dim)': pillCls==='st-warn'?'var(--orange)':'var(--red)';
+    pEl.className  = 'ctrl-status-pill ' + pillCls;
+    pEl.textContent= pillTxt;
+  }
+
+  // ── Hook into main tick ──
+  const _origTick = tick;
+  // patch: call updateBEIControl every tick
+  const _patchedLoop = (function(){
+    const orig = tick;
+    return function(){
+      orig();
+      updateBEIControl(SCENARIOS[scenario].alertLv);
+    };
+  })();
+  // Monkey-patch tick reference
+  // Actually we inject the call directly into tick below
 
   // ── Public API ────────────────────────────────────
   window.setScenario = function(s){

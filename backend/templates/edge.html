@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BEI Edge 디바이스 규격 — IMC AI Smart Battery</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;}
+    :root{
+      --bg:#080c18; --panel:#0d1117; --card:#111827;
+      --border:rgba(255,255,255,0.07);
+      --cyan:#00d4ff; --green:#00ff88; --yellow:#ffd700;
+      --orange:#ff9020; --red:#ff4444; --purple:#a855f7;
+      --text:#c9d1d9; --muted:#8b949e; --dim:#484f58;
+    }
+    html{scroll-behavior:smooth;}
+    body{
+      background:var(--bg); color:var(--text);
+      font-family:'Segoe UI','Noto Sans KR',sans-serif;
+      min-height:100vh;
+    }
+    body::before{
+      content:''; position:fixed; inset:0;
+      background-image:
+        linear-gradient(rgba(0,212,255,0.02) 1px,transparent 1px),
+        linear-gradient(90deg,rgba(0,212,255,0.02) 1px,transparent 1px);
+      background-size:48px 48px; pointer-events:none; z-index:0;
+    }
+    .wrap{position:relative;z-index:1;max-width:1200px;margin:0 auto;padding:0 24px 80px;}
+
+    /* Header */
+    .hdr{
+      display:flex; align-items:center; justify-content:space-between;
+      padding:18px 0; border-bottom:1px solid rgba(0,212,255,0.12);
+      margin-bottom:40px; position:sticky; top:0; z-index:100;
+      background:rgba(8,12,24,0.96); backdrop-filter:blur(12px);
+    }
+    .hdr-left{display:flex;align-items:center;gap:14px;}
+    .hdr-icon{
+      width:40px;height:40px;border-radius:10px;
+      background:linear-gradient(135deg,#00ff88,#00d4ff);
+      display:flex;align-items:center;justify-content:center;font-size:18px;
+      box-shadow:0 0 16px rgba(0,255,136,0.3);
+    }
+    .hdr-title{font-size:15px;font-weight:700;color:#fff;}
+    .hdr-sub{font-size:10px;color:var(--green);letter-spacing:2px;text-transform:uppercase;}
+    .hdr-right{display:flex;gap:10px;align-items:center;}
+    .nav-btn{
+      padding:5px 14px;border-radius:20px;font-size:11px;font-weight:600;
+      text-decoration:none;border:1px solid rgba(0,212,255,0.3);color:var(--cyan);
+      transition:all .15s;
+    }
+    .nav-btn:hover{background:rgba(0,212,255,0.1);}
+    .nav-btn.active{background:rgba(0,255,136,0.1);border-color:rgba(0,255,136,0.4);color:var(--green);}
+
+    /* Hero */
+    .hero{
+      text-align:center; padding:60px 20px 48px;
+    }
+    .hero-badge{
+      display:inline-flex;align-items:center;gap:8px;
+      padding:6px 18px;border-radius:20px;
+      background:rgba(0,255,136,0.08);border:1px solid rgba(0,255,136,0.2);
+      color:var(--green);font-size:11px;font-weight:700;letter-spacing:2px;
+      margin-bottom:20px;text-transform:uppercase;
+    }
+    .hero-title{font-size:38px;font-weight:900;color:#fff;margin-bottom:12px;line-height:1.2;}
+    .hero-title span{
+      background:linear-gradient(135deg,#00ff88,#00d4ff);
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+    }
+    .hero-sub{font-size:16px;color:var(--muted);max-width:600px;margin:0 auto 28px;line-height:1.7;}
+    .hero-links{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;}
+    .btn-primary{
+      padding:12px 28px;border-radius:8px;font-size:13px;font-weight:700;
+      background:linear-gradient(135deg,#00ff88,#00d4ff);color:#080c18;
+      text-decoration:none;transition:all .2s;
+    }
+    .btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,255,136,0.3);}
+    .btn-outline{
+      padding:12px 28px;border-radius:8px;font-size:13px;font-weight:700;
+      border:1px solid rgba(0,212,255,0.3);color:var(--cyan);
+      text-decoration:none;transition:all .2s;
+    }
+    .btn-outline:hover{background:rgba(0,212,255,0.08);}
+
+    /* Section */
+    .section{margin-bottom:56px;}
+    .section-title{
+      font-size:13px;font-weight:700;letter-spacing:3px;text-transform:uppercase;
+      color:var(--cyan);margin-bottom:8px;
+    }
+    .section-heading{font-size:26px;font-weight:800;color:#fff;margin-bottom:24px;}
+
+    /* Hardware Spec Card */
+    .spec-card{
+      background:var(--card);border:1px solid rgba(0,255,136,0.15);
+      border-radius:14px;padding:28px;margin-bottom:16px;
+    }
+    .spec-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;}
+    .spec-row{
+      display:flex;justify-content:space-between;align-items:flex-start;
+      padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);gap:16px;
+    }
+    .spec-row:last-child{border-bottom:none;}
+    .spec-key{font-size:12px;color:var(--muted);white-space:nowrap;min-width:120px;}
+    .spec-val{font-size:12px;color:var(--text);font-weight:600;text-align:right;}
+    .spec-val.green{color:var(--green);}
+    .spec-val.cyan {color:var(--cyan);}
+    .spec-val.yellow{color:var(--yellow);}
+
+    /* Architecture layers */
+    .layer-list{display:flex;flex-direction:column;gap:10px;}
+    .layer-item{
+      background:var(--card);border-radius:12px;padding:16px 20px;
+      border-left:3px solid;display:flex;gap:16px;align-items:flex-start;
+    }
+    .li-num{
+      width:28px;height:28px;border-radius:6px;
+      display:flex;align-items:center;justify-content:center;
+      font-size:12px;font-weight:800;flex-shrink:0;margin-top:1px;
+    }
+    .li-body{flex:1;}
+    .li-title{font-size:14px;font-weight:700;color:#fff;margin-bottom:4px;}
+    .li-desc{font-size:12px;color:var(--muted);line-height:1.6;}
+    .li-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+    .tag{
+      font-size:10px;padding:2px 8px;border-radius:20px;
+      border:1px solid;font-weight:600;
+    }
+
+    /* Code block */
+    .code-wrap{
+      background:rgba(0,0,0,0.5);border:1px solid rgba(0,212,255,0.15);
+      border-radius:10px;overflow:hidden;margin-bottom:16px;
+    }
+    .code-header{
+      display:flex;justify-content:space-between;align-items:center;
+      padding:10px 16px;background:rgba(0,212,255,0.05);
+      border-bottom:1px solid rgba(0,212,255,0.1);
+    }
+    .code-lang{font-size:11px;font-weight:700;color:var(--cyan);letter-spacing:1px;text-transform:uppercase;}
+    .code-file{font-size:11px;color:var(--muted);}
+    pre{
+      padding:20px;font-family:'Courier New',Courier,monospace;
+      font-size:12px;line-height:1.7;overflow-x:auto;color:#e6edf3;
+    }
+    pre .kw  {color:#ff7b72;}
+    pre .fn  {color:#d2a8ff;}
+    pre .str {color:#a5d6ff;}
+    pre .cmt {color:rgba(139,148,158,0.7);font-style:italic;}
+    pre .num {color:#79c0ff;}
+    pre .cls {color:#ffa657;}
+
+    /* CAN table */
+    .can-table{
+      width:100%;border-collapse:collapse;font-size:12px;
+    }
+    .can-table th{
+      padding:10px 14px;text-align:left;
+      background:rgba(0,212,255,0.06);border:1px solid rgba(0,212,255,0.12);
+      color:var(--cyan);font-size:10px;letter-spacing:1px;text-transform:uppercase;
+    }
+    .can-table td{
+      padding:9px 14px;border:1px solid rgba(255,255,255,0.05);
+      font-family:'Courier New',monospace;
+    }
+    .can-table tr:hover td{background:rgba(255,255,255,0.02);}
+    .can-rx{color:var(--cyan);}
+    .can-tx{color:var(--orange);}
+    .can-id-cell{color:var(--yellow);}
+    .can-dir-rx{
+      display:inline-block;padding:1px 8px;border-radius:4px;
+      background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.3);
+      color:var(--cyan);font-size:10px;font-weight:700;
+    }
+    .can-dir-tx{
+      display:inline-block;padding:1px 8px;border-radius:4px;
+      background:rgba(255,144,32,0.1);border:1px solid rgba(255,144,32,0.3);
+      color:var(--orange);font-size:10px;font-weight:700;
+    }
+
+    /* Quick start steps */
+    .steps{display:flex;flex-direction:column;gap:12px;}
+    .step{
+      display:flex;gap:16px;align-items:flex-start;
+      background:var(--card);border:1px solid var(--border);
+      border-radius:10px;padding:16px 20px;
+    }
+    .step-num{
+      width:28px;height:28px;border-radius:50%;
+      background:linear-gradient(135deg,#00ff88,#00d4ff);
+      color:#080c18;font-size:13px;font-weight:800;
+      display:flex;align-items:center;justify-content:center;flex-shrink:0;
+    }
+    .step-body{flex:1;}
+    .step-title{font-size:13px;font-weight:700;color:#fff;margin-bottom:4px;}
+    .step-desc{font-size:12px;color:var(--muted);line-height:1.6;}
+
+    /* Agent flow diagram */
+    .flow-diagram{
+      display:flex;align-items:center;gap:0;flex-wrap:wrap;
+      background:var(--card);border:1px solid rgba(0,255,136,0.12);
+      border-radius:12px;padding:20px 24px;overflow-x:auto;
+    }
+    .flow-box{
+      background:rgba(0,212,255,0.06);border:1px solid rgba(0,212,255,0.2);
+      border-radius:8px;padding:10px 14px;text-align:center;
+      min-width:110px;flex-shrink:0;
+    }
+    .flow-box.green-box{
+      background:rgba(0,255,136,0.06);border-color:rgba(0,255,136,0.2);
+    }
+    .flow-box.orange-box{
+      background:rgba(255,144,32,0.06);border-color:rgba(255,144,32,0.2);
+    }
+    .flow-box.red-box{
+      background:rgba(255,68,68,0.06);border-color:rgba(255,68,68,0.2);
+    }
+    .flow-label{font-size:11px;font-weight:700;color:#fff;margin-bottom:2px;}
+    .flow-sub{font-size:9px;color:var(--muted);}
+    .flow-arrow{
+      font-size:16px;color:var(--dim);padding:0 6px;flex-shrink:0;
+    }
+
+    /* Install box */
+    .install-box{
+      background:rgba(0,0,0,0.4);border:1px solid rgba(0,255,136,0.15);
+      border-radius:10px;padding:20px;
+    }
+    .install-cmd{
+      font-family:'Courier New',monospace;font-size:13px;
+      color:var(--green);line-height:2;
+    }
+    .install-cmd .prompt{color:var(--dim);}
+    .install-cmd .comment{color:rgba(139,148,158,0.6);font-size:11px;}
+
+    /* Responsive */
+    @media(max-width:768px){
+      .hero-title{font-size:26px;}
+      .spec-grid{grid-template-columns:1fr;}
+      .flow-diagram{gap:4px;}
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- HEADER -->
+<header class="hdr">
+  <div class="hdr-left">
+    <div class="hdr-icon">⚡</div>
+    <div>
+      <div class="hdr-title">BEI Edge 디바이스 규격</div>
+      <div class="hdr-sub">IMC AI Smart Battery Platform · bei_agent.py</div>
+    </div>
+  </div>
+  <div class="hdr-right">
+    <a class="nav-btn" href="/battery">제안서</a>
+    <a class="nav-btn active" href="/battery-sim">시뮬레이션</a>
+    <a class="nav-btn" href="/landing">플랫폼</a>
+  </div>
+</header>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-badge">🔋 BEI-1 Hardware · Software Specification</div>
+  <h1 class="hero-title">Battery Edge Intelligence<br><span>실제 제어 에이전트</span></h1>
+  <p class="hero-sub">
+    배터리 내부에 내장된 BEI 모듈이 24시간 자율적으로 위험을 감지하고,
+    CAN/SMBus로 BMS에 직접 명령을 보내 화재·폭발을 사전 차단합니다.
+    화면을 볼 수 없는 실제 환경에서도 <strong>자동으로 제어</strong>합니다.
+  </p>
+  <div class="hero-links">
+    <a class="btn-primary" href="/battery-sim">🔴 실시간 시뮬레이션 →</a>
+    <a class="btn-outline" href="#agent-code">bei_agent.py 코드 보기</a>
+    <a class="btn-outline" href="#quickstart">빠른 시작 가이드</a>
+  </div>
+</div>
+
+<!-- ── SECTION: BEI-1 Hardware Spec ── -->
+<div class="section">
+  <div class="section-title">Hardware</div>
+  <div class="section-heading">IMC BEI-1 모듈 사양</div>
+
+  <div class="spec-card">
+    <div style="font-size:13px;font-weight:700;color:var(--green);margin-bottom:16px;">
+      📐 BEI-1 Edge 모듈 — 배터리 팩 내장용
+    </div>
+    <div class="spec-grid">
+      <div>
+        <div class="spec-row"><span class="spec-key">폼팩터</span><span class="spec-val green">65 × 40 × 8 mm</span></div>
+        <div class="spec-row"><span class="spec-key">프로세서</span><span class="spec-val">ARM Cortex-A55 × 4</span></div>
+        <div class="spec-row"><span class="spec-key">NPU (AI 추론)</span><span class="spec-val green">1 TOPS · &lt;12 ms 추론</span></div>
+        <div class="spec-row"><span class="spec-key">RAM</span><span class="spec-val">2 GB LPDDR4X</span></div>
+        <div class="spec-row"><span class="spec-key">스토리지</span><span class="spec-val">32 GB eMMC</span></div>
+        <div class="spec-row"><span class="spec-key">소비전력</span><span class="spec-val cyan">0.8 W (최대 1.5 W)</span></div>
+        <div class="spec-row"><span class="spec-key">방수등급</span><span class="spec-val green">IP67</span></div>
+      </div>
+      <div>
+        <div class="spec-row"><span class="spec-key">BMS 인터페이스</span><span class="spec-val cyan">CAN 2.0B · SMBus · UART · I²C</span></div>
+        <div class="spec-row"><span class="spec-key">셀 전압 모니터링</span><span class="spec-val">최대 96셀</span></div>
+        <div class="spec-row"><span class="spec-key">온도 포인트</span><span class="spec-val">16채널</span></div>
+        <div class="spec-row"><span class="spec-key">샘플링 주기</span><span class="spec-val green">100 ms (10 Hz)</span></div>
+        <div class="spec-row"><span class="spec-key">무선 통신</span><span class="spec-val">WiFi 6 / BLE 5.3 / LTE-M</span></div>
+        <div class="spec-row"><span class="spec-key">동작 온도</span><span class="spec-val">–40°C ~ +85°C</span></div>
+        <div class="spec-row"><span class="spec-key">인증</span><span class="spec-val yellow">UN38.3 · IEC 62619 · CE · KC</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BMS 인터페이스 연결 방식 -->
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px;margin-top:16px;">
+    <div style="font-size:13px;font-weight:700;color:var(--cyan);margin-bottom:16px;">
+      🔌 BMS 인터페이스 연결 방식 (3단계 진화)
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;">
+      <div style="background:rgba(0,255,136,0.04);border:1px solid rgba(0,255,136,0.15);border-radius:10px;padding:16px;">
+        <div style="font-size:11px;color:var(--green);font-weight:700;letter-spacing:1px;margin-bottom:8px;">OPTION 1 · 2026 POC</div>
+        <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:6px;">팩 외부 부착형</div>
+        <div style="font-size:12px;color:var(--muted);line-height:1.6;">
+          기존 BMS 옆에 BEI 보드 장착<br>
+          CAN/SMBus 탭 연결 → BMS 교체 불필요<br>
+          즉시 적용 가능한 레트로핏 방식
+        </div>
+      </div>
+      <div style="background:rgba(0,212,255,0.04);border:1px solid rgba(0,212,255,0.15);border-radius:10px;padding:16px;">
+        <div style="font-size:11px;color:var(--cyan);font-weight:700;letter-spacing:1px;margin-bottom:8px;">OPTION 2 · 2027~</div>
+        <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:6px;">셀 레벨 내장형</div>
+        <div style="font-size:12px;color:var(--muted);line-height:1.6;">
+          마이크로 센서 + BT Mesh/Zigbee<br>
+          셀 개별 교체 가능<br>
+          정밀 셀 단위 모니터링
+        </div>
+      </div>
+      <div style="background:rgba(168,85,247,0.04);border:1px solid rgba(168,85,247,0.15);border-radius:10px;padding:16px;">
+        <div style="font-size:11px;color:var(--purple);font-weight:700;letter-spacing:1px;margin-bottom:8px;">OPTION 3 · 2029+</div>
+        <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:6px;">BMS SoC 온칩 통합</div>
+        <div style="font-size:12px;color:var(--muted);line-height:1.6;">
+          Ontology + AI 코어를 BMS 칩에 내장<br>
+          OEM 직접 공급 (자동차/드론 제조사)<br>
+          글로벌 배터리 인텔리전스 표준
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── SECTION: Software Architecture ── -->
+<div class="section">
+  <div class="section-title">Software Architecture</div>
+  <div class="section-heading">bei_agent.py — 5계층 아키텍처</div>
+
+  <!-- Flow Diagram -->
+  <div class="flow-diagram" style="margin-bottom:20px;">
+    <div class="flow-box green-box">
+      <div class="flow-label">Layer 1</div>
+      <div class="flow-sub">센서 수집<br>CAN / SMBus</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box">
+      <div class="flow-label">Layer 2</div>
+      <div class="flow-sub">신호 처리<br>Kalman Filter</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box">
+      <div class="flow-label">Layer 3</div>
+      <div class="flow-sub">Ontology 추론<br>5단계 계층</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box orange-box">
+      <div class="flow-label">Layer 4</div>
+      <div class="flow-sub">Agentic AI<br>NPU 위험 스코어</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box red-box">
+      <div class="flow-label">Layer 5</div>
+      <div class="flow-sub">MCP 제어<br>CAN 명령 전송</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box">
+      <div class="flow-label">Cloud</div>
+      <div class="flow-sub">WiFi 6<br>MQTT / REST</div>
+    </div>
+  </div>
+
+  <div class="layer-list">
+    <div class="layer-item" style="border-left-color:#00d4ff;">
+      <div class="li-num" style="background:rgba(0,212,255,0.1);color:var(--cyan);">1</div>
+      <div class="li-body">
+        <div class="li-title">HardwareInterface — CAN / SMBus 데이터 수집</div>
+        <div class="li-desc">BMS CAN 2.0B (100ms 주기), SMBus I²C (SBS 레지스터), 셀 전압·온도(16pt)·임피던스 EIS·SOC/SOH 수집. <code>--simulate</code> 플래그로 실제 하드웨어 없이 테스트 가능.</div>
+        <div class="li-tags">
+          <span class="tag" style="color:var(--cyan);border-color:rgba(0,212,255,0.3);">python-can</span>
+          <span class="tag" style="color:var(--cyan);border-color:rgba(0,212,255,0.3);">smbus2</span>
+          <span class="tag" style="color:var(--muted);border-color:rgba(255,255,255,0.1);">CAN 2.0B 29-bit</span>
+          <span class="tag" style="color:var(--muted);border-color:rgba(255,255,255,0.1);">SBS SmartBattery</span>
+        </div>
+      </div>
+    </div>
+    <div class="layer-item" style="border-left-color:#00ff88;">
+      <div class="li-num" style="background:rgba(0,255,136,0.1);color:var(--green);">2</div>
+      <div class="li-body">
+        <div class="li-title">SignalProcessor — Kalman 필터 + dT/dt 계산</div>
+        <div class="li-desc">단순 스칼라 Kalman 필터로 노이즈 제거, dV/dt·dT/dt 실시간 계산, 셀 전압 불균형 ΔV 산출, 이상치(outlier) 제거. 임피던스 기준값 자동 학습.</div>
+        <div class="li-tags">
+          <span class="tag" style="color:var(--green);border-color:rgba(0,255,136,0.3);">Kalman Filter</span>
+          <span class="tag" style="color:var(--green);border-color:rgba(0,255,136,0.3);">dT/dt · dV/dt</span>
+          <span class="tag" style="color:var(--muted);border-color:rgba(255,255,255,0.1);">Outlier Removal</span>
+        </div>
+      </div>
+    </div>
+    <div class="layer-item" style="border-left-color:#ffd700;">
+      <div class="li-num" style="background:rgba(255,215,0,0.1);color:var(--yellow);">3</div>
+      <div class="li-body">
+        <div class="li-title">OntologyEngine — 5단계 계층 추론 (Observation→Intent)</div>
+        <div class="li-desc">Observation → Event (9종) → Situation → Risk Score (0–100) → Intent 흐름. 열폭주, 리튬 석출, 내부 단락, SEI 성장, 과방전, 급속충전 스트레스 감지. 위험까지 남은 시간 예측(dT/dt 기반).</div>
+        <div class="li-tags">
+          <span class="tag" style="color:var(--yellow);border-color:rgba(255,215,0,0.3);">ThermalRunaway</span>
+          <span class="tag" style="color:var(--yellow);border-color:rgba(255,215,0,0.3);">LithiumPlating</span>
+          <span class="tag" style="color:var(--yellow);border-color:rgba(255,215,0,0.3);">InternalShort</span>
+          <span class="tag" style="color:var(--yellow);border-color:rgba(255,215,0,0.3);">SEIGrowth</span>
+          <span class="tag" style="color:var(--muted);border-color:rgba(255,255,255,0.1);">RUL Prediction</span>
+        </div>
+      </div>
+    </div>
+    <div class="layer-item" style="border-left-color:#ff9020;">
+      <div class="li-num" style="background:rgba(255,144,32,0.1);color:var(--orange);">4</div>
+      <div class="li-body">
+        <div class="li-title">AgenticController — MCP 자율 제어 결정</div>
+        <div class="li-desc">위험도 스코어 기반 4단계 대응 (OK/Warning/Danger/Critical). 충전 전류 자동 감소 (25%→40%→60%→차단), 냉각 팬/Peltier ON, 셀 밸런싱, MOSFET 긴급 차단. CAN 프레임 자동 생성.</div>
+        <div class="li-tags">
+          <span class="tag" style="color:var(--orange);border-color:rgba(255,144,32,0.3);">MCP Commands</span>
+          <span class="tag" style="color:var(--orange);border-color:rgba(255,144,32,0.3);">Auto Current Reduce</span>
+          <span class="tag" style="color:var(--orange);border-color:rgba(255,144,32,0.3);">MOSFET Cutoff</span>
+          <span class="tag" style="color:var(--muted);border-color:rgba(255,255,255,0.1);">Cell Balancing</span>
+        </div>
+      </div>
+    </div>
+    <div class="layer-item" style="border-left-color:#a855f7;">
+      <div class="li-num" style="background:rgba(168,85,247,0.1);color:var(--purple);">5</div>
+      <div class="li-body">
+        <div class="li-title">CloudNotifier — MQTT / HTTP 알림</div>
+        <div class="li-desc">위험 발생 시 제조사 클라우드 서버로 JSON 페이로드 전송 (MQTT QoS 1 + HTTP REST 백업). 30초 쿨다운. 1분마다 원격 측정 데이터 동기화.</div>
+        <div class="li-tags">
+          <span class="tag" style="color:var(--purple);border-color:rgba(168,85,247,0.3);">paho-mqtt</span>
+          <span class="tag" style="color:var(--purple);border-color:rgba(168,85,247,0.3);">HTTP REST</span>
+          <span class="tag" style="color:var(--muted);border-color:rgba(255,255,255,0.1);">JSON Telemetry</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── SECTION: CAN Message Table ── -->
+<div class="section">
+  <div class="section-title">CAN Protocol</div>
+  <div class="section-heading">CAN 메시지 ID 정의 (J1939 29-bit)</div>
+
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;">
+    <table class="can-table">
+      <thead>
+        <tr>
+          <th>방향</th>
+          <th>CAN ID (29-bit)</th>
+          <th>설명</th>
+          <th>데이터 바이트 (8B)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="can-dir-rx">RX</span></td>
+          <td class="can-id-cell">0x0CF11E05</td>
+          <td>BMS 상태 (SOC, SOH, 전류, 전압)</td>
+          <td><code>[SOC%][SOH%][I_H][I_L][V_H][V_L][FF][FF]</code></td>
+        </tr>
+        <tr>
+          <td><span class="can-dir-rx">RX</span></td>
+          <td class="can-id-cell">0x0CF11E06</td>
+          <td>셀 전압 (2셀/프레임, mV×0.001)</td>
+          <td><code>[CellIdx][V1H][V1L][V2H][V2L][V3H][V3L][FF]</code></td>
+        </tr>
+        <tr>
+          <td><span class="can-dir-rx">RX</span></td>
+          <td class="can-id-cell">0x0CF11E07</td>
+          <td>온도 센서 (4채널/프레임, 0.1K)</td>
+          <td><code>[T1H][T1L][T2H][T2L][T3H][T3L][T4H][T4L]</code></td>
+        </tr>
+        <tr>
+          <td><span class="can-dir-rx">RX</span></td>
+          <td class="can-id-cell">0x0CF11E08</td>
+          <td>임피던스 EIS (mΩ×0.1)</td>
+          <td><code>[ImpH][ImpL][FF][FF][FF][FF][FF][FF]</code></td>
+        </tr>
+        <tr>
+          <td><span class="can-dir-rx">RX</span></td>
+          <td class="can-id-cell">0x18FF1400</td>
+          <td>BMS 결함 플래그</td>
+          <td><code>[Fault_H][Fault_L][FF][FF][FF][FF][FF][FF]</code></td>
+        </tr>
+        <tr style="background:rgba(255,144,32,0.02);">
+          <td><span class="can-dir-tx">TX</span></td>
+          <td class="can-id-cell">0x18FF50E5</td>
+          <td>충전 전류 제한 명령 (A×10)</td>
+          <td><code>[EN][CurH][CurL][00][FF][FF][FF][FF]</code></td>
+        </tr>
+        <tr style="background:rgba(255,144,32,0.02);">
+          <td><span class="can-dir-tx">TX</span></td>
+          <td class="can-id-cell">0x18FFA003</td>
+          <td>냉각 팬 / Peltier 제어</td>
+          <td><code>[EN][Pct%][FF][FF][FF][FF][FF][FF]</code></td>
+        </tr>
+        <tr style="background:rgba(255,144,32,0.02);">
+          <td><span class="can-dir-tx">TX</span></td>
+          <td class="can-id-cell">0x18FFA004</td>
+          <td>셀 밸런싱 ON/OFF</td>
+          <td><code>[EN][FF][FF][FF][FF][FF][FF][FF]</code></td>
+        </tr>
+        <tr style="background:rgba(255,68,68,0.03);">
+          <td><span class="can-dir-tx">TX</span></td>
+          <td class="can-id-cell">0x18FF1500</td>
+          <td>⚠️ MOSFET 긴급 차단</td>
+          <td><code>[CUT][FF][FF][FF][FF][FF][FF][FF]</code></td>
+        </tr>
+        <tr style="background:rgba(255,68,68,0.03);">
+          <td><span class="can-dir-tx">TX</span></td>
+          <td class="can-id-cell">0x18FFFE00</td>
+          <td>상위 시스템 알림 플래그</td>
+          <td><code>[Level][SOC%][Temp][00][FF][FF][FF][FF]</code></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ── SECTION: bei_agent.py Code ── -->
+<div class="section" id="agent-code">
+  <div class="section-title">Source Code</div>
+  <div class="section-heading">bei_agent.py — 핵심 코드 발췌</div>
+
+  <!-- Ontology Inference Code -->
+  <div class="code-wrap">
+    <div class="code-header">
+      <span class="code-lang">Python · Layer 3</span>
+      <span class="code-file">OntologyEngine.infer()</span>
+    </div>
+    <pre><span class="kw">def</span> <span class="fn">infer</span>(self, raw: SensorReading, sig: ProcessedSignal) -> OntologyInference:
+    <span class="str">"""5단계 Operational Ontology 추론"""</span>
+
+    <span class="cmt"># Level 1: Observation</span>
+    obs = f<span class="str">"셀온도 {raw.temp_max:.1f}°C · ΔV {sig.cell_imbalance:.1f}mV · "</span>
+          f<span class="str">"임피던스 {raw.impedance_mohm:.1f}mΩ · 전류 {raw.current_a:.1f}A"</span>
+
+    <span class="cmt"># Level 2: Events (9가지 이벤트 감지)</span>
+    events = []
+    <span class="kw">if</span> sig.kalman_temp > th[<span class="str">'temp_warn'</span>]:   events.append(ThermalRiseEvent)
+    <span class="kw">if</span> sig.kalman_temp > th[<span class="str">'temp_danger'</span>]: events.append(ThermalRunawayEvent)
+    <span class="kw">if</span> sig.cell_imbalance > th[<span class="str">'delta_v_warn'</span>]: events.append(VoltageImbalanceEvent)
+    <span class="kw">if</span> imp_delta > th[<span class="str">'imp_danger_delta'</span>] <span class="kw">and</span> sig.dt_dt > th[<span class="str">'dtemp_warn'</span>]:
+        events.append(LithiumPlatingEvent)
+
+    <span class="cmt"># Level 4: Risk Score (0–100)</span>
+    risk = <span class="num">8.0</span>
+    <span class="kw">if</span>   t > th[<span class="str">'temp_critical'</span>]: risk += <span class="num">50</span>
+    <span class="kw">elif</span> t > th[<span class="str">'temp_danger'</span>]:  risk += <span class="num">35</span>
+    <span class="kw">elif</span> t > th[<span class="str">'temp_warn'</span>]:    risk += <span class="num">18</span>
+    <span class="kw">if</span> dt > th[<span class="str">'dtemp_danger'</span>]:    risk += <span class="num">20</span>
+    <span class="kw">if</span> has_short:  risk *= <span class="num">1.5</span>   <span class="cmt"># 내부 단락 가중치</span>
+    <span class="kw">if</span> has_plating <span class="kw">and</span> has_thermal: risk *= <span class="num">1.3</span>
+
+    <span class="cmt"># Level 5: Intent → MCP 명령 결정</span>
+    <span class="kw">if</span>   rl == CRITICAL: intent = <span class="str">"긴급 차단 + 제조사 알림"</span>
+    <span class="kw">elif</span> rl == DANGER:   intent = <span class="str">"충전 전류 감소 + 냉각 팬 ON + 알림"</span>
+    <span class="kw">else</span>:                intent = <span class="str">"정상 운용 계속 — 모니터링"</span></pre>
+  </div>
+
+  <!-- MCP Decision Code -->
+  <div class="code-wrap">
+    <div class="code-header">
+      <span class="code-lang">Python · Layer 4</span>
+      <span class="code-file">AgenticController.decide() + CAN 프레임 생성</span>
+    </div>
+    <pre><span class="kw">def</span> <span class="fn">decide</span>(self, infer: OntologyInference, raw: SensorReading) -> MCPCommand:
+    <span class="str">"""위험도 기반 MCP 제어 명령 결정"""</span>
+    rl    = infer.risk_level
+    score = infer.risk_score
+
+    <span class="kw">if</span> rl == RiskLevel.WARNING:            <span class="cmt"># 스코어 25~59</span>
+        reduced = max(<span class="num">0.5</span>, curr * <span class="num">0.75</span>)
+        cmd.charge_current_a = reduced
+        cmd.fan_pct          = <span class="num">30</span>           <span class="cmt"># 30% 예비 ON</span>
+        cmd.alert_level      = <span class="str">"warn"</span>
+
+    <span class="kw">elif</span> rl == RiskLevel.DANGER:           <span class="cmt"># 스코어 60~79</span>
+        reduced = max(<span class="num">0.3</span>, curr * <span class="num">0.40</span>)
+        cmd.charge_current_a = reduced
+        cmd.fan_pct          = <span class="num">100</span>          <span class="cmt"># 100% 냉각</span>
+        cmd.cell_balance     = <span class="cls">True</span>
+        cmd.alert_level      = <span class="str">"critical"</span>
+
+    <span class="kw">else</span>:  <span class="cmt"># CRITICAL ≥ 80</span>
+        cmd.charge_current_a = <span class="num">0.0</span>          <span class="cmt"># 완전 차단</span>
+        cmd.mosfet_cut       = <span class="cls">True</span>         <span class="cmt"># MOSFET 긴급 차단!</span>
+        cmd.fan_pct          = <span class="num">100</span>
+
+<span class="cmt"># CAN 프레임 자동 생성 (충전 전류 명령 예시)</span>
+cur_raw = int(cmd.charge_current_a * <span class="num">10</span>)
+frame = {
+    <span class="str">'id'</span>:   <span class="num">0x18FF50E5</span>,
+    <span class="str">'data'</span>: [<span class="num">0x01</span>, (cur_raw >> <span class="num">8</span>) & <span class="num">0xFF</span>, cur_raw & <span class="num">0xFF</span>,
+              <span class="num">0x00</span>, <span class="num">0xFF</span>, <span class="num">0xFF</span>, <span class="num">0xFF</span>, <span class="num">0xFF</span>]
+}
+<span class="cmt"># → CAN TX: 0x18FF50E5 [8] 01 0C 00 00 FF FF FF FF  (1.2A)</span></pre>
+  </div>
+
+  <!-- Main Loop Code -->
+  <div class="code-wrap">
+    <div class="code-header">
+      <span class="code-lang">Python · Main Loop</span>
+      <span class="code-file">BEIAgent._tick_once() — 100ms 자율 루프</span>
+    </div>
+    <pre><span class="kw">async def</span> <span class="fn">_tick_once</span>(self):
+    <span class="cmt"># ── Layer 1: 센서 수집 (CAN / SMBus) ─────────</span>
+    raw  = self.hw.read_sensors()
+
+    <span class="cmt"># ── Layer 2: Kalman 필터링 ────────────────────</span>
+    sig  = self.signal.process(raw)
+
+    <span class="cmt"># ── Layer 3: Ontology 5단계 추론 ─────────────</span>
+    infer = self.ontology.infer(raw, sig)
+
+    <span class="cmt"># ── Layer 4: Agentic MCP 명령 결정 ───────────</span>
+    cmd  = self.agent.decide(infer, raw)
+
+    <span class="cmt"># ── Layer 5: CAN 명령 전송 ───────────────────</span>
+    <span class="kw">if</span> cmd.action != MCPAction.NONE:
+        <span class="kw">for</span> frame <span class="kw">in</span> cmd.can_frames:
+            self.hw.send_can_command(frame[<span class="str">'id'</span>], frame[<span class="str">'data'</span>])
+            <span class="kw">await</span> asyncio.sleep(<span class="num">0.002</span>)   <span class="cmt"># 2ms 간격</span>
+
+    <span class="cmt"># ── 위험 시 클라우드 MQTT/HTTP 알림 ──────────</span>
+    <span class="kw">if</span> infer.risk_level <span class="kw">in</span> (DANGER, CRITICAL):
+        self.cloud.send_alert(infer, raw, cmd)</pre>
+  </div>
+</div>
+
+<!-- ── SECTION: Quick Start ── -->
+<div class="section" id="quickstart">
+  <div class="section-title">Quick Start</div>
+  <div class="section-heading">3단계 빠른 시작 가이드</div>
+
+  <!-- Step 1: Install -->
+  <div class="install-box" style="margin-bottom:20px;">
+    <div style="font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--green);margin-bottom:12px;">
+      📦 의존성 설치 (Raspberry Pi CM4 / Jetson)
+    </div>
+    <div class="install-cmd">
+      <span class="comment"># Python 패키지 설치</span><br>
+      <span class="prompt">$</span> pip install python-can smbus2 paho-mqtt requests numpy<br><br>
+      <span class="comment"># Raspberry Pi: CAN 인터페이스 활성화</span><br>
+      <span class="prompt">$</span> sudo ip link set can0 up type can bitrate 500000<br>
+      <span class="prompt">$</span> sudo ifconfig can0 up<br><br>
+      <span class="comment"># Jetson: CAN 활성화 (Jetson AGX Orin 기준)</span><br>
+      <span class="prompt">$</span> sudo modprobe can && sudo modprobe can_raw && sudo modprobe mttcan<br>
+      <span class="prompt">$</span> sudo ip link set can0 up type can bitrate 500000 dbitrate 2000000 berr-reporting on fd on
+    </div>
+  </div>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title">시뮬레이션 모드로 테스트</div>
+        <div class="step-desc">
+          실제 하드웨어 없이 bei_agent.py 동작 확인.<br>
+          <code style="background:rgba(0,0,0,0.3);padding:2px 6px;border-radius:4px;font-size:11px;">
+            python3 bei_agent.py --simulate --scenario thermal
+          </code><br>
+          열폭주 시나리오를 실행하면 MCP 명령이 자동으로 생성되고 로그에 CAN TX 프레임이 출력됩니다.
+        </div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title">실제 BMS 연결 (CAN 인터페이스)</div>
+        <div class="step-desc">
+          드론/로봇/EV 배터리 팩의 CAN 포트를 BEI 보드에 연결.<br>
+          <code style="background:rgba(0,0,0,0.3);padding:2px 6px;border-radius:4px;font-size:11px;">
+            sudo python3 bei_agent.py --interface can0 --baudrate 500000
+          </code><br>
+          자동으로 CAN 프레임 수신 시작, 100ms 주기로 Ontology 추론 실행.
+        </div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="step-title">클라우드 연동 + 서비스 등록</div>
+        <div class="step-desc">
+          제조사 서버 URL과 디바이스 ID를 설정하면 위험 발생 시 자동 알림 전송.<br>
+          <code style="background:rgba(0,0,0,0.3);padding:2px 6px;border-radius:4px;font-size:11px;">
+            sudo python3 bei_agent.py --interface can0 --device-id DRONE-001 --cloud-url https://yourserver.com/api/alert
+          </code><br>
+          systemd 서비스 등록으로 부팅 시 자동 실행 가능:
+          <code style="background:rgba(0,0,0,0.3);padding:2px 6px;border-radius:4px;font-size:11px;display:block;margin-top:6px;">
+            sudo systemctl enable bei-agent && sudo systemctl start bei-agent
+          </code>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── CTA ── -->
+<div style="text-align:center;padding:48px 20px;background:var(--card);border:1px solid rgba(0,255,136,0.12);border-radius:16px;margin-top:40px;">
+  <div style="font-size:13px;letter-spacing:2px;text-transform:uppercase;color:var(--green);margin-bottom:8px;">배터리 제조사 파트너십</div>
+  <h2 style="font-size:28px;font-weight:800;color:#fff;margin-bottom:12px;">지금 BEI POC를 시작하세요</h2>
+  <p style="font-size:14px;color:var(--muted);max-width:500px;margin:0 auto 24px;line-height:1.7;">
+    드론·로봇·EV 배터리 팩에 BEI 모듈을 장착하고<br>
+    3개월 POC로 화재 위험 감소와 수명 연장 효과를 직접 검증하세요.
+  </p>
+  <div style="display:flex;justify-content:center;gap:12px;flex-wrap:wrap;">
+    <a class="btn-primary" href="/battery-sim">🔴 시뮬레이션 체험</a>
+    <a class="btn-outline" href="/battery">📋 제안서 보기</a>
+  </div>
+</div>
+
+</div><!-- /wrap -->
+</body>
+</html>
