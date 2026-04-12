@@ -384,6 +384,191 @@
     .compare-table .td-new { color: #00ff88; font-weight: 600; }
     .compare-table tr:hover td { background: rgba(255,255,255,0.02); }
 
+    /* ── 로드맵 섹션 ── */
+    .roadmap-section { background: #080c18; border-top: 1px solid rgba(0,255,136,0.1); }
+
+    /* 제품 스펙 카드 */
+    .product-hero {
+      max-width: 1100px; margin: 0 auto 56px;
+      display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+    }
+    .product-main-card {
+      background: linear-gradient(135deg, rgba(0,255,136,0.06), rgba(0,212,255,0.04));
+      border: 1px solid rgba(0,255,136,0.25); border-radius: 16px; padding: 36px;
+      position: relative; overflow: hidden;
+    }
+    .product-main-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+      background: linear-gradient(90deg, #00ff88, #00d4ff);
+    }
+    .product-badge {
+      display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: 2px;
+      text-transform: uppercase; padding: 4px 14px; border-radius: 20px;
+      background: rgba(0,255,136,0.1); border: 1px solid rgba(0,255,136,0.3);
+      color: #00ff88; margin-bottom: 18px;
+    }
+    .product-name { font-size: 26px; font-weight: 900; color: #fff; margin-bottom: 6px; letter-spacing: -0.5px; }
+    .product-sub  { font-size: 13px; color: #8b949e; margin-bottom: 24px; line-height: 1.6; }
+    .product-specs { display: flex; flex-direction: column; gap: 8px; }
+    .spec-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 8px 12px; background: rgba(0,0,0,0.2); border-radius: 6px;
+      font-size: 12px;
+    }
+    .spec-key { color: #8b949e; }
+    .spec-val { color: #00ff88; font-weight: 700; }
+    .spec-val.accent { color: #00d4ff; }
+    .spec-val.warn   { color: #ffd700; }
+
+    .product-side { display: flex; flex-direction: column; gap: 16px; }
+    .side-card {
+      flex: 1; background: rgba(255,255,255,0.02);
+      border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 22px;
+      transition: border-color .2s;
+    }
+    .side-card:hover { border-color: rgba(0,255,136,0.2); }
+    .side-card-icon { font-size: 22px; margin-bottom: 10px; }
+    .side-card-title { font-size: 14px; font-weight: 700; color: #fff; margin-bottom: 6px; }
+    .side-card-desc  { font-size: 12px; color: #8b949e; line-height: 1.7; }
+
+    /* 아키텍처 다이어그램 */
+    .arch-diagram {
+      max-width: 1000px; margin: 0 auto 56px;
+      background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 16px; padding: 36px;
+    }
+    .arch-title { font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: #00d4ff; margin-bottom: 28px; }
+    .arch-layers { display: flex; flex-direction: column; gap: 0; }
+    .arch-layer {
+      display: grid; grid-template-columns: 160px 1fr;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .arch-layer:first-child { border-top: 1px solid rgba(255,255,255,0.05); }
+    .arch-layer-tag {
+      display: flex; align-items: center; justify-content: center; padding: 20px 12px;
+      font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;
+      text-align: center; border-right: 1px solid rgba(255,255,255,0.06);
+    }
+    .arch-layer-body { padding: 20px 28px; }
+    .arch-layer-title { font-size: 14px; font-weight: 700; margin-bottom: 6px; }
+    .arch-layer-items { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+    .arch-chip {
+      font-size: 11px; font-weight: 600; padding: 4px 12px; border-radius: 20px;
+      border: 1px solid; background: rgba(0,0,0,0.3);
+    }
+    .arch-desc { font-size: 12px; color: #8b949e; line-height: 1.7; margin-top: 4px; }
+
+    .al1 .arch-layer-tag   { background: rgba(100,200,255,0.05); color: #64c8ff; }
+    .al1 .arch-layer-title { color: #64c8ff; }
+    .al1 .arch-chip { border-color: rgba(100,200,255,0.3); color: #64c8ff; }
+
+    .al2 .arch-layer-tag   { background: rgba(255,180,60,0.05); color: #ffb43c; }
+    .al2 .arch-layer-title { color: #ffb43c; }
+    .al2 .arch-chip { border-color: rgba(255,180,60,0.3); color: #ffb43c; }
+
+    .al3 .arch-layer-tag   { background: rgba(0,255,136,0.05); color: #00ff88; }
+    .al3 .arch-layer-title { color: #00ff88; }
+    .al3 .arch-chip { border-color: rgba(0,255,136,0.3); color: #00ff88; }
+
+    .al4 .arch-layer-tag   { background: rgba(168,85,247,0.05); color: #c084fc; }
+    .al4 .arch-layer-title { color: #c084fc; }
+    .al4 .arch-chip { border-color: rgba(168,85,247,0.3); color: #c084fc; }
+
+    .al5 .arch-layer-tag   { background: rgba(0,180,255,0.05); color: #00b4ff; }
+    .al5 .arch-layer-title { color: #00b4ff; }
+    .al5 .arch-chip { border-color: rgba(0,180,255,0.3); color: #00b4ff; }
+
+    /* 3단계 로드맵 */
+    .phase-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 20px; max-width: 1000px; margin: 0 auto 56px;
+    }
+    .phase-card {
+      border-radius: 14px; padding: 28px;
+      border: 1px solid rgba(255,255,255,0.08);
+      position: relative; overflow: hidden;
+    }
+    .phase-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    }
+    .phase-1 { background: rgba(0,212,255,0.04); }
+    .phase-1::before { background: linear-gradient(90deg, #00d4ff, #0066ff); }
+    .phase-2 { background: rgba(0,255,136,0.04); }
+    .phase-2::before { background: linear-gradient(90deg, #00ff88, #00d4ff); }
+    .phase-3 { background: rgba(168,85,247,0.04); }
+    .phase-3::before { background: linear-gradient(90deg, #a855f7, #00d4ff); }
+
+    .phase-num { font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 8px; }
+    .phase-1 .phase-num { color: #00d4ff; }
+    .phase-2 .phase-num { color: #00ff88; }
+    .phase-3 .phase-num { color: #a855f7; }
+
+    .phase-period {
+      display: inline-block; font-size: 11px; padding: 2px 10px; border-radius: 20px;
+      border: 1px solid; margin-bottom: 14px; font-weight: 600;
+    }
+    .phase-1 .phase-period { border-color: rgba(0,212,255,0.3); color: #00d4ff; background: rgba(0,212,255,0.06); }
+    .phase-2 .phase-period { border-color: rgba(0,255,136,0.3); color: #00ff88; background: rgba(0,255,136,0.06); }
+    .phase-3 .phase-period { border-color: rgba(168,85,247,0.3); color: #a855f7; background: rgba(168,85,247,0.06); }
+
+    .phase-title { font-size: 16px; font-weight: 800; color: #fff; margin-bottom: 10px; line-height: 1.3; }
+    .phase-items { list-style: none; margin-bottom: 16px; }
+    .phase-items li { font-size: 12px; color: #8b949e; padding: 4px 0; display: flex; gap: 8px; line-height: 1.6; border-bottom: 1px solid rgba(255,255,255,0.04); }
+    .phase-items li:last-child { border-bottom: none; }
+    .phase-items li .dot { flex-shrink: 0; margin-top: 2px; }
+    .phase-kpi {
+      font-size: 11px; padding: 8px 12px; border-radius: 6px;
+      background: rgba(0,0,0,0.2); line-height: 1.7;
+    }
+    .phase-1 .phase-kpi { color: #00d4ff; }
+    .phase-2 .phase-kpi { color: #00ff88; }
+    .phase-3 .phase-kpi { color: #a855f7; }
+
+    /* 시장 규모 */
+    .market-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(200px,1fr));
+      gap: 16px; max-width: 900px; margin: 0 auto 48px;
+    }
+    .market-card {
+      background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px; padding: 24px; text-align: center;
+    }
+    .market-num { font-size: 32px; font-weight: 900; letter-spacing: -1px; margin-bottom: 4px; }
+    .market-label { font-size: 11px; color: #8b949e; line-height: 1.6; }
+    .market-src { font-size: 10px; color: #484f58; margin-top: 6px; }
+
+    /* 납품 흐름 */
+    .supply-flow {
+      max-width: 860px; margin: 0 auto;
+      display: flex; align-items: stretch; gap: 0;
+    }
+    .sf-node {
+      flex: 1; text-align: center; padding: 20px 12px;
+      background: rgba(255,255,255,0.02);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px; position: relative;
+    }
+    .sf-node:not(:last-child) { margin-right: 0; border-radius: 12px 0 0 12px; }
+    .sf-node:not(:first-child) { border-radius: 0 12px 12px 0; border-left: none; }
+    .sf-node + .sf-node { border-left: none; }
+
+    .sf-flow {
+      display: flex; align-items: center; max-width: 860px; margin: 0 auto;
+    }
+    .sf-box {
+      flex: 1; text-align: center; padding: 20px 10px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.02); border-radius: 10px;
+    }
+    .sf-arrow {
+      flex-shrink: 0; width: 36px; text-align: center;
+      font-size: 18px; color: rgba(0,255,136,0.4);
+    }
+    .sf-icon  { font-size: 24px; margin-bottom: 8px; }
+    .sf-name  { font-size: 12px; font-weight: 700; color: #fff; margin-bottom: 4px; }
+    .sf-desc  { font-size: 10px; color: #8b949e; line-height: 1.6; }
+    .sf-price { font-size: 13px; font-weight: 700; color: #00ff88; margin-top: 6px; }
+
     /* ── CTA ── */
     .cta-section {
       text-align: center; padding: 80px 48px;
@@ -409,6 +594,177 @@
       font-size: 12px; color: #484f58;
     }
 
+    /* ── 실제 구현 로드맵 추가 CSS ── */
+
+    /* 부착 방식 3단계 */
+    .attach-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 20px; max-width: 1000px; margin: 0 auto 56px;
+    }
+    .attach-card {
+      border-radius: 14px; padding: 28px 24px;
+      border: 1px solid rgba(255,255,255,0.08);
+      position: relative; overflow: hidden;
+      transition: transform .2s, border-color .2s;
+    }
+    .attach-card:hover { transform: translateY(-4px); }
+    .attach-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; }
+    .at1 { background: rgba(0,212,255,0.04); }
+    .at1::before { background: linear-gradient(90deg, #00d4ff, #0066ff); }
+    .at1 { border-color: rgba(0,212,255,0.2); }
+    .at2 { background: rgba(0,255,136,0.04); }
+    .at2::before { background: linear-gradient(90deg, #00ff88, #00d4ff); }
+    .at2 { border-color: rgba(0,255,136,0.2); }
+    .at3 { background: rgba(168,85,247,0.04); }
+    .at3::before { background: linear-gradient(90deg, #a855f7, #ff6b6b); }
+    .at3 { border-color: rgba(168,85,247,0.2); }
+
+    .attach-badge {
+      display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: 2px;
+      text-transform: uppercase; padding: 3px 12px; border-radius: 20px;
+      border: 1px solid; margin-bottom: 14px;
+    }
+    .at1 .attach-badge { color: #00d4ff; background: rgba(0,212,255,0.06); border-color: rgba(0,212,255,0.3); }
+    .at2 .attach-badge { color: #00ff88; background: rgba(0,255,136,0.06); border-color: rgba(0,255,136,0.3); }
+    .at3 .attach-badge { color: #a855f7; background: rgba(168,85,247,0.06); border-color: rgba(168,85,247,0.3); }
+
+    .attach-title { font-size: 16px; font-weight: 800; color: #fff; margin-bottom: 8px; line-height: 1.3; }
+    .attach-timeline {
+      font-size: 11px; color: #8b949e; margin-bottom: 14px;
+      background: rgba(0,0,0,0.2); border-radius: 6px; padding: 6px 10px;
+    }
+    .at1 .attach-timeline span { color: #00d4ff; }
+    .at2 .attach-timeline span { color: #00ff88; }
+    .at3 .attach-timeline span { color: #a855f7; }
+
+    .attach-items { list-style: none; }
+    .attach-items li {
+      font-size: 12px; color: #8b949e; padding: 4px 0;
+      display: flex; gap: 8px; line-height: 1.6;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .attach-items li:last-child { border-bottom: none; }
+    .attach-items li .dot { flex-shrink: 0; margin-top: 2px; }
+    .attach-comm {
+      margin-top: 14px; padding: 10px 12px;
+      border-radius: 8px; font-size: 12px; line-height: 1.7;
+      background: rgba(0,0,0,0.25);
+    }
+    .at1 .attach-comm { color: #00d4ff; border-left: 2px solid rgba(0,212,255,0.4); }
+    .at2 .attach-comm { color: #00ff88; border-left: 2px solid rgba(0,255,136,0.4); }
+    .at3 .attach-comm { color: #a855f7; border-left: 2px solid rgba(168,85,247,0.4); }
+
+    /* 폭발 방지 타임라인 */
+    .explosion-timeline {
+      max-width: 860px; margin: 0 auto 56px;
+      background: rgba(255,0,0,0.02); border: 1px solid rgba(255,50,50,0.15);
+      border-radius: 16px; padding: 32px 36px;
+    }
+    .expl-title {
+      font-size: 12px; letter-spacing: 2px; text-transform: uppercase;
+      color: #ff5577; margin-bottom: 24px;
+    }
+    .expl-steps { display: flex; flex-direction: column; gap: 0; }
+    .expl-step {
+      display: grid; grid-template-columns: 80px 1fr;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      align-items: stretch;
+    }
+    .expl-step:first-child { border-top: 1px solid rgba(255,255,255,0.04); }
+    .expl-time {
+      display: flex; align-items: center; justify-content: center;
+      padding: 14px 8px; font-size: 13px; font-weight: 800;
+      border-right: 1px solid rgba(255,255,255,0.06);
+      text-align: center;
+    }
+    .expl-body { padding: 14px 20px; }
+    .expl-event { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+    .expl-detail { font-size: 12px; color: #8b949e; line-height: 1.6; }
+    .expl-action {
+      display: inline-block; margin-top: 6px; font-size: 11px; font-weight: 700;
+      padding: 3px 12px; border-radius: 20px; border: 1px solid;
+    }
+
+    .et-safe    .expl-time { color: #64c8ff; background: rgba(100,200,255,0.04); }
+    .et-safe    .expl-event { color: #64c8ff; }
+    .et-safe    .expl-action { color: #64c8ff; border-color: rgba(100,200,255,0.3); background: rgba(100,200,255,0.06); }
+
+    .et-warn    .expl-time { color: #ffb43c; background: rgba(255,180,60,0.05); }
+    .et-warn    .expl-event { color: #ffb43c; }
+    .et-warn    .expl-action { color: #ffb43c; border-color: rgba(255,180,60,0.3); background: rgba(255,180,60,0.06); }
+
+    .et-alert   .expl-time { color: #ff7060; background: rgba(255,100,80,0.06); }
+    .et-alert   .expl-event { color: #ff7060; }
+    .et-alert   .expl-action { color: #ff7060; border-color: rgba(255,100,80,0.3); background: rgba(255,100,80,0.06); }
+
+    .et-danger  .expl-time { color: #ff4444; background: rgba(255,50,50,0.08); animation: pulse-row 1.5s infinite; }
+    .et-danger  .expl-event { color: #ff4444; }
+    .et-danger  .expl-action { color: #ff4444; border-color: rgba(255,50,50,0.4); background: rgba(255,50,50,0.08); animation: pulse-red 1.5s infinite; }
+    @keyframes pulse-row { 0%,100%{background:rgba(255,50,50,0.08)} 50%{background:rgba(255,50,50,0.15)} }
+
+    .et-safe2   .expl-time { color: #00ff88; background: rgba(0,255,136,0.05); }
+    .et-safe2   .expl-event { color: #00ff88; }
+    .et-safe2   .expl-action { color: #00ff88; border-color: rgba(0,255,136,0.3); background: rgba(0,255,136,0.06); }
+
+    .expl-comparison {
+      margin-top: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+    }
+    .expl-bms, .expl-bei {
+      border-radius: 8px; padding: 14px 18px; font-size: 12px; line-height: 1.7;
+    }
+    .expl-bms { background: rgba(255,51,85,0.06); border: 1px solid rgba(255,51,85,0.2); color: #ff8899; }
+    .expl-bei { background: rgba(0,255,136,0.06); border: 1px solid rgba(0,255,136,0.2); color: #00ff88; }
+    .expl-bms-title, .expl-bei-title { font-weight: 700; margin-bottom: 6px; font-size: 13px; }
+    .expl-bms-title { color: #ff5577; }
+    .expl-bei-title { color: #00ff88; }
+
+    /* 수명 연장 비교표 */
+    .lifespan-table-wrap { max-width: 700px; margin: 0 auto 48px; overflow-x: auto; }
+    .lifespan-table { width: 100%; border-collapse: collapse; }
+    .lifespan-table th, .lifespan-table td {
+      padding: 12px 16px; font-size: 13px; text-align: center;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .lifespan-table th {
+      font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: #8b949e;
+    }
+    .lifespan-table .td-condition { text-align: left; color: #c9d1d9; }
+    .lifespan-table .td-cycles { color: #8b949e; }
+    .lifespan-table .td-gain { color: #00ff88; font-weight: 700; }
+    .lifespan-table .row-highlight td { background: rgba(0,255,136,0.04); }
+    .lifespan-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+    /* 광섬유 테더 연동 */
+    .tether-box {
+      max-width: 900px; margin: 0 auto 48px;
+      background: rgba(0,100,255,0.04); border: 1px solid rgba(0,100,255,0.2);
+      border-radius: 14px; padding: 28px 36px;
+    }
+    .tether-header { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; }
+    .tether-icon { font-size: 32px; }
+    .tether-title { font-size: 16px; font-weight: 800; color: #4488ff; margin-bottom: 4px; }
+    .tether-sub   { font-size: 12px; color: #8b949e; }
+    .tether-specs { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px,1fr)); gap: 12px; margin-bottom: 20px; }
+    .tether-spec {
+      background: rgba(0,0,0,0.25); border-radius: 8px; padding: 12px 14px;
+      border: 1px solid rgba(0,100,255,0.15);
+    }
+    .tether-spec-key { font-size: 10px; color: #8b949e; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 4px; }
+    .tether-spec-val { font-size: 14px; font-weight: 700; color: #4488ff; }
+    .tether-flow {
+      display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
+      font-size: 12px; background: rgba(0,0,0,0.2); border-radius: 8px; padding: 12px 16px;
+    }
+    .tether-node {
+      padding: 5px 12px; border-radius: 20px; border: 1px solid;
+      font-weight: 600; white-space: nowrap;
+    }
+    .tether-arrow { color: rgba(0,100,255,0.5); font-size: 14px; }
+    .tn-surface  { color: #00d4ff; border-color: rgba(0,212,255,0.3); background: rgba(0,212,255,0.06); }
+    .tn-tether   { color: #4488ff; border-color: rgba(68,136,255,0.3); background: rgba(68,136,255,0.06); }
+    .tn-edge     { color: #00ff88; border-color: rgba(0,255,136,0.3); background: rgba(0,255,136,0.06); }
+    .tn-battery  { color: #ffd700; border-color: rgba(255,215,0,0.3); background: rgba(255,215,0,0.06); }
+
     /* ── 반응형 ── */
     @media (max-width: 768px) {
       .header { padding: 16px 20px; }
@@ -422,6 +778,11 @@
       .ef-step:not(:last-child)::after { content: '↓'; right: auto; left: 50%; top: auto; bottom: -16px; }
       .cta-section { padding: 50px 20px; }
       .footer { padding: 20px; }
+      .attach-grid { grid-template-columns: 1fr; }
+      .phase-grid  { grid-template-columns: 1fr; }
+      .expl-step   { grid-template-columns: 60px 1fr; }
+      .expl-comparison { grid-template-columns: 1fr; }
+      .tether-specs { grid-template-columns: 1fr 1fr; }
     }
   </style>
 </head>
@@ -925,12 +1286,612 @@
     </div>
   </section>
 
+  <!-- ══════════════════════════════════════════════════════════
+       실제 구현 로드맵 — 배터리 제조사 납품용 Edge 디바이스
+  ══════════════════════════════════════════════════════════ -->
+  <section class="section roadmap-section" id="roadmap">
+    <div class="section-header">
+      <div class="section-tag">Product Roadmap · 납품용 Edge 디바이스</div>
+      <div class="section-title-lg">배터리 제조사에 납품하는<br><span style="background:linear-gradient(90deg,#00ff88,#00d4ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">IMC BEI — Battery Edge Intelligence</span></div>
+      <p class="section-desc">
+        배터리 팩에 물리적으로 부착되어 Operational Ontology · Agentic AI · MCP를 실행하는
+        전용 Edge 디바이스를 개발·납품합니다.<br>
+        제조사는 기존 배터리 팩 설계를 바꾸지 않고 BEI 모듈만 추가하면 됩니다.
+      </p>
+    </div>
+
+    <!-- ① 제품 스펙 -->
+    <div class="product-hero">
+      <div class="product-main-card">
+        <div class="product-badge">IMC BEI-1 · 1st Generation</div>
+        <div class="product-name">Battery Edge Intelligence</div>
+        <div class="product-sub">
+          배터리 팩 내부 또는 외부에 부착되는 명함 크기의 AI 엣지 모듈.<br>
+          기존 BMS와 병렬로 연결되어 Ontology 기반 지능을 추가합니다.
+        </div>
+        <div class="product-specs">
+          <div class="spec-row"><span class="spec-key">폼팩터</span><span class="spec-val">65 × 40 × 8 mm (명함 크기)</span></div>
+          <div class="spec-row"><span class="spec-key">프로세서</span><span class="spec-val">ARM Cortex-A55 + NPU 1 TOPS</span></div>
+          <div class="spec-row"><span class="spec-key">BMS 인터페이스</span><span class="spec-val accent">CAN / SMBus / UART / I²C</span></div>
+          <div class="spec-row"><span class="spec-key">모니터링 채널</span><span class="spec-val">셀 전압 × 최대 96셀, 온도 × 16점</span></div>
+          <div class="spec-row"><span class="spec-key">샘플링 주기</span><span class="spec-val accent">100 ms (10 Hz) 실시간</span></div>
+          <div class="spec-row"><span class="spec-key">통신</span><span class="spec-val">WiFi 6 / BLE 5.3 / LTE-M / 유선 이더넷</span></div>
+          <div class="spec-row"><span class="spec-key">자체 소비전력</span><span class="spec-val accent">0.8 W (배터리에서 직접 공급)</span></div>
+          <div class="spec-row"><span class="spec-key">동작 온도</span><span class="spec-val">−40°C ~ +85°C (산업 등급)</span></div>
+          <div class="spec-row"><span class="spec-key">방수·방진</span><span class="spec-val accent">IP67 (수중 드론·해상 USV 대응)</span></div>
+          <div class="spec-row"><span class="spec-key">로컬 스토리지</span><span class="spec-val">32 GB eMMC (오프라인 이력 저장)</span></div>
+          <div class="spec-row"><span class="spec-key">인증 목표</span><span class="spec-val warn">UN38.3 / IEC 62619 / CE / KC</span></div>
+          <div class="spec-row"><span class="spec-key">목표 단가</span><span class="spec-val accent">$35 ~ $80 (생산량 의존)</span></div>
+        </div>
+      </div>
+      <div class="product-side">
+        <div class="side-card">
+          <div class="side-card-icon">🔌</div>
+          <div class="side-card-title">기존 BMS 교체 없음</div>
+          <div class="side-card-desc">
+            제조사의 기존 BMS 칩·회로를 그대로 유지합니다.
+            BEI는 BMS의 CAN/SMBus 버스에 <strong style="color:#c9d1d9">병렬로 연결</strong>되어
+            데이터를 읽고 판단만 합니다. 하드웨어 재설계 불필요.
+          </div>
+        </div>
+        <div class="side-card">
+          <div class="side-card-icon">🧠</div>
+          <div class="side-card-title">온디바이스 AI 추론</div>
+          <div class="side-card-desc">
+            클라우드 연결 없이 <strong style="color:#c9d1d9">로컬에서 즉시 판단</strong>합니다.
+            인터넷이 끊겨도 열폭주 감지·대응이 동작합니다.
+            비행 중 드론, 수중 UUV, 해상 USV 모두 대응.
+          </div>
+        </div>
+        <div class="side-card">
+          <div class="side-card-icon">📡</div>
+          <div class="side-card-title">클라우드 동기화 (선택)</div>
+          <div class="side-card-desc">
+            연결 가능 환경에서는 사용 이력·열화 데이터를
+            <strong style="color:#c9d1d9">제조사 서버로 자동 전송</strong>합니다.
+            필드 데이터 기반 차세대 셀 설계 피드백 루프 완성.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ② 내부 아키텍처 5계층 -->
+    <div class="arch-diagram">
+      <div class="arch-title">📐 BEI 내부 소프트웨어 아키텍처 — 5계층</div>
+      <div class="arch-layers">
+
+        <div class="arch-layer al1">
+          <div class="arch-layer-tag">Layer 1<br>Hardware<br>Interface</div>
+          <div class="arch-layer-body">
+            <div class="arch-layer-title">물리 센서 수집</div>
+            <div class="arch-desc">BMS CAN/SMBus에서 원시 데이터를 100 ms 주기로 수집. ADC 직접 연결 시 1 ms 해상도.</div>
+            <div class="arch-layer-items">
+              <span class="arch-chip">셀별 전압 (mV)</span>
+              <span class="arch-chip">온도 × 16점 (NTC/PT100)</span>
+              <span class="arch-chip">충방전 전류 (mA)</span>
+              <span class="arch-chip">임피던스 (EIS)</span>
+              <span class="arch-chip">SOC / SOH</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="arch-layer al2">
+          <div class="arch-layer-tag">Layer 2<br>Signal<br>Processing</div>
+          <div class="arch-layer-body">
+            <div class="arch-layer-title">신호 처리 및 특징 추출</div>
+            <div class="arch-desc">노이즈 필터링, 이상값 제거, 셀 간 불균형 계산, 온도 상승률(dT/dt), 임피던스 변화율 추출.</div>
+            <div class="arch-layer-items">
+              <span class="arch-chip">칼만 필터</span>
+              <span class="arch-chip">dV/dt · dT/dt 계산</span>
+              <span class="arch-chip">셀 불균형 ΔV</span>
+              <span class="arch-chip">임피던스 스펙트럼</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="arch-layer al3">
+          <div class="arch-layer-tag">Layer 3<br>Operational<br>Ontology</div>
+          <div class="arch-layer-body">
+            <div class="arch-layer-title">의미 계층 해석 엔진 (핵심)</div>
+            <div class="arch-desc">
+              Observation → Event → Situation → Risk → Intent 5계층으로 실시간 해석.
+              규칙 기반이 아닌 <strong style="color:#c9d1d9">의미 기반 상황 인식</strong>으로 복합 위험 패턴 감지.
+            </div>
+            <div class="arch-layer-items">
+              <span class="arch-chip">ThermalRunawayRisk</span>
+              <span class="arch-chip">LithiumPlating</span>
+              <span class="arch-chip">InternalShortCircuit</span>
+              <span class="arch-chip">SEI 막 성장</span>
+              <span class="arch-chip">셀 열화 가속</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="arch-layer al4">
+          <div class="arch-layer-tag">Layer 4<br>Agentic<br>AI</div>
+          <div class="arch-layer-body">
+            <div class="arch-layer-title">예측 모델 및 자율 판단</div>
+            <div class="arch-desc">
+              NPU에서 경량 AI 추론. RUL(잔여수명) 예측, 위험도 스코어링(0~100),
+              사용 패턴 학습으로 충전 전략 자동 최적화.
+            </div>
+            <div class="arch-layer-items">
+              <span class="arch-chip">RUL 예측 모델</span>
+              <span class="arch-chip">위험도 스코어 0~100</span>
+              <span class="arch-chip">충전 프로파일 최적화</span>
+              <span class="arch-chip">이상 패턴 자기학습</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="arch-layer al5">
+          <div class="arch-layer-tag">Layer 5<br>MCP<br>Control</div>
+          <div class="arch-layer-body">
+            <div class="arch-layer-title">실행 제어 출력 (MCP)</div>
+            <div class="arch-desc">
+              판단 결과를 BMS·충전기·냉각계통·상위 시스템에 명령으로 전달.
+              드론 FC, 차량 VCU, 로봇 컨트롤러와 직접 통신.
+            </div>
+            <div class="arch-layer-items">
+              <span class="arch-chip">충전전류 조절 명령</span>
+              <span class="arch-chip">셀 밸런싱 제어</span>
+              <span class="arch-chip">냉각 팬·펠티에 ON/OFF</span>
+              <span class="arch-chip">긴급차단 (MOSFET)</span>
+              <span class="arch-chip">상위 시스템 경고 전송</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ③ 3단계 사업 로드맵 -->
+    <div class="section-header" style="margin-bottom:32px;">
+      <div class="section-tag">Business Roadmap</div>
+      <div class="section-title-lg" style="font-size:24px;">3단계 사업화 계획</div>
+    </div>
+    <div class="phase-grid">
+
+      <div class="phase-card phase-1">
+        <div class="phase-num">Phase 1</div>
+        <div class="phase-period">2026 · POC</div>
+        <div class="phase-title">레퍼런스 구축<br>드론 배터리 실증</div>
+        <ul class="phase-items">
+          <li><span class="dot">①</span>BEI 프로토타입 보드 제작 (Raspberry Pi CM4 기반)</li>
+          <li><span class="dot">②</span>드론용 6S LiPo 배터리에 부착 실증</li>
+          <li><span class="dot">③</span>fpv.exko.kr HUD에서 실시간 모니터링</li>
+          <li><span class="dot">④</span>열폭주 시뮬레이션 — 선제 대응 데이터 수집</li>
+          <li><span class="dot">⑤</span>수명 예측 모델 학습 (50+ 사이클)</li>
+        </ul>
+        <div class="phase-kpi">
+          🎯 목표: 드론 제조사 1곳 POC 계약<br>
+          💰 투자: 개발비 위주 · 외부 투자 최소화<br>
+          📦 납품 형태: 개발보드 + 소프트웨어 라이선스
+        </div>
+      </div>
+
+      <div class="phase-card phase-2">
+        <div class="phase-num">Phase 2</div>
+        <div class="phase-period">2027 · Pilot 양산</div>
+        <div class="phase-title">전용 PCB 설계<br>소규모 양산 납품</div>
+        <ul class="phase-items">
+          <li><span class="dot">①</span>전용 BEI PCBA 설계 (65×40mm, IP67)</li>
+          <li><span class="dot">②</span>EV·ESS·산업용 로봇 배터리로 적용 확장</li>
+          <li><span class="dot">③</span>배터리 제조사 OEM 납품 계약 (3~5곳)</li>
+          <li><span class="dot">④</span>UN38.3 · IEC 62619 안전 인증 획득</li>
+          <li><span class="dot">⑤</span>클라우드 데이터 플랫폼 구축 (SaaS 모델 추가)</li>
+        </ul>
+        <div class="phase-kpi">
+          🎯 목표: 연 5,000개 납품<br>
+          💰 단가: $60 × 5,000 = $300K 매출<br>
+          📦 납품 형태: 완제품 모듈 + 클라우드 구독
+        </div>
+      </div>
+
+      <div class="phase-card phase-3">
+        <div class="phase-num">Phase 3</div>
+        <div class="phase-period">2028+ · Scale</div>
+        <div class="phase-title">SoC 통합 설계<br>글로벌 표준화</div>
+        <ul class="phase-items">
+          <li><span class="dot">①</span>Ontology + AI 코어를 BMS SoC에 직접 통합</li>
+          <li><span class="dot">②</span>자동차 OEM (완성차) 직납 추진</li>
+          <li><span class="dot">③</span>군수·방산 배터리 납품 (방폭 인증)</li>
+          <li><span class="dot">④</span>배터리 2nd Life 판단 플랫폼 서비스</li>
+          <li><span class="dot">⑤</span>글로벌 배터리 지능화 표준(안) 제안</li>
+        </ul>
+        <div class="phase-kpi">
+          🎯 목표: 연 100,000개 이상 납품<br>
+          💰 하드웨어 + SaaS 복합 매출<br>
+          📦 납품 형태: SoC 라이선스 + 모듈
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ④ 시장 규모 -->
+    <div class="section-header" style="margin-bottom:32px;">
+      <div class="section-tag">Market Size · 시장 규모</div>
+      <div class="section-title-lg" style="font-size:24px;">배터리 지능화 시장</div>
+    </div>
+    <div class="market-grid">
+      <div class="market-card">
+        <div class="market-num" style="color:#00ff88;">$47B</div>
+        <div class="market-label">글로벌 BMS 시장<br>2030년 예측 규모</div>
+        <div class="market-src">출처: MarketsandMarkets 2024</div>
+      </div>
+      <div class="market-card">
+        <div class="market-num" style="color:#00d4ff;">28%</div>
+        <div class="market-label">AI·Edge 지능화 BMS<br>연평균 성장률 (CAGR)</div>
+        <div class="market-src">Thermal management + AI 융합</div>
+      </div>
+      <div class="market-card">
+        <div class="market-num" style="color:#ffd700;">$8B</div>
+        <div class="market-label">배터리 화재 피해<br>연간 글로벌 추정 비용</div>
+        <div class="market-src">EV·ESS·드론 화재 포함</div>
+      </div>
+      <div class="market-card">
+        <div class="market-num" style="color:#a855f7;">40%</div>
+        <div class="market-label">수명 연장 시<br>TCO(총소유비용) 절감</div>
+        <div class="market-src">배터리 교체 주기 연장 기준</div>
+      </div>
+    </div>
+
+    <!-- ⑤ 납품 흐름 -->
+    <div class="section-header" style="margin-bottom:32px;">
+      <div class="section-tag">Supply Chain · 납품 흐름</div>
+      <div class="section-title-lg" style="font-size:24px;">IMC BEI 납품 구조</div>
+    </div>
+    <div class="sf-flow" style="max-width:960px;margin:0 auto 24px;flex-wrap:wrap;gap:8px;">
+      <div class="sf-box" style="border-color:rgba(0,255,136,0.25);">
+        <div class="sf-icon">🏭</div>
+        <div class="sf-name" style="color:#00ff88;">IMC</div>
+        <div class="sf-desc">BEI 모듈 설계·제조<br>Ontology 엔진 개발<br>AI 모델 학습</div>
+        <div class="sf-price">개발사</div>
+      </div>
+      <div class="sf-arrow">→</div>
+      <div class="sf-box" style="border-color:rgba(0,212,255,0.25);">
+        <div class="sf-icon">🔋</div>
+        <div class="sf-name" style="color:#00d4ff;">배터리 제조사</div>
+        <div class="sf-desc">배터리 팩 조립 시<br>BEI 모듈 내장<br>OEM 납품</div>
+        <div class="sf-price">$35~80 / 개</div>
+      </div>
+      <div class="sf-arrow">→</div>
+      <div class="sf-box" style="border-color:rgba(255,180,60,0.25);">
+        <div class="sf-icon">🚁</div>
+        <div class="sf-name" style="color:#ffb43c;">완성품 제조사</div>
+        <div class="sf-desc">드론 · 로봇 · EV<br>Smart Battery 탑재<br>차별화 마케팅</div>
+        <div class="sf-price">프리미엄 포지셔닝</div>
+      </div>
+      <div class="sf-arrow">→</div>
+      <div class="sf-box" style="border-color:rgba(168,85,247,0.25);">
+        <div class="sf-icon">👤</div>
+        <div class="sf-name" style="color:#a855f7;">최종 사용자</div>
+        <div class="sf-desc">안전한 배터리 사용<br>수명 40% 연장<br>실시간 상태 모니터링</div>
+        <div class="sf-price">가치 수혜자</div>
+      </div>
+      <div class="sf-arrow">↩</div>
+      <div class="sf-box" style="border-color:rgba(0,255,136,0.15);">
+        <div class="sf-icon">☁️</div>
+        <div class="sf-name" style="color:#00ff88;">IMC Cloud</div>
+        <div class="sf-desc">필드 데이터 수집<br>모델 개선 피드백<br>SaaS 구독 수익</div>
+        <div class="sf-price">월정액 구독</div>
+      </div>
+    </div>
+    <p style="text-align:center;font-size:12px;color:#484f58;max-width:700px;margin:0 auto;">
+      ↩ 필드 사용 데이터는 클라우드를 통해 IMC에 피드백되어 AI 모델을 지속 개선합니다.<br>
+      배터리 제조사에는 집계된 품질 인사이트 리포트를 제공합니다.
+    </p>
+
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════
+       실제 구현 로드맵 — 제조사 납품 가능한 Edge 디바이스 개발
+  ══════════════════════════════════════════════════════════ -->
+  <section class="section" id="impl-roadmap" style="background:linear-gradient(180deg,rgba(0,20,40,0.8),rgba(8,12,24,0.95));border-top:1px solid rgba(0,255,136,0.12);">
+    <div class="section-header">
+      <div class="section-tag">실제 구현 로드맵 · Implementation Roadmap</div>
+      <div class="section-title-lg">
+        배터리 자체에 부착하는<br>
+        <span style="background:linear-gradient(90deg,#00ff88,#00d4ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">제조사 납품용 Edge 디바이스 개발</span>
+      </div>
+      <p class="section-desc">
+        3가지 핵심 기술(Operational Ontology · Agentic AI · MCP)을 실행하는 전용 Edge 디바이스를<br>
+        실제 배터리 팩에 부착·내장하여 제조사에 납품합니다.<br>
+        충전 폭발 차단 · 수명 연장 · 임무 인식 에너지 제어를 배터리 자체가 수행합니다.
+      </p>
+    </div>
+
+    <!-- ① 3가지 물리적 부착 방식 -->
+    <div class="section-header" style="margin-bottom:32px;">
+      <div class="section-tag">Hardware Integration</div>
+      <div class="section-title-lg" style="font-size:24px;">배터리와 Edge 디바이스 결합 방식</div>
+    </div>
+    <div class="attach-grid">
+
+      <div class="attach-card at1">
+        <div class="attach-badge">방식 1 · 현재 가능</div>
+        <div class="attach-title">배터리 팩 레벨<br>외부 부착</div>
+        <div class="attach-timeline">⏱ 적용 시점: <span>즉시 (2026 POC)</span></div>
+        <ul class="attach-items">
+          <li><span class="dot">·</span>명함 크기 BEI 보드를 팩 외벽에 부착</li>
+          <li><span class="dot">·</span>CAN / SMBus 케이블로 기존 BMS 연결</li>
+          <li><span class="dot">·</span>배터리 팩 설계 변경 불필요</li>
+          <li><span class="dot">·</span>제조사 양산 라인 그대로 유지</li>
+          <li><span class="dot">·</span>Raspberry Pi CM4 → 전용 PCBA 로드맵</li>
+        </ul>
+        <div class="attach-comm">
+          💬 <strong>통신:</strong> WiFi 6 · BLE 5.3 · LTE-M · 유선 이더넷<br>
+          🔋 <strong>전원:</strong> 배터리 팩에서 직접 공급 (0.8 W)
+        </div>
+      </div>
+
+      <div class="attach-card at2">
+        <div class="attach-badge">방식 2 · 중기 목표</div>
+        <div class="attach-title">셀 레벨<br>임베디드 센서</div>
+        <div class="attach-timeline">⏱ 적용 시점: <span>2027–2028 양산</span></div>
+        <ul class="attach-items">
+          <li><span class="dot">·</span>셀 개별에 초소형 센서 모듈 부착</li>
+          <li><span class="dot">·</span>Bluetooth Mesh / Zigbee로 Edge 게이트웨이 통신</li>
+          <li><span class="dot">·</span>셀 단위 이상 조기 감지 (ΔV < 1 mV)</li>
+          <li><span class="dot">·</span>셀 불량만 교체 가능 (팩 전체 교체 불필요)</li>
+          <li><span class="dot">·</span>배터리 제조사 조립 공정에 통합</li>
+        </ul>
+        <div class="attach-comm">
+          💬 <strong>통신:</strong> Bluetooth Mesh · Zigbee 3.0<br>
+          🔋 <strong>전원:</strong> 셀 자체 미소 전류 하베스팅 (50 μW)
+        </div>
+      </div>
+
+      <div class="attach-card at3">
+        <div class="attach-badge">방식 3 · 장기 목표</div>
+        <div class="attach-title">BMS SoC<br>온칩 통합</div>
+        <div class="attach-timeline">⏱ 적용 시점: <span>2029+ 글로벌 표준</span></div>
+        <ul class="attach-items">
+          <li><span class="dot">·</span>Ontology 엔진 + AI 코어를 BMS SoC에 직접 통합</li>
+          <li><span class="dot">·</span>Intel Movidius / Arm Ethos NPU 활용</li>
+          <li><span class="dot">·</span>배터리 칩 설계 단계부터 AI 내장</li>
+          <li><span class="dot">·</span>자동차 OEM 완성차 직납 (ISO 26262)</li>
+          <li><span class="dot">·</span>글로벌 Battery Intelligence 표준 제안</li>
+        </ul>
+        <div class="attach-comm">
+          💬 <strong>통신:</strong> 차량 CAN-FD / Automotive Ethernet<br>
+          🔋 <strong>전원:</strong> SoC 자체 전원 도메인 (수 mW)
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ② 충전 폭발 방지 실시간 타임라인 -->
+    <div class="section-header" style="margin-bottom:32px;">
+      <div class="section-tag">Safety Scenario · 안전 시나리오</div>
+      <div class="section-title-lg" style="font-size:24px;">충전 중 열폭주 선제 차단<br><small style="font-size:16px;font-weight:400;color:#8b949e;">BEI 부착 배터리의 실시간 대응 과정</small></div>
+    </div>
+    <div class="explosion-timeline">
+      <div class="expl-title">🛡️ 열폭주 예방 타임라인 — BEI 실시간 감지·대응 (충전 시나리오)</div>
+      <div class="expl-steps">
+
+        <div class="expl-step et-safe">
+          <div class="expl-time">T − 5 분</div>
+          <div class="expl-body">
+            <div class="expl-event">셀 임피던스 변화 감지</div>
+            <div class="expl-detail">셀 임피던스 측정값 +8% 상승. 정상 BMS는 이 값을 무시하거나 허용 범위 내로 판정. BEI는 EIS 스펙트럼 변화 패턴으로 SEI 막 이상 감지 시작.</div>
+            <span class="expl-action">📡 BEI 감지 · BMS 정상 판정</span>
+          </div>
+        </div>
+
+        <div class="expl-step et-warn">
+          <div class="expl-time">T − 4 분</div>
+          <div class="expl-body">
+            <div class="expl-event">온도 상승률 이상 (ThermalRiseEvent)</div>
+            <div class="expl-detail">온도 상승률 dT/dt = +2.1°C/min. BEI Ontology: TemperatureRiseEvent 발생 → 임피던스 이상과 결합하여 '리튬 플레이팅 의심' 상황 판단.</div>
+            <span class="expl-action">⚠️ ThermalRiseEvent + ImpedanceAnomaly 복합 판단</span>
+          </div>
+        </div>
+
+        <div class="expl-step et-alert">
+          <div class="expl-time">T − 3 분</div>
+          <div class="expl-body">
+            <div class="expl-event">VoltageImbalance + ThermalRise → 리튬 플레이팅 판정</div>
+            <div class="expl-detail">셀 간 전압 편차 ΔV = 18 mV (임계치 12 mV 초과). Ontology Situation 계층: ThermalRunawayRisk 스코어 78/100 산출. Agentic AI: 충전 전류 40% 감소 결정.</div>
+            <span class="expl-action">🤖 MCP 출력: 충전기에 전류 감소 명령 전송</span>
+          </div>
+        </div>
+
+        <div class="expl-step et-danger">
+          <div class="expl-time">T − 2 분</div>
+          <div class="expl-body">
+            <div class="expl-event">🔴 위험 스코어 78 → 충전 전류 40% 자동 감소</div>
+            <div class="expl-detail">BEI MCP가 충전기 BMS에 전류 감소 명령 실행. 기존 BMS는 여전히 "정상 범위" 판정 중. BEI만이 복합 위험 패턴을 감지·대응.</div>
+            <span class="expl-action">⚡ 충전 전류 2.0A → 1.2A 자동 감소</span>
+          </div>
+        </div>
+
+        <div class="expl-step et-safe2">
+          <div class="expl-time">T − 1 분</div>
+          <div class="expl-body">
+            <div class="expl-event">✅ 온도 안정화 — 위험 회피 완료</div>
+            <div class="expl-detail">전류 감소 후 dT/dt = +0.3°C/min으로 안정. 임피던스 정상화. ThermalRunawayRisk 스코어 22/100으로 하강. 충전 완료 후 리포트 전송.</div>
+            <span class="expl-action">✅ 선제 대응 완료 · 폭발 위험 제거</span>
+          </div>
+        </div>
+
+      </div>
+      <div class="expl-comparison">
+        <div class="expl-bms">
+          <div class="expl-bms-title">❌ 기존 BMS 단독 대응</div>
+          T-0: 온도 임계치(70°C) 초과 → 충전 차단<br>
+          이미 열폭주 초기 단계 진입<br>
+          배터리 손상 불가피 · 화재 위험 잔존
+        </div>
+        <div class="expl-bei">
+          <div class="expl-bei-title">✅ BEI Edge 디바이스 대응</div>
+          T-5분부터 복합 패턴 감지 시작<br>
+          T-2분 선제 전류 감소로 위험 해소<br>
+          배터리 손상 없음 · 화재 위험 제거
+        </div>
+      </div>
+    </div>
+
+    <!-- ③ 수명 연장 실수치 -->
+    <div class="section-header" style="margin-bottom:32px;">
+      <div class="section-tag">Lifespan Extension · 수명 연장</div>
+      <div class="section-title-lg" style="font-size:24px;">BEI 부착 시 사이클 수명 비교</div>
+    </div>
+    <div class="lifespan-table-wrap">
+      <table class="lifespan-table">
+        <thead>
+          <tr>
+            <th style="text-align:left;">충전·사용 조건</th>
+            <th>사이클 수명</th>
+            <th>기준 대비</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="td-condition">현재 — 고정 충전 프로파일 (CC-CV, 4.2V)</td>
+            <td class="td-cycles">~500 사이클</td>
+            <td class="td-gain">기준</td>
+          </tr>
+          <tr>
+            <td class="td-condition">BEI + 사용 패턴 학습 기반 충전 최적화</td>
+            <td class="td-cycles">700–900 사이클</td>
+            <td class="td-gain">+40–80%</td>
+          </tr>
+          <tr class="row-highlight">
+            <td class="td-condition">BEI + 온도 제어 연동 + 셀 밸런싱 최적화</td>
+            <td class="td-cycles">850–1,000 사이클</td>
+            <td class="td-gain" style="font-size:16px;">+70–100%</td>
+          </tr>
+          <tr>
+            <td class="td-condition">드론 배터리 (고방전·급속충전 반복 환경)</td>
+            <td class="td-cycles">200 → 380–420 사이클</td>
+            <td class="td-gain">+90–110%</td>
+          </tr>
+          <tr>
+            <td class="td-condition">EV 배터리 (주행 패턴 학습 · 급속충전 제어)</td>
+            <td class="td-cycles">1,000 → 1,400–1,600 사이클</td>
+            <td class="td-gain">+40–60%</td>
+          </tr>
+          <tr>
+            <td class="td-condition">UUV / 수중 배터리 (온도 편차 최소화)</td>
+            <td class="td-cycles">300 → 450–500 사이클</td>
+            <td class="td-gain">+50–67%</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="text-align:center;font-size:12px;color:#484f58;margin-bottom:56px;">
+      수명 연장 수치는 실험실 조건 및 현장 데이터 기반 추정치입니다. 실제 환경에 따라 차이가 있을 수 있습니다.
+    </p>
+
+    <!-- ④ 수중 플랫폼 광섬유 테더 연동 -->
+    <div class="section-header" style="margin-bottom:32px;">
+      <div class="section-tag">Underwater Platform · 수중 플랫폼 특화</div>
+      <div class="section-title-lg" style="font-size:24px;">UUV / MCM 배터리 —<br>광섬유 테더 연동 실시간 모니터링</div>
+    </div>
+    <div class="tether-box">
+      <div class="tether-header">
+        <div class="tether-icon">🌊</div>
+        <div>
+          <div class="tether-title">광섬유 테더 기반 배터리 원격 모니터링</div>
+          <div class="tether-sub">수중 드론(UUV) · 기뢰 탐지(MCM) 배터리에 BEI를 내장, 광섬유 테더로 수면 상위 시스템과 실시간 연결</div>
+        </div>
+      </div>
+      <div class="tether-specs">
+        <div class="tether-spec">
+          <div class="tether-spec-key">통신 방식</div>
+          <div class="tether-spec-val">광섬유 테더</div>
+        </div>
+        <div class="tether-spec">
+          <div class="tether-spec-key">데이터 속도</div>
+          <div class="tether-spec-val">≈ 1 Gbps</div>
+        </div>
+        <div class="tether-spec">
+          <div class="tether-spec-key">통신 지연</div>
+          <div class="tether-spec-val">&lt; 5 ms</div>
+        </div>
+        <div class="tether-spec">
+          <div class="tether-spec-key">최대 길이</div>
+          <div class="tether-spec-val">최대 500 m</div>
+        </div>
+        <div class="tether-spec">
+          <div class="tether-spec-key">운용 수심</div>
+          <div class="tether-spec-val">최대 400 m</div>
+        </div>
+        <div class="tether-spec">
+          <div class="tether-spec-key">배터리 BEI</div>
+          <div class="tether-spec-val">방압 Jetson TX2</div>
+        </div>
+      </div>
+      <div class="tether-flow">
+        <span class="tether-node tn-surface">🖥️ 수면 운영 서버</span>
+        <span class="tether-arrow">──광섬유──</span>
+        <span class="tether-node tn-tether">🔌 윈치 / 압력 커넥터</span>
+        <span class="tether-arrow">──이더넷──</span>
+        <span class="tether-node tn-edge">🧠 BEI Edge (방압)</span>
+        <span class="tether-arrow">──CAN──</span>
+        <span class="tether-node tn-battery">🔋 UUV 배터리 팩</span>
+      </div>
+      <div style="margin-top:16px;font-size:12px;color:#8b949e;line-height:1.8;">
+        ✔ 수중에서도 배터리 셀 전압 · 온도 · 임피던스를 <strong style="color:#4488ff">100 ms 주기</strong>로 수면으로 실시간 전송<br>
+        ✔ 테더 단절 시 BEI 로컬 자율 판단 모드 자동 전환 — 온보드 AI 계속 작동<br>
+        ✔ <a href="https://fpv.exko.kr/edge#tether" target="_blank" style="color:#4488ff;text-decoration:none;">fpv.exko.kr/edge 광섬유 테더 규격 전체 보기 →</a>
+      </div>
+    </div>
+
+    <!-- ⑤ 제조사 납품 체계 요약 -->
+    <div class="section-header" style="margin-bottom:32px;">
+      <div class="section-tag">Manufacturer Integration · 제조사 통합 가이드</div>
+      <div class="section-title-lg" style="font-size:24px;">배터리 제조사 납품 체계</div>
+    </div>
+    <div style="max-width:900px;margin:0 auto;">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin-bottom:36px;">
+
+        <div style="background:rgba(0,255,136,0.04);border:1px solid rgba(0,255,136,0.2);border-radius:12px;padding:24px;">
+          <div style="font-size:20px;margin-bottom:10px;">📋</div>
+          <div style="font-size:14px;font-weight:700;color:#00ff88;margin-bottom:8px;">Step 1 — 기술 협의</div>
+          <div style="font-size:12px;color:#8b949e;line-height:1.7;">
+            배터리 팩 사양 검토 (셀 수, BMS 인터페이스)<br>
+            BEI 부착 방식 결정 (외부/내장)<br>
+            POC 계약 체결 및 개발 일정 협의
+          </div>
+        </div>
+
+        <div style="background:rgba(0,212,255,0.04);border:1px solid rgba(0,212,255,0.2);border-radius:12px;padding:24px;">
+          <div style="font-size:20px;margin-bottom:10px;">🔧</div>
+          <div style="font-size:14px;font-weight:700;color:#00d4ff;margin-bottom:8px;">Step 2 — POC 실증 (3개월)</div>
+          <div style="font-size:12px;color:#8b949e;line-height:1.7;">
+            BEI 프로토타입 보드 제공 (Raspberry Pi CM4 기반)<br>
+            제조사 배터리에 부착 · 테스트<br>
+            열폭주 시뮬레이션 · 수명 예측 데이터 수집
+          </div>
+        </div>
+
+        <div style="background:rgba(255,180,60,0.04);border:1px solid rgba(255,180,60,0.2);border-radius:12px;padding:24px;">
+          <div style="font-size:20px;margin-bottom:10px;">🏭</div>
+          <div style="font-size:14px;font-weight:700;color:#ffb43c;margin-bottom:8px;">Step 3 — 양산 납품 계약</div>
+          <div style="font-size:12px;color:#8b949e;line-height:1.7;">
+            전용 BEI PCBA 설계 (65×40mm, IP67)<br>
+            OEM 납품 계약 · 안전 인증 획득<br>
+            SaaS 구독 모델 추가 (클라우드 데이터 분석)
+          </div>
+        </div>
+
+      </div>
+      <div style="background:rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:20px 24px;font-size:13px;line-height:1.8;color:#8b949e;">
+        💡 <strong style="color:#00ff88;">핵심 가치 제안:</strong> 배터리 제조사는 기존 설계·생산 라인을 바꾸지 않고 BEI 모듈 하나로<br>
+        "AI 탑재 스마트 배터리"를 출시할 수 있습니다. 드론·로봇·EV·ESS 고객사에 프리미엄 포지셔닝이 가능합니다.
+      </div>
+    </div>
+
+  </section>
+
   <!-- ── CTA ── -->
   <section class="cta-section">
-    <div class="cta-title">배터리 지능화, 지금 시작할 수 있습니다</div>
+    <div class="cta-title">배터리 제조사와 함께 만들어 갑니다</div>
     <p class="cta-sub">
-      fpv.exko.kr의 Edge 디바이스에 BMS 센서를 연결하는 것만으로<br>
-      이 모든 기능이 실시간으로 동작합니다. Ontology 엔진은 이미 준비되어 있습니다.
+      POC 문의 · OEM 납품 협의 · 공동 개발 제안 모두 환영합니다.<br>
+      기존 배터리 설계를 바꾸지 않고, BEI 모듈 하나로 시작할 수 있습니다.
     </p>
     <div class="cta-links">
       <a class="cta-btn btn-primary" href="/landing.html">← IMC 플랫폼 전체 보기</a>
