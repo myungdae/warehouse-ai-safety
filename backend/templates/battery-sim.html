@@ -1,0 +1,1226 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BEI Smart Battery — 실시간 시뮬레이션</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;}
+    :root{
+      --bg:#080c18; --panel:#0d1117; --card:#111827;
+      --border:rgba(255,255,255,0.07);
+      --cyan:#00d4ff; --green:#00ff88; --yellow:#ffd700;
+      --orange:#ff9020; --red:#ff4444; --purple:#a855f7;
+      --text:#c9d1d9; --muted:#8b949e; --dim:#484f58;
+    }
+    html{scroll-behavior:smooth;}
+    body{
+      background:var(--bg); color:var(--text);
+      font-family:'Segoe UI','Noto Sans KR',sans-serif;
+      min-height:100vh; overflow-x:hidden;
+    }
+    body::before{
+      content:''; position:fixed; inset:0;
+      background-image:
+        linear-gradient(rgba(0,212,255,0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,212,255,0.025) 1px, transparent 1px);
+      background-size:48px 48px; pointer-events:none; z-index:0;
+    }
+    .wrap{position:relative;z-index:1;}
+
+    /* ── HEADER ── */
+    .hdr{
+      display:flex; align-items:center; justify-content:space-between;
+      padding:16px 32px; background:rgba(8,12,24,0.96);
+      border-bottom:1px solid rgba(0,212,255,0.12);
+      backdrop-filter:blur(12px); position:sticky; top:0; z-index:200;
+    }
+    .hdr-left{display:flex;align-items:center;gap:14px;}
+    .hdr-icon{
+      width:42px;height:42px; border-radius:10px;
+      background:linear-gradient(135deg,#00ff88,#00d4ff);
+      display:flex;align-items:center;justify-content:center;
+      font-size:20px; box-shadow:0 0 18px rgba(0,255,136,0.35);
+    }
+    .hdr-title{font-size:16px;font-weight:700;color:#fff;letter-spacing:0.5px;}
+    .hdr-sub{font-size:10px;color:var(--green);letter-spacing:2px;text-transform:uppercase;}
+    .hdr-right{display:flex;align-items:center;gap:10px;}
+    .hdr-link{
+      padding:5px 14px; border-radius:20px; font-size:11px; font-weight:600;
+      text-decoration:none; border:1px solid rgba(0,212,255,0.3); color:var(--cyan);
+      transition:all .15s;
+    }
+    .hdr-link:hover{background:rgba(0,212,255,0.1);}
+    .sim-badge{
+      padding:5px 14px; border-radius:20px; font-size:11px; font-weight:700;
+      background:linear-gradient(135deg,#00ff88,#00d4ff); color:#080c18;
+      letter-spacing:1px;
+    }
+
+    /* ── ALERT BANNER ── */
+    #alert-banner{
+      display:none; padding:14px 32px;
+      background:rgba(255,68,68,0.12); border-bottom:2px solid rgba(255,68,68,0.5);
+      animation:alert-pulse 1s infinite;
+    }
+    @keyframes alert-pulse{0%,100%{background:rgba(255,68,68,0.12)}50%{background:rgba(255,68,68,0.22)}}
+    .alert-inner{
+      display:flex; align-items:center; gap:16px; max-width:1400px; margin:0 auto;
+    }
+    .alert-icon{font-size:22px;}
+    .alert-text{flex:1;}
+    .alert-title{font-size:14px;font-weight:700;color:#ff4444;margin-bottom:2px;}
+    .alert-detail{font-size:12px;color:#ff8899;}
+    .alert-time{font-size:11px;color:var(--muted);}
+
+    /* ── MAIN GRID ── */
+    .main{
+      display:grid;
+      grid-template-columns:320px 1fr 300px;
+      gap:0; min-height:calc(100vh - 62px);
+    }
+
+    /* ── LEFT PANEL — Battery 3D Visual + Scenario Controls ── */
+    .left-panel{
+      background:var(--panel); border-right:1px solid var(--border);
+      padding:20px; display:flex; flex-direction:column; gap:16px;
+      overflow-y:auto;
+    }
+
+    /* Battery Visual */
+    .battery-visual-wrap{
+      background:var(--card); border:1px solid var(--border);
+      border-radius:14px; padding:20px; text-align:center;
+    }
+    .battery-img-container{
+      position:relative; display:inline-block; margin-bottom:16px;
+    }
+    .battery-img{
+      width:220px; height:140px; border-radius:10px;
+      background:linear-gradient(145deg,#1a1f2e,#111827);
+      border:2px solid rgba(0,255,136,0.2);
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      position:relative; overflow:hidden;
+    }
+    .batt-body{
+      width:180px; height:100px;
+      background:linear-gradient(180deg,#1c2235,#141824);
+      border:1.5px solid rgba(255,255,255,0.1); border-radius:8px;
+      position:relative; overflow:hidden;
+    }
+    .batt-label{
+      position:absolute; top:8px; left:12px;
+      font-size:10px; font-weight:700; color:#fff; letter-spacing:0.5px;
+    }
+    .batt-cap{
+      position:absolute; bottom:10px; left:12px;
+      font-size:8px; color:var(--muted);
+    }
+    /* PCB on top */
+    .batt-pcb{
+      position:absolute; top:0; left:50%; transform:translateX(-50%);
+      width:70px; height:36px;
+      background:linear-gradient(135deg,#0a2a0a,#0d350d);
+      border:1px solid rgba(0,255,136,0.4);
+      border-radius:4px; display:flex; align-items:center; justify-content:center;
+      overflow:hidden;
+    }
+    .batt-chip{
+      width:28px; height:28px;
+      background:linear-gradient(135deg,#0a3a0a,#1a5a1a);
+      border:1px solid rgba(0,255,136,0.6);
+      border-radius:3px; position:relative;
+    }
+    .batt-chip::after{
+      content:''; position:absolute; inset:3px;
+      background:linear-gradient(135deg,#00ff88,#00d4ff);
+      opacity:0.15; border-radius:2px;
+    }
+    .chip-glow{
+      position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+      width:20px; height:20px; border-radius:50%;
+      background:radial-gradient(circle,rgba(0,255,136,0.8),transparent 70%);
+      animation:chip-pulse 2s infinite;
+    }
+    @keyframes chip-pulse{0%,100%{opacity:0.4;transform:translate(-50%,-50%) scale(1)}50%{opacity:1;transform:translate(-50%,-50%) scale(1.4)}}
+
+    /* LED bars */
+    .batt-leds{
+      position:absolute; bottom:14px; left:50%; transform:translateX(-50%);
+      display:flex; gap:4px;
+    }
+    .batt-led{
+      width:14px; height:7px; border-radius:2px;
+      background:rgba(0,255,136,0.15); border:1px solid rgba(0,255,136,0.3);
+      transition:background .3s, box-shadow .3s;
+    }
+    .batt-led.on{
+      background:rgba(0,255,136,0.8);
+      box-shadow:0 0 6px rgba(0,255,136,0.6);
+    }
+    .batt-led.warn{ background:rgba(255,144,32,0.8); border-color:rgba(255,144,32,0.5); box-shadow:0 0 6px rgba(255,144,32,0.6); }
+    .batt-led.danger{ background:rgba(255,68,68,0.8); border-color:rgba(255,68,68,0.5); box-shadow:0 0 6px rgba(255,68,68,0.6); animation:led-blink .5s infinite; }
+    @keyframes led-blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+    .batt-status-txt{
+      font-size:11px; font-weight:700; letter-spacing:1.5px;
+      text-transform:uppercase; margin-bottom:6px;
+      transition:color .3s;
+    }
+    .batt-soc-row{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);}
+    .batt-soc-val{font-weight:700; color:var(--green);}
+
+    /* SOC bar */
+    .soc-bar-wrap{margin-top:10px;}
+    .soc-bar-bg{
+      height:8px; background:rgba(255,255,255,0.06);
+      border-radius:4px; overflow:hidden;
+    }
+    .soc-bar-fill{
+      height:100%; border-radius:4px;
+      background:linear-gradient(90deg,#00ff88,#00d4ff);
+      transition:width .5s, background .5s;
+    }
+
+    /* ── Scenario Control ── */
+    .scenario-box{
+      background:var(--card); border:1px solid var(--border);
+      border-radius:14px; padding:18px;
+    }
+    .panel-label{
+      font-size:10px; font-weight:700; letter-spacing:2px;
+      text-transform:uppercase; color:var(--muted); margin-bottom:14px;
+    }
+    .scenario-btn{
+      width:100%; padding:10px 14px; border-radius:8px;
+      border:1px solid; font-size:12px; font-weight:700;
+      cursor:pointer; transition:all .15s; text-align:left;
+      margin-bottom:8px; letter-spacing:0.3px;
+    }
+    .scenario-btn:last-child{margin-bottom:0;}
+    .btn-normal{
+      background:rgba(0,255,136,0.06); border-color:rgba(0,255,136,0.25); color:var(--green);
+    }
+    .btn-normal:hover{background:rgba(0,255,136,0.12);}
+    .btn-warn{
+      background:rgba(255,144,32,0.06); border-color:rgba(255,144,32,0.25); color:var(--orange);
+    }
+    .btn-warn:hover{background:rgba(255,144,32,0.12);}
+    .btn-danger{
+      background:rgba(255,68,68,0.06); border-color:rgba(255,68,68,0.25); color:var(--red);
+    }
+    .btn-danger:hover{background:rgba(255,68,68,0.15);}
+    .btn-deep{
+      background:rgba(168,85,247,0.06); border-color:rgba(168,85,247,0.25); color:var(--purple);
+    }
+    .btn-deep:hover{background:rgba(168,85,247,0.12);}
+    .btn-icon{margin-right:6px;}
+
+    /* Speed controls */
+    .speed-row{
+      display:flex; gap:6px; margin-top:12px;
+    }
+    .speed-btn{
+      flex:1; padding:6px; border-radius:6px; font-size:11px; font-weight:700;
+      cursor:pointer; border:1px solid var(--border); background:var(--panel);
+      color:var(--muted); transition:all .15s;
+    }
+    .speed-btn.active{
+      background:rgba(0,212,255,0.1); border-color:rgba(0,212,255,0.3); color:var(--cyan);
+    }
+
+    /* ── CENTER — Dashboard ── */
+    .center-panel{
+      background:var(--bg); overflow-y:auto; padding:20px;
+      display:flex; flex-direction:column; gap:16px;
+    }
+
+    /* Sensor Grid */
+    .sensor-grid{
+      display:grid; grid-template-columns:repeat(4,1fr);
+      gap:12px;
+    }
+    .sensor-card{
+      background:var(--card); border:1px solid var(--border);
+      border-radius:12px; padding:16px;
+      transition:border-color .3s, box-shadow .3s;
+    }
+    .sensor-card.ok    {border-color:rgba(0,255,136,0.2);}
+    .sensor-card.warn  {border-color:rgba(255,144,32,0.4); box-shadow:0 0 12px rgba(255,144,32,0.1);}
+    .sensor-card.danger{border-color:rgba(255,68,68,0.5); box-shadow:0 0 16px rgba(255,68,68,0.15); animation:card-pulse 1s infinite;}
+    @keyframes card-pulse{0%,100%{box-shadow:0 0 16px rgba(255,68,68,0.15)}50%{box-shadow:0 0 24px rgba(255,68,68,0.3)}}
+
+    .sc-label{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;}
+    .sc-status{font-size:9px;font-weight:700;padding:2px 8px;border-radius:20px;border:1px solid;}
+    .sc-status.ok    {color:var(--green);border-color:rgba(0,255,136,0.3);background:rgba(0,255,136,0.06);}
+    .sc-status.warn  {color:var(--orange);border-color:rgba(255,144,32,0.3);background:rgba(255,144,32,0.06);}
+    .sc-status.danger{color:var(--red);border-color:rgba(255,68,68,0.4);background:rgba(255,68,68,0.08);animation:blink-status .8s infinite;}
+    @keyframes blink-status{0%,100%{opacity:1}50%{opacity:.5}}
+
+    .sc-val{font-size:26px;font-weight:800;line-height:1;margin-bottom:4px;transition:color .3s;}
+    .sc-unit{font-size:11px;color:var(--muted);}
+    .sc-mini{font-size:11px;color:var(--muted);margin-top:6px;}
+
+    /* Gauge bar */
+    .gauge-bar{height:4px;background:rgba(255,255,255,0.06);border-radius:2px;margin-top:10px;overflow:hidden;}
+    .gauge-fill{height:100%;border-radius:2px;transition:width .4s, background .4s;}
+
+    /* ── Canvas chart area ── */
+    .chart-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+    .chart-box{
+      background:var(--card); border:1px solid var(--border);
+      border-radius:12px; padding:16px;
+    }
+    .chart-title{
+      font-size:11px; font-weight:700; letter-spacing:1px;
+      text-transform:uppercase; color:var(--muted); margin-bottom:12px;
+      display:flex; justify-content:space-between; align-items:center;
+    }
+    .chart-live{
+      font-size:9px; padding:2px 8px; border-radius:10px;
+      background:rgba(0,255,136,0.1); color:var(--green);
+      border:1px solid rgba(0,255,136,0.3);
+      animation:blink 1.4s infinite;
+    }
+    @keyframes blink{0%,100%{opacity:1}50%{opacity:.4}}
+    canvas{width:100%;display:block;}
+
+    /* ── Ontology Inference Panel ── */
+    .ontology-box{
+      background:var(--card); border:1px solid var(--border);
+      border-radius:12px; padding:18px;
+    }
+    .ont-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+    .ont-title{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);}
+    .ont-score-wrap{display:flex;align-items:center;gap:10px;}
+    .ont-score-label{font-size:11px;color:var(--muted);}
+    .ont-score{
+      font-size:22px; font-weight:900; letter-spacing:-1px;
+      transition:color .5s;
+    }
+    .ont-score-sub{font-size:10px;color:var(--muted);}
+
+    /* Risk score bar */
+    .risk-bar-wrap{margin-bottom:16px;}
+    .risk-bar-bg{height:12px;background:rgba(255,255,255,0.05);border-radius:6px;overflow:hidden;position:relative;}
+    .risk-bar-fill{
+      height:100%; border-radius:6px;
+      background:linear-gradient(90deg,#00ff88,#ffd700,#ff9020,#ff4444);
+      transition:width .6s cubic-bezier(.4,0,.2,1);
+    }
+    .risk-ticks{
+      display:flex; justify-content:space-between;
+      font-size:9px; color:var(--dim); margin-top:4px; padding:0 2px;
+    }
+
+    /* Ontology layers live */
+    .ont-layers{display:flex;flex-direction:column;gap:4px;}
+    .ont-row{
+      display:grid; grid-template-columns:90px 1fr auto;
+      align-items:center; gap:10px;
+      padding:8px 10px; border-radius:6px;
+      background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.04);
+      transition:background .3s, border-color .3s;
+    }
+    .ont-row.active{border-color:rgba(0,255,136,0.25); background:rgba(0,255,136,0.04);}
+    .ont-row.alert {border-color:rgba(255,68,68,0.35); background:rgba(255,68,68,0.05);}
+    .ont-row-tag{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);}
+    .ont-row-val{font-size:12px;color:var(--text);}
+    .ont-row-badge{
+      font-size:10px;font-weight:700;padding:2px 10px;border-radius:20px;border:1px solid;
+      white-space:nowrap;
+    }
+
+    /* ── MCP Action Log ── */
+    .action-log{
+      background:var(--card); border:1px solid var(--border);
+      border-radius:12px; padding:18px; max-height:220px; overflow-y:auto;
+    }
+    .log-title{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:12px;}
+    .log-entry{
+      display:flex; align-items:flex-start; gap:10px;
+      padding:7px 0; border-bottom:1px solid rgba(255,255,255,0.04);
+      font-size:12px;
+    }
+    .log-entry:last-child{border-bottom:none;}
+    .log-time{font-size:10px;color:var(--dim);white-space:nowrap;min-width:52px;margin-top:2px;}
+    .log-icon{font-size:13px;flex-shrink:0;}
+    .log-text{color:var(--text);line-height:1.5;}
+    .log-text strong{font-weight:600;}
+    .log-ok    .log-text strong{color:var(--green);}
+    .log-warn  .log-text strong{color:var(--orange);}
+    .log-danger.log-text strong{color:var(--red);}
+    .log-action .log-text strong{color:var(--cyan);}
+
+    /* ── RIGHT PANEL ── */
+    .right-panel{
+      background:var(--panel); border-left:1px solid var(--border);
+      padding:20px; display:flex; flex-direction:column; gap:16px;
+      overflow-y:auto;
+    }
+
+    /* Cell heatmap */
+    .heatmap-box{
+      background:var(--card); border:1px solid var(--border);
+      border-radius:12px; padding:16px;
+    }
+    .heatmap-grid{
+      display:grid; grid-template-columns:repeat(6,1fr);
+      gap:4px; margin-top:12px;
+    }
+    .cell-tile{
+      aspect-ratio:1; border-radius:4px;
+      display:flex; align-items:center; justify-content:center;
+      font-size:8px; font-weight:700; cursor:default;
+      transition:background .4s, box-shadow .4s;
+      position:relative;
+    }
+    .cell-tile::after{
+      content:attr(data-n);
+      position:absolute; bottom:2px; right:2px;
+      font-size:7px; opacity:.6;
+    }
+    .cell-temp-label{
+      font-size:9px; font-weight:700; color:rgba(255,255,255,0.8);
+    }
+
+    /* Heatmap legend */
+    .hm-legend{
+      display:flex; align-items:center; gap:8px; margin-top:10px;
+      font-size:10px; color:var(--muted);
+    }
+    .hm-bar{
+      flex:1; height:6px; border-radius:3px;
+      background:linear-gradient(90deg,#00b4ff,#00ff88,#ffd700,#ff9020,#ff4444);
+    }
+
+    /* Stats */
+    .stats-box{
+      background:var(--card); border:1px solid var(--border);
+      border-radius:12px; padding:16px;
+    }
+    .stat-row{
+      display:flex; justify-content:space-between; align-items:center;
+      padding:7px 0; border-bottom:1px solid rgba(255,255,255,0.04);
+      font-size:12px;
+    }
+    .stat-row:last-child{border-bottom:none;}
+    .stat-key{color:var(--muted);}
+    .stat-val{font-weight:700; color:var(--text); transition:color .3s;}
+
+    /* BEI Response Timer */
+    .timer-box{
+      background:linear-gradient(135deg,rgba(0,255,136,0.04),rgba(0,212,255,0.03));
+      border:1px solid rgba(0,255,136,0.15); border-radius:12px; padding:16px;
+      text-align:center;
+    }
+    .timer-label{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+    .timer-val{font-size:36px;font-weight:900;color:var(--green);letter-spacing:-1px;font-variant-numeric:tabular-nums;}
+    .timer-sub{font-size:10px;color:var(--muted);margin-top:4px;}
+
+    /* ── Responsive ── */
+    @media(max-width:1200px){
+      .main{grid-template-columns:280px 1fr;}
+      .right-panel{display:none;}
+      .sensor-grid{grid-template-columns:repeat(2,1fr);}
+    }
+    @media(max-width:768px){
+      .main{grid-template-columns:1fr;}
+      .left-panel{border-right:none;border-bottom:1px solid var(--border);}
+      .sensor-grid{grid-template-columns:repeat(2,1fr);}
+      .chart-row{grid-template-columns:1fr;}
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- ── HEADER ── -->
+<header class="hdr">
+  <div class="hdr-left">
+    <div class="hdr-icon">🔋</div>
+    <div>
+      <div class="hdr-title">BEI Smart Battery — 실시간 시뮬레이션</div>
+      <div class="hdr-sub">Battery Edge Intelligence · Operational Ontology · Agentic AI · MCP</div>
+    </div>
+  </div>
+  <div class="hdr-right">
+    <a class="hdr-link" href="/battery">← 제안서</a>
+    <a class="hdr-link" href="https://fpv.exko.kr/edge" target="_blank">Edge 규격</a>
+    <span class="sim-badge">LIVE SIM</span>
+  </div>
+</header>
+
+<!-- ── ALERT BANNER ── -->
+<div id="alert-banner">
+  <div class="alert-inner">
+    <div class="alert-icon">🚨</div>
+    <div class="alert-text">
+      <div class="alert-title" id="alert-title">열폭주 위험 감지</div>
+      <div class="alert-detail" id="alert-detail">BEI Agentic AI가 복합 위험 패턴을 감지했습니다. MCP 명령 실행 중.</div>
+    </div>
+    <div class="alert-time" id="alert-time">00:00</div>
+  </div>
+</div>
+
+<!-- ── MAIN ── -->
+<div class="main">
+
+  <!-- ════ LEFT PANEL ════ -->
+  <div class="left-panel">
+
+    <!-- Battery Visual -->
+    <div class="battery-visual-wrap">
+      <div class="panel-label">IMC BEI-1 · Smart Battery</div>
+      <div class="battery-img-container">
+        <div class="battery-img">
+          <div class="batt-body">
+            <div class="batt-label">SMART BATTERY<br><span style="font-size:8px;font-weight:400;color:var(--muted);">Li-Ion 5200 mAh</span></div>
+            <div class="batt-pcb">
+              <div class="batt-chip">
+                <div class="chip-glow" id="chip-glow"></div>
+              </div>
+              <span style="position:absolute;bottom:2px;left:3px;font-size:6px;color:rgba(0,255,136,0.6);font-weight:700;">EDGE AI</span>
+            </div>
+            <div class="batt-leds">
+              <div class="batt-led on"  id="led0"></div>
+              <div class="batt-led on"  id="led1"></div>
+              <div class="batt-led on"  id="led2"></div>
+              <div class="batt-led on"  id="led3"></div>
+            </div>
+            <div class="batt-cap">IMC BEI-1 · IP67</div>
+          </div>
+        </div>
+      </div>
+      <div class="batt-status-txt" id="batt-status-txt" style="color:var(--green);">✅ NORMAL OPERATION</div>
+      <div class="batt-soc-row">
+        <span>SOC (충전율)</span>
+        <span class="batt-soc-val" id="soc-val">87%</span>
+      </div>
+      <div class="soc-bar-wrap">
+        <div class="soc-bar-bg">
+          <div class="soc-bar-fill" id="soc-bar" style="width:87%;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scenario Controls -->
+    <div class="scenario-box">
+      <div class="panel-label">시나리오 선택</div>
+      <button class="scenario-btn btn-normal" onclick="setScenario('normal')">
+        <span class="btn-icon">🟢</span> 정상 충전 모드
+      </button>
+      <button class="scenario-btn btn-warn" onclick="setScenario('heat')">
+        <span class="btn-icon">🟡</span> 온도 상승 감지 (경고)
+      </button>
+      <button class="scenario-btn btn-danger" onclick="setScenario('thermal')">
+        <span class="btn-icon">🔴</span> 열폭주 임박 — BEI 대응
+      </button>
+      <button class="scenario-btn btn-deep" onclick="setScenario('deep')">
+        <span class="btn-icon">🟣</span> 과방전 + 셀 불균형
+      </button>
+      <button class="scenario-btn btn-warn" onclick="setScenario('fastcharge')">
+        <span class="btn-icon">⚡</span> 급속충전 중 위험
+      </button>
+
+      <div class="panel-label" style="margin-top:14px;">시뮬레이션 속도</div>
+      <div class="speed-row">
+        <button class="speed-btn" onclick="setSpeed(0.5)" id="sp0">0.5×</button>
+        <button class="speed-btn active" onclick="setSpeed(1)" id="sp1">1×</button>
+        <button class="speed-btn" onclick="setSpeed(2)" id="sp2">2×</button>
+        <button class="speed-btn" onclick="setSpeed(5)" id="sp3">5×</button>
+      </div>
+    </div>
+
+    <!-- BEI Response Timer -->
+    <div class="timer-box">
+      <div class="timer-label">BEI 반응 시간</div>
+      <div class="timer-val" id="response-timer">--</div>
+      <div class="timer-sub" id="response-sub">위험 감지 후 대응까지</div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-box">
+      <div class="panel-label">누적 통계</div>
+      <div class="stat-row"><span class="stat-key">감지된 이벤트</span><span class="stat-val" id="st-events">0</span></div>
+      <div class="stat-row"><span class="stat-key">MCP 명령 실행</span><span class="stat-val" id="st-actions">0</span></div>
+      <div class="stat-row"><span class="stat-key">차단된 위험</span><span class="stat-val" id="st-blocked" style="color:var(--green);">0</span></div>
+      <div class="stat-row"><span class="stat-key">예측 RUL</span><span class="stat-val" id="st-rul">712 사이클</span></div>
+      <div class="stat-row"><span class="stat-key">사이클 수</span><span class="stat-val" id="st-cycles">47</span></div>
+    </div>
+
+  </div>
+
+  <!-- ════ CENTER PANEL ════ -->
+  <div class="center-panel">
+
+    <!-- Sensor Cards -->
+    <div class="sensor-grid">
+      <!-- Temperature -->
+      <div class="sensor-card ok" id="card-temp">
+        <div class="sc-label">
+          🌡️ 최고 셀 온도
+          <span class="sc-status ok" id="badge-temp">정상</span>
+        </div>
+        <div class="sc-val" id="val-temp" style="color:var(--green);">28.4</div>
+        <div class="sc-unit">°C <span style="color:var(--muted);font-size:10px;">/ 임계 55°C</span></div>
+        <div class="sc-mini">dT/dt: <span id="val-dtemp">+0.08</span> °C/min</div>
+        <div class="gauge-bar"><div class="gauge-fill" id="g-temp" style="width:25%;background:var(--green);"></div></div>
+      </div>
+      <!-- Voltage Imbalance -->
+      <div class="sensor-card ok" id="card-volt">
+        <div class="sc-label">
+          ⚡ 셀 전압 불균형 ΔV
+          <span class="sc-status ok" id="badge-volt">정상</span>
+        </div>
+        <div class="sc-val" id="val-volt" style="color:var(--green);">3.2</div>
+        <div class="sc-unit">mV <span style="color:var(--muted);font-size:10px;">/ 임계 12 mV</span></div>
+        <div class="sc-mini">최저셀: <span id="val-vcell">3,815</span> mV</div>
+        <div class="gauge-bar"><div class="gauge-fill" id="g-volt" style="width:15%;background:var(--green);"></div></div>
+      </div>
+      <!-- Impedance -->
+      <div class="sensor-card ok" id="card-imp">
+        <div class="sc-label">
+          📉 내부 임피던스
+          <span class="sc-status ok" id="badge-imp">정상</span>
+        </div>
+        <div class="sc-val" id="val-imp" style="color:var(--green);">42.1</div>
+        <div class="sc-unit">mΩ <span style="color:var(--muted);font-size:10px;">/ 기준 40 mΩ</span></div>
+        <div class="sc-mini">변화율: <span id="val-dimp">+0.3</span>% / cycle</div>
+        <div class="gauge-bar"><div class="gauge-fill" id="g-imp" style="width:20%;background:var(--green);"></div></div>
+      </div>
+      <!-- Current -->
+      <div class="sensor-card ok" id="card-curr">
+        <div class="sc-label">
+          🔌 충방전 전류
+          <span class="sc-status ok" id="badge-curr">정상</span>
+        </div>
+        <div class="sc-val" id="val-curr" style="color:var(--cyan);">2.1</div>
+        <div class="sc-unit">A <span style="color:var(--muted);font-size:10px;">/ 최대 5.0 A</span></div>
+        <div class="sc-mini">모드: <span id="val-mode">CC 충전</span></div>
+        <div class="gauge-bar"><div class="gauge-fill" id="g-curr" style="width:30%;background:var(--cyan);"></div></div>
+      </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="chart-row">
+      <div class="chart-box">
+        <div class="chart-title">
+          온도 추이 (°C)
+          <span class="chart-live">● LIVE</span>
+        </div>
+        <canvas id="chart-temp" height="120"></canvas>
+      </div>
+      <div class="chart-box">
+        <div class="chart-title">
+          위험도 스코어 (0–100)
+          <span class="chart-live">● LIVE</span>
+        </div>
+        <canvas id="chart-risk" height="120"></canvas>
+      </div>
+    </div>
+
+    <!-- Ontology Inference -->
+    <div class="ontology-box">
+      <div class="ont-header">
+        <div class="ont-title">🧠 Operational Ontology 실시간 추론</div>
+        <div class="ont-score-wrap">
+          <div>
+            <div class="ont-score-label">위험도 스코어</div>
+            <div class="ont-score-sub">ThermalRunawayRisk</div>
+          </div>
+          <div class="ont-score" id="risk-score" style="color:var(--green);">8</div>
+          <div style="font-size:14px;color:var(--muted)">/100</div>
+        </div>
+      </div>
+
+      <div class="risk-bar-wrap">
+        <div class="risk-bar-bg">
+          <div class="risk-bar-fill" id="risk-bar" style="width:8%;"></div>
+        </div>
+        <div class="risk-ticks">
+          <span>0 안전</span><span>25</span><span>50 경고</span><span>75</span><span>100 위험</span>
+        </div>
+      </div>
+
+      <div class="ont-layers">
+        <div class="ont-row" id="ont-obs">
+          <span class="ont-row-tag">Observation</span>
+          <span class="ont-row-val" id="ont-obs-val">셀 온도 28.4°C · ΔV 3.2 mV · 임피던스 42 mΩ</span>
+          <span class="ont-row-badge" id="ont-obs-badge" style="color:var(--green);border-color:rgba(0,255,136,0.3);background:rgba(0,255,136,0.06);">정상</span>
+        </div>
+        <div class="ont-row" id="ont-evt">
+          <span class="ont-row-tag">Event</span>
+          <span class="ont-row-val" id="ont-evt-val">이벤트 없음</span>
+          <span class="ont-row-badge" id="ont-evt-badge" style="color:var(--muted);border-color:rgba(255,255,255,0.1);background:rgba(255,255,255,0.02);">대기</span>
+        </div>
+        <div class="ont-row" id="ont-sit">
+          <span class="ont-row-tag">Situation</span>
+          <span class="ont-row-val" id="ont-sit-val">정상 운용 상황</span>
+          <span class="ont-row-badge" id="ont-sit-badge" style="color:var(--muted);border-color:rgba(255,255,255,0.1);background:rgba(255,255,255,0.02);">감시 중</span>
+        </div>
+        <div class="ont-row" id="ont-risk">
+          <span class="ont-row-tag">Risk</span>
+          <span class="ont-row-val" id="ont-risk-val">ThermalRunawayRisk 스코어 8/100</span>
+          <span class="ont-row-badge" id="ont-risk-badge" style="color:var(--green);border-color:rgba(0,255,136,0.3);background:rgba(0,255,136,0.06);">낮음</span>
+        </div>
+        <div class="ont-row" id="ont-act">
+          <span class="ont-row-tag">MCP Action</span>
+          <span class="ont-row-val" id="ont-act-val">충전 전류 유지 (2.1 A) — 개입 없음</span>
+          <span class="ont-row-badge" id="ont-act-badge" style="color:var(--cyan);border-color:rgba(0,212,255,0.3);background:rgba(0,212,255,0.06);">모니터링</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Action Log -->
+    <div class="action-log" id="action-log">
+      <div class="log-title">📋 MCP 실행 로그</div>
+      <div id="log-body">
+        <div class="log-entry log-ok">
+          <span class="log-time" id="init-time">00:00</span>
+          <span class="log-icon">🟢</span>
+          <span class="log-text"><strong>시스템 시작</strong> — BEI 정상 부팅. Ontology 엔진 로드 완료. 센서 연결: 셀 전압 ×12, 온도 ×16, 임피던스 EIS 활성화.</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ════ RIGHT PANEL ════ -->
+  <div class="right-panel">
+
+    <!-- Cell Heatmap -->
+    <div class="heatmap-box">
+      <div class="panel-label">셀 온도 히트맵 (12셀)</div>
+      <div class="heatmap-grid" id="heatmap"></div>
+      <div class="hm-legend">
+        <span>저온</span>
+        <div class="hm-bar"></div>
+        <span>고온</span>
+      </div>
+      <div style="margin-top:8px;font-size:10px;color:var(--muted);text-align:center;" id="hm-max-info">최고 셀: #7 / 28.4°C</div>
+    </div>
+
+    <!-- SOH & RUL -->
+    <div class="stats-box">
+      <div class="panel-label">배터리 건강 · 수명</div>
+      <div class="stat-row">
+        <span class="stat-key">SOH (건강도)</span>
+        <span class="stat-val" id="soh-val" style="color:var(--green);">94.2%</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-key">RUL (잔여수명)</span>
+        <span class="stat-val" id="rul-val" style="color:var(--cyan);">712 사이클</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-key">누적 사이클</span>
+        <span class="stat-val" id="cyc-val">47</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-key">수명 예측 개선</span>
+        <span class="stat-val" style="color:var(--green);">+68% vs 기존</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-key">다음 점검 권고</span>
+        <span class="stat-val" id="next-check">610 사이클 후</span>
+      </div>
+    </div>
+
+    <!-- Voltage per cell -->
+    <div class="stats-box">
+      <div class="panel-label">셀별 전압 (V) — 최상위 3셀</div>
+      <div class="stat-row"><span class="stat-key">셀 #3 (최고)</span><span class="stat-val" id="cv3" style="color:var(--green);">3.821</span></div>
+      <div class="stat-row"><span class="stat-key">셀 #7 (최고온)</span><span class="stat-val" id="cv7">3.818</span></div>
+      <div class="stat-row"><span class="stat-key">셀 #11 (최저)</span><span class="stat-val" id="cv11">3.819</span></div>
+      <div class="stat-row"><span class="stat-key">팩 전압 합계</span><span class="stat-val" id="cv-total">45.83 V</span></div>
+    </div>
+
+    <!-- Communication status -->
+    <div class="stats-box">
+      <div class="panel-label">Edge 통신 상태</div>
+      <div class="stat-row">
+        <span class="stat-key">BMS 인터페이스</span>
+        <span class="stat-val" style="color:var(--green);">CAN ✓</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-key">클라우드 동기</span>
+        <span class="stat-val" style="color:var(--cyan);">WiFi 6 ✓</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-key">샘플링 주기</span>
+        <span class="stat-val">100 ms</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-key">추론 지연</span>
+        <span class="stat-val" style="color:var(--green);">< 12 ms</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-key">온보드 AI</span>
+        <span class="stat-val" style="color:var(--green);">NPU 활성</span>
+      </div>
+    </div>
+
+  </div>
+
+</div><!-- /main -->
+</div><!-- /wrap -->
+
+<script>
+// ══════════════════════════════════════════════════════
+//  BEI Smart Battery Simulation Engine
+// ══════════════════════════════════════════════════════
+(function(){
+  'use strict';
+
+  // ── State ──────────────────────────────────────────
+  let scenario   = 'normal';
+  let simSpeed   = 1;
+  let simTime    = 0;       // seconds
+  let tickCount  = 0;
+  let riskScore  = 8;
+  let dangerActive = false;
+  let responseStartTime = null;
+  let stats = { events:0, actions:0, blocked:0, cycles:47 };
+
+  // Sensor values (noisy)
+  let sensors = {
+    temp:28.4, dtemp:0.08, volt:3.2, vcell:3815,
+    imp:42.1, dimp:0.3, curr:2.1, soc:87,
+    soh:94.2, rul:712, cellTemps: Array.from({length:12},(_,i)=>26+Math.random()*4)
+  };
+
+  // Chart history
+  const HIST = 60;
+  let tempHist = Array(HIST).fill(28.4);
+  let riskHist = Array(HIST).fill(8);
+
+  // ── Canvas Setup ──────────────────────────────────
+  const cvTemp = document.getElementById('chart-temp');
+  const cvRisk = document.getElementById('chart-risk');
+
+  function resizeCanvases(){
+    [cvTemp, cvRisk].forEach(c=>{
+      c.width  = c.offsetWidth  * devicePixelRatio;
+      c.height = c.offsetHeight * devicePixelRatio;
+    });
+  }
+  resizeCanvases();
+  window.addEventListener('resize', resizeCanvases);
+
+  function drawLineChart(canvas, data, minY, maxY, lineColor, fillColor, label){
+    const ctx  = canvas.getContext('2d');
+    const W    = canvas.width, H = canvas.height;
+    const pad  = {top:20*devicePixelRatio, bot:20*devicePixelRatio, left:8*devicePixelRatio, right:8*devicePixelRatio};
+    ctx.clearRect(0,0,W,H);
+
+    const dpr  = devicePixelRatio;
+    const iW   = W - pad.left - pad.right;
+    const iH   = H - pad.top  - pad.bot;
+    const range= maxY - minY || 1;
+
+    // Grid lines
+    ctx.strokeStyle='rgba(255,255,255,0.04)';
+    ctx.lineWidth=1;
+    for(let g=0;g<=4;g++){
+      const y = pad.top + iH*(1 - g/4);
+      ctx.beginPath(); ctx.moveTo(pad.left,y); ctx.lineTo(W-pad.right,y); ctx.stroke();
+    }
+
+    // Area fill
+    const pts = data.map((v,i)=>({
+      x: pad.left + (i/(data.length-1))*iW,
+      y: pad.top  + iH*(1 - (v-minY)/range)
+    }));
+
+    const grad = ctx.createLinearGradient(0,pad.top,0,H-pad.bot);
+    grad.addColorStop(0, fillColor);
+    grad.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, H-pad.bot);
+    pts.forEach(p=> ctx.lineTo(p.x,p.y));
+    ctx.lineTo(pts[pts.length-1].x, H-pad.bot);
+    ctx.closePath();
+    ctx.fillStyle=grad;
+    ctx.fill();
+
+    // Line
+    ctx.beginPath();
+    pts.forEach((p,i)=> i===0 ? ctx.moveTo(p.x,p.y) : ctx.lineTo(p.x,p.y));
+    ctx.strokeStyle=lineColor; ctx.lineWidth=2*dpr; ctx.lineJoin='round'; ctx.stroke();
+
+    // Latest value label
+    const last = pts[pts.length-1];
+    ctx.fillStyle=lineColor; ctx.font=`${11*dpr}px 'Segoe UI',sans-serif`;
+    ctx.fillText(data[data.length-1].toFixed(1), last.x - 22*dpr, last.y - 6*dpr);
+  }
+
+  // ── Heatmap ───────────────────────────────────────
+  function buildHeatmap(){
+    const hm = document.getElementById('heatmap');
+    hm.innerHTML='';
+    for(let i=0;i<12;i++){
+      const t = document.createElement('div');
+      t.className='cell-tile';
+      t.dataset.n = i+1;
+      t.innerHTML = `<span class="cell-temp-label" id="ct${i}">--</span>`;
+      hm.appendChild(t);
+    }
+  }
+  buildHeatmap();
+
+  function tempToColor(t){
+    // 20°C(blue) → 35°C(green) → 55°C(orange) → 70°C+(red)
+    if(t < 30) return `rgba(0,${Math.round(100+t*4)},${Math.round(255-(t-20)*10)},0.7)`;
+    if(t < 45) return `rgba(${Math.round((t-30)*12)},${Math.round(255-(t-30)*8)},60,0.75)`;
+    if(t < 60) return `rgba(255,${Math.round(180-(t-45)*10)},30,0.8)`;
+    return `rgba(255,${Math.round(60-(t-60)*3)},20,0.9)`;
+  }
+
+  function updateHeatmap(){
+    let maxT=-Infinity, maxIdx=0;
+    sensors.cellTemps.forEach((t,i)=>{
+      const tile = document.getElementById(`ct${i}`);
+      if(!tile) return;
+      tile.textContent = t.toFixed(1);
+      tile.parentElement.style.background = tempToColor(t);
+      tile.parentElement.style.boxShadow  = t>50 ? `0 0 8px rgba(255,68,68,0.5)`:
+                                             t>40 ? `0 0 6px rgba(255,144,32,0.3)`:'none';
+      if(t>maxT){maxT=t; maxIdx=i;}
+    });
+    document.getElementById('hm-max-info').textContent =
+      `최고 셀: #${maxIdx+1} / ${maxT.toFixed(1)}°C`;
+  }
+
+  // ── Noise helper ──────────────────────────────────
+  function noise(base, amp){ return base + (Math.random()-0.5)*amp*2; }
+
+  // ── Scenario Targets ──────────────────────────────
+  const SCENARIOS = {
+    normal:     { temp:28, dtemp:0.08, volt:3.2, imp:42,  curr:2.1, soc:87, riskTarget:8,  alertLv:'ok' },
+    heat:       { temp:42, dtemp:1.2,  volt:8.1, imp:46,  curr:2.8, soc:85, riskTarget:42, alertLv:'warn' },
+    thermal:    { temp:56, dtemp:2.1,  volt:18,  imp:52,  curr:1.2, soc:83, riskTarget:78, alertLv:'danger' },
+    deep:       { temp:32, dtemp:0.3,  volt:22,  imp:61,  curr:-3.5,soc:12, riskTarget:55, alertLv:'warn' },
+    fastcharge: { temp:48, dtemp:1.8,  volt:14,  imp:49,  curr:4.8, soc:35, riskTarget:65, alertLv:'warn' }
+  };
+
+  let target = {...SCENARIOS.normal};
+
+  // ── Log helper ────────────────────────────────────
+  function timeStr(){
+    const m = Math.floor(simTime/60).toString().padStart(2,'0');
+    const s = (simTime%60).toString().padStart(2,'0');
+    return `${m}:${s}`;
+  }
+
+  function addLog(icon, text, cls){
+    const lb = document.getElementById('log-body');
+    const el = document.createElement('div');
+    el.className=`log-entry ${cls}`;
+    el.innerHTML=`<span class="log-time">${timeStr()}</span><span class="log-icon">${icon}</span><span class="log-text">${text}</span>`;
+    lb.prepend(el);
+    if(lb.children.length > 40) lb.removeChild(lb.lastChild);
+    stats.events++;
+    document.getElementById('st-events').textContent = stats.events;
+  }
+
+  // ── Update Ontology UI ────────────────────────────
+  function updateOntology(lv){
+    const score = riskScore;
+
+    // Observation
+    document.getElementById('ont-obs-val').textContent =
+      `셀 온도 ${sensors.temp.toFixed(1)}°C · ΔV ${sensors.volt.toFixed(1)} mV · 임피던스 ${sensors.imp.toFixed(1)} mΩ`;
+
+    if(lv==='ok'){
+      setOntRow('ont-obs','active','정상'); setOntRow('ont-evt','','대기');
+      setOntRow('ont-sit','','감시 중'); setOntRow('ont-risk','','낮음');
+      setOntRow('ont-act','','모니터링');
+      document.getElementById('ont-evt-val').textContent='이벤트 없음';
+      document.getElementById('ont-sit-val').textContent='정상 운용 상황';
+      document.getElementById('ont-risk-val').textContent=`ThermalRunawayRisk 스코어 ${score}/100`;
+      document.getElementById('ont-act-val').textContent=`충전 전류 유지 (${sensors.curr.toFixed(1)} A) — 개입 없음`;
+    } else if(lv==='warn'){
+      setOntRow('ont-obs','active','감지됨','var(--orange)');
+      setOntRow('ont-evt','active','ThermalRiseEvent','var(--orange)');
+      setOntRow('ont-sit','active','이상 상황 감지','var(--orange)');
+      setOntRow('ont-risk','','경고','var(--orange)');
+      setOntRow('ont-act','','조정 중','var(--cyan)');
+      document.getElementById('ont-evt-val').textContent='ThermalRiseEvent + ImpedanceAnomaly';
+      document.getElementById('ont-sit-val').textContent='복합 이상 패턴 — 주의 모드';
+      document.getElementById('ont-risk-val').textContent=`ThermalRunawayRisk 스코어 ${score}/100`;
+      document.getElementById('ont-act-val').textContent='충전 전류 감소 명령 대기 중';
+    } else {
+      setOntRow('ont-obs','alert','위험!','var(--red)');
+      setOntRow('ont-evt','alert','⚠️ ThermalRunaway','var(--red)');
+      setOntRow('ont-sit','alert','열폭주 임박','var(--red)');
+      setOntRow('ont-risk','alert','위험','var(--red)');
+      setOntRow('ont-act','active','MCP 실행 중','var(--cyan)');
+      document.getElementById('ont-evt-val').textContent='🔴 ThermalRunawayRisk + LithiumPlating';
+      document.getElementById('ont-sit-val').textContent='열폭주 임박 — 긴급 대응 실행';
+      document.getElementById('ont-risk-val').textContent=`🚨 ThermalRunawayRisk 스코어 ${score}/100 — 위험`;
+      document.getElementById('ont-act-val').textContent=`MCP → 충전전류 ${sensors.curr.toFixed(1)}A 감소 · 냉각 팬 ON · 경고 전송`;
+    }
+
+    document.getElementById('risk-score').textContent = score;
+    document.getElementById('risk-score').style.color =
+      score>=75 ? 'var(--red)' : score>=50 ? 'var(--orange)' : score>=25 ? 'var(--yellow)' : 'var(--green)';
+    document.getElementById('risk-bar').style.width = score+'%';
+  }
+
+  function setOntRow(id, cls, badge, color){
+    const row = document.getElementById(id);
+    row.className='ont-row'+(cls?' '+cls:'');
+    const b = row.querySelector('.ont-row-badge');
+    if(badge) b.textContent=badge;
+    if(color){
+      b.style.color=color; b.style.borderColor=color.replace('var(--','rgba(').replace(')',',0.3)');
+      b.style.background=color.replace('var(--','rgba(').replace(')',',0.06)');
+    } else {
+      b.style.color='var(--muted)'; b.style.borderColor='rgba(255,255,255,0.1)'; b.style.background='rgba(255,255,255,0.02)';
+    }
+  }
+
+  // ── Update Sensor Card UI ─────────────────────────
+  function updateCard(id, badgeId, valId, gId, val, max, unit, status){
+    const card  = document.getElementById(id);
+    const badge = document.getElementById(badgeId);
+    const valEl = document.getElementById(valId);
+    const g     = document.getElementById(gId);
+    const pct   = Math.min(100, (val/max)*100);
+
+    card.className  = 'sensor-card '  + status;
+    badge.className = 'sc-status '    + status;
+    badge.textContent = status==='ok'?'정상': status==='warn'?'주의':'위험!';
+    valEl.textContent = typeof val==='number' ? val.toFixed(1) : val;
+    valEl.style.color = status==='ok'?'var(--green)': status==='warn'?'var(--orange)':'var(--red)';
+    g.style.width = pct+'%';
+    g.style.background = status==='ok'?'var(--green)': status==='warn'?'var(--orange)':'var(--red)';
+  }
+
+  function statusOf(val, warnT, dangerT){
+    return val>=dangerT?'danger': val>=warnT?'warn':'ok';
+  }
+
+  // ── Battery visual update ─────────────────────────
+  function updateBatteryVisual(lv){
+    const txt = document.getElementById('batt-status-txt');
+    const leds = [0,1,2,3].map(i=>document.getElementById('led'+i));
+    const soc  = sensors.soc;
+
+    // SOC
+    document.getElementById('soc-val').textContent = Math.round(soc)+'%';
+    const bar = document.getElementById('soc-bar');
+    bar.style.width = soc+'%';
+    bar.style.background = soc>50?'linear-gradient(90deg,#00ff88,#00d4ff)':
+                           soc>20?'linear-gradient(90deg,#ffd700,#ff9020)':
+                                  'linear-gradient(90deg,#ff4444,#ff9020)';
+
+    // LEDs
+    const activeLeds = Math.ceil((soc/100)*4);
+    leds.forEach((l,i)=>{
+      l.className = 'batt-led';
+      if(i < activeLeds){
+        if(lv==='danger') l.classList.add('danger');
+        else if(lv==='warn') l.classList.add('warn');
+        else l.classList.add('on');
+      }
+    });
+
+    // Status text
+    if(lv==='danger'){
+      txt.textContent='🔴 위험 — BEI 대응 중!';
+      txt.style.color='var(--red)';
+    } else if(lv==='warn'){
+      txt.textContent='⚠️ 경고 — 이상 감지';
+      txt.style.color='var(--orange)';
+    } else {
+      txt.textContent='✅ 정상 운용 중';
+      txt.style.color='var(--green)';
+    }
+  }
+
+  // ── Alert Banner ──────────────────────────────────
+  let alertShown = false;
+  function showAlert(title, detail){
+    const banner = document.getElementById('alert-banner');
+    banner.style.display='block';
+    document.getElementById('alert-title').textContent = title;
+    document.getElementById('alert-detail').textContent = detail;
+    document.getElementById('alert-time').textContent = timeStr();
+    if(!alertShown){
+      alertShown=true;
+      if(responseStartTime!==null){
+        const ms = Date.now() - responseStartTime;
+        document.getElementById('response-timer').textContent = (ms/1000).toFixed(2)+'s';
+        document.getElementById('response-sub').textContent = '위험 감지 후 MCP 대응까지';
+      }
+    }
+  }
+  function hideAlert(){
+    document.getElementById('alert-banner').style.display='none';
+    alertShown=false; responseStartTime=null;
+    document.getElementById('response-timer').textContent='--';
+    document.getElementById('response-sub').textContent='위험 감지 후 대응까지';
+  }
+
+  // ── Main Tick ─────────────────────────────────────
+  let loggedEvents = new Set();
+  function tick(){
+    simTime += simSpeed;
+    tickCount++;
+
+    const tgt = SCENARIOS[scenario];
+    const spd = 0.04 * simSpeed;
+
+    // Lerp sensors toward target
+    sensors.temp  += (tgt.temp  - sensors.temp)  * spd + noise(0,0.08);
+    sensors.dtemp += (tgt.dtemp - sensors.dtemp) * spd + noise(0,0.01);
+    sensors.volt  += (tgt.volt  - sensors.volt)  * spd + noise(0,0.05);
+    sensors.imp   += (tgt.imp   - sensors.imp)   * spd + noise(0,0.05);
+    sensors.curr  += (tgt.curr  - sensors.curr)  * spd + noise(0,0.03);
+    sensors.soc    = Math.max(1, Math.min(100, sensors.soc + (tgt.soc - sensors.soc)*spd*0.3));
+    riskScore     += (tgt.riskTarget - riskScore) * spd*1.2;
+    riskScore      = Math.max(0, Math.min(100, riskScore + noise(0,0.5)));
+
+    // Cell temperatures
+    sensors.cellTemps = sensors.cellTemps.map((t,i)=>{
+      const base = sensors.temp + (i===6 ? 2.5 : i===3||i===9 ? 1.2 : Math.random()-0.5);
+      return t + (base-t)*spd*0.6 + noise(0,0.04);
+    });
+    sensors.vcell = 3820 - (sensors.volt*10) + noise(0,0.5);
+
+    // Histories
+    tempHist.push(sensors.temp); tempHist.shift();
+    riskHist.push(riskScore);    riskHist.shift();
+
+    // Determine level
+    const lv = tgt.alertLv;
+
+    // ── Update Sensor Cards ──
+    updateCard('card-temp','badge-temp','val-temp','g-temp', sensors.temp,  90, '°C',
+               statusOf(sensors.temp,  40, 52));
+    document.getElementById('val-dtemp').textContent = (sensors.dtemp>=0?'+':'')+sensors.dtemp.toFixed(2);
+
+    updateCard('card-volt','badge-volt','val-volt','g-volt', sensors.volt,  50, 'mV',
+               statusOf(sensors.volt,  12, 20));
+    document.getElementById('val-vcell').textContent = Math.round(sensors.vcell).toLocaleString();
+
+    updateCard('card-imp','badge-imp','val-imp','g-imp', sensors.imp,  80, 'mΩ',
+               statusOf(sensors.imp-40, 5, 12));
+
+    const absCurr = Math.abs(sensors.curr);
+    updateCard('card-curr','badge-curr','val-curr','g-curr', absCurr, 5, 'A',
+               statusOf(absCurr, 4.0, 4.8));
+    document.getElementById('val-mode').textContent =
+      sensors.curr>0 ? (sensors.curr>4?'🔴 급속충전':'CC 충전') :
+      sensors.curr<-3?'🔴 과방전':'정상 방전';
+
+    // ── Ontology UI ──
+    updateOntology(lv);
+
+    // ── Battery Visual ──
+    updateBatteryVisual(lv);
+
+    // ── Alert Banner ──
+    if(lv==='danger'){
+      if(!dangerActive){ dangerActive=true; responseStartTime=Date.now(); }
+      const msg = scenario==='thermal'
+        ? 'ThermalRunawayRisk 78/100 — 충전 전류 자동 감소 · 냉각 팬 ON · 제조사 서버 알림 전송'
+        : scenario==='deep'
+        ? 'LowSOC + VoltageImbalance — 과방전 차단 · 밸런싱 모드 전환'
+        : '고전류 + 임피던스 상승 — 충전 제한 실행';
+      showAlert('🚨 BEI 위험 감지 — MCP 대응 실행 중', msg);
+    } else {
+      if(dangerActive){ dangerActive=false; hideAlert(); stats.blocked++; document.getElementById('st-blocked').textContent=stats.blocked; }
+    }
+
+    // ── Scenario-specific log events ──
+    if(lv==='warn' && !loggedEvents.has('warn_start')){
+      loggedEvents.add('warn_start');
+      addLog('⚠️','<strong>ThermalRiseEvent 감지</strong> — dT/dt = +'+sensors.dtemp.toFixed(2)+' °C/min. Ontology 경고 모드 전환. 추가 센서 샘플링 주기 ↑100ms→20ms.','log-warn');
+    }
+    if(riskScore>=50 && !loggedEvents.has('risk50')){
+      loggedEvents.add('risk50');
+      addLog('🧠','<strong>위험도 스코어 50 돌파</strong> — VoltageImbalance('+sensors.volt.toFixed(1)+'mV) + ImpedanceAnomaly 복합 판단. Agentic AI 예측 모드 활성화.','log-warn');
+      stats.actions++; document.getElementById('st-actions').textContent=stats.actions;
+    }
+    if(riskScore>=70 && !loggedEvents.has('risk70')){
+      loggedEvents.add('risk70');
+      addLog('🔴','<strong>ThermalRunawayRisk 스코어 70+</strong> — MCP 명령 실행: 충전 전류 '+Math.abs(sensors.curr).toFixed(1)+'A로 감소. 냉각 팬 ON. 제조사 클라우드 서버에 긴급 알림 전송.','log-danger');
+      addLog('📡','<strong>MCP 실행 완료</strong> — BMS CAN 버스로 명령 전달. 응답 확인: 12ms. 충전기 제어 성공.','log-action');
+      stats.actions+=2; document.getElementById('st-actions').textContent=stats.actions;
+    }
+
+    if(lv==='ok' && loggedEvents.size > 0 && !loggedEvents.has('recovery')){
+      loggedEvents.add('recovery');
+      addLog('✅','<strong>위험 해소 완료</strong> — 온도 정상화. 위험도 스코어 하강 중. BEI 정상 모드 복귀. 이번 이벤트 데이터 클라우드 동기화 완료.','log-ok');
+    }
+
+    // ── Right Panel Updates ──
+    document.getElementById('soh-val').textContent = sensors.soh.toFixed(1)+'%';
+    document.getElementById('rul-val').textContent = Math.round(sensors.rul)+' 사이클';
+    document.getElementById('cyc-val').textContent = stats.cycles;
+    document.getElementById('next-check').textContent = Math.round(sensors.rul*0.85)+' 사이클 후';
+    document.getElementById('st-rul').textContent = Math.round(sensors.rul)+' 사이클';
+
+    // Cell voltages
+    const base = sensors.vcell;
+    document.getElementById('cv3').textContent   = ((base+6)/1000).toFixed(3);
+    document.getElementById('cv7').textContent   = ((base)/1000).toFixed(3);
+    document.getElementById('cv11').textContent  = ((base+3)/1000).toFixed(3);
+    document.getElementById('cv-total').textContent = (((base*12)+15)/1000).toFixed(2)+' V';
+
+    // ── Heatmap ──
+    updateHeatmap();
+
+    // ── Charts ──
+    const tMin = Math.min(...tempHist)-2, tMax = Math.max(...tempHist)+5;
+    drawLineChart(cvTemp, tempHist, tMin, tMax,
+      sensors.temp>50?'#ff4444': sensors.temp>38?'#ff9020':'#00ff88',
+      sensors.temp>50?'rgba(255,68,68,0.15)': sensors.temp>38?'rgba(255,144,32,0.1)':'rgba(0,255,136,0.1)',
+      '°C');
+    drawLineChart(cvRisk, riskHist, 0, 100,
+      riskScore>75?'#ff4444': riskScore>50?'#ff9020': riskScore>25?'#ffd700':'#00ff88',
+      riskScore>75?'rgba(255,68,68,0.15)': riskScore>50?'rgba(255,144,32,0.1)':'rgba(0,255,136,0.08)',
+      '');
+  }
+
+  // ── Simulation Loop ────────────────────────────────
+  let lastTime = performance.now();
+  function loop(now){
+    const dt = (now - lastTime) / 1000;
+    lastTime = now;
+    if(dt < 0.2) tick();  // ~10 fps max
+    requestAnimationFrame(loop);
+  }
+  // Set init time
+  document.getElementById('init-time').textContent = '00:00';
+  requestAnimationFrame(loop);
+
+  // ── Public API ────────────────────────────────────
+  window.setScenario = function(s){
+    scenario = s;
+    loggedEvents.clear();
+    dangerActive=false;
+    hideAlert();
+
+    const names={
+      normal:'정상 충전 모드',heat:'온도 상승 감지',
+      thermal:'열폭주 임박',deep:'과방전+셀불균형',fastcharge:'급속충전 위험'
+    };
+    const icons={normal:'🟢',heat:'🟡',thermal:'🔴',deep:'🟣',fastcharge:'⚡'};
+    addLog(icons[s]||'🔄',`<strong>시나리오 변경: ${names[s]||s}</strong> — BEI 시뮬레이션 업데이트. Ontology 재학습 중.`,'log-action');
+    stats.actions++; document.getElementById('st-actions').textContent=stats.actions;
+  };
+
+  window.setSpeed = function(v){
+    simSpeed = v;
+    document.querySelectorAll('.speed-btn').forEach(b=>b.classList.remove('active'));
+    const idx={0.5:'sp0',1:'sp1',2:'sp2',5:'sp3'}[v];
+    if(idx) document.getElementById(idx).classList.add('active');
+  };
+
+})();
+</script>
+</body>
+</html>
