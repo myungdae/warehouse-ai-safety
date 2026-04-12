@@ -174,6 +174,12 @@ def battery():
     """AI Smart Battery Platform — Thinking Battery 제안 페이지"""
     return render_template('battery.html')
 
+@app.route('/battery-sim')
+@app.route('/battery/sim')
+def battery_sim():
+    """BEI Smart Battery — 실시간 시뮬레이션 (Operational Ontology · Agentic AI · MCP)"""
+    return render_template('battery-sim.html')
+
 @app.route('/static/<path:filename>')
 def serve_static(filename):
     return send_from_directory('backend/static', filename)
