@@ -180,6 +180,12 @@ def battery_sim():
     """BEI Smart Battery — 실시간 시뮬레이션 (Operational Ontology · Agentic AI · MCP)"""
     return render_template('battery-sim.html')
 
+@app.route('/edge')
+@app.route('/battery/edge')
+def edge_spec():
+    """BEI Edge 디바이스 규격 + bei_agent.py 문서화 페이지"""
+    return render_template('edge.html')
+
 @app.route('/static/<path:filename>')
 def serve_static(filename):
     return send_from_directory('backend/static', filename)
