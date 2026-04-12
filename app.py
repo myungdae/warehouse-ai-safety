@@ -163,6 +163,17 @@ def download_quotation_excel():
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     )
 
+@app.route('/landing.html')
+@app.route('/landing')
+def landing():
+    """IMC Agentic AI Platform 랜딩 페이지 (Module 05 Battery 포함)"""
+    return render_template('landing.html')
+
+@app.route('/battery')
+def battery():
+    """AI Smart Battery Platform — Thinking Battery 제안 페이지"""
+    return render_template('battery.html')
+
 @app.route('/static/<path:filename>')
 def serve_static(filename):
     return send_from_directory('backend/static', filename)
