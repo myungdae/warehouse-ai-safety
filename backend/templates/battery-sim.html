@@ -925,7 +925,7 @@
 
   // ── Update Ontology UI ────────────────────────────
   function updateOntology(lv){
-    const score = riskScore;
+    const score = Math.round(riskScore);
 
     // Observation
     document.getElementById('ont-obs-val').textContent =
@@ -937,7 +937,7 @@
       setOntRow('ont-act','','모니터링');
       document.getElementById('ont-evt-val').textContent='이벤트 없음';
       document.getElementById('ont-sit-val').textContent='정상 운용 상황';
-      document.getElementById('ont-risk-val').textContent=`ThermalRunawayRisk 스코어 ${score}/100`;
+      document.getElementById('ont-risk-val').textContent=`ThermalRunawayRisk 스코어 ${Math.round(score)}/100`;
       document.getElementById('ont-act-val').textContent=`충전 전류 유지 (${sensors.curr.toFixed(1)} A) — 개입 없음`;
     } else if(lv==='warn'){
       setOntRow('ont-obs','active','감지됨','var(--orange)');
@@ -947,7 +947,7 @@
       setOntRow('ont-act','','조정 중','var(--cyan)');
       document.getElementById('ont-evt-val').textContent='ThermalRiseEvent + ImpedanceAnomaly';
       document.getElementById('ont-sit-val').textContent='복합 이상 패턴 — 주의 모드';
-      document.getElementById('ont-risk-val').textContent=`ThermalRunawayRisk 스코어 ${score}/100`;
+      document.getElementById('ont-risk-val').textContent=`ThermalRunawayRisk 스코어 ${Math.round(score)}/100`;
       document.getElementById('ont-act-val').textContent='충전 전류 감소 명령 대기 중';
     } else {
       setOntRow('ont-obs','alert','위험!','var(--red)');
@@ -957,14 +957,14 @@
       setOntRow('ont-act','active','MCP 실행 중','var(--cyan)');
       document.getElementById('ont-evt-val').textContent='🔴 ThermalRunawayRisk + LithiumPlating';
       document.getElementById('ont-sit-val').textContent='열폭주 임박 — 긴급 대응 실행';
-      document.getElementById('ont-risk-val').textContent=`🚨 ThermalRunawayRisk 스코어 ${score}/100 — 위험`;
+      document.getElementById('ont-risk-val').textContent=`🚨 ThermalRunawayRisk 스코어 ${Math.round(score)}/100 — 위험`;
       document.getElementById('ont-act-val').textContent=`MCP → 충전전류 ${sensors.curr.toFixed(1)}A 감소 · 냉각 팬 ON · 경고 전송`;
     }
 
     document.getElementById('risk-score').textContent = score;
     document.getElementById('risk-score').style.color =
       score>=75 ? 'var(--red)' : score>=50 ? 'var(--orange)' : score>=25 ? 'var(--yellow)' : 'var(--green)';
-    document.getElementById('risk-bar').style.width = score+'%';
+    document.getElementById('risk-bar').style.width = Math.round(score)+'%';
   }
 
   function setOntRow(id, cls, badge, color){
@@ -1080,7 +1080,7 @@
     sensors.curr  += (tgt.curr  - sensors.curr)  * spd + noise(0,0.03);
     sensors.soc    = Math.max(1, Math.min(100, sensors.soc + (tgt.soc - sensors.soc)*spd*0.3));
     riskScore     += (tgt.riskTarget - riskScore) * spd*1.2;
-    riskScore      = Math.max(0, Math.min(100, riskScore + noise(0,0.5)));
+    riskScore      = Math.max(0, Math.min(100, riskScore + noise(0,0.3)));
 
     // Cell temperatures
     sensors.cellTemps = sensors.cellTemps.map((t,i)=>{
