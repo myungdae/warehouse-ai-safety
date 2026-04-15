@@ -24,10 +24,21 @@ try:
 except ImportError:
     pass
 
+import urllib.request
+
+try:
+    from flask_cors import CORS
+    CORS_AVAILABLE = True
+except ImportError:
+    CORS_AVAILABLE = False
+
 # ── Flask App ──────────────────────────────────────────────────
 app = Flask(__name__,
             template_folder='backend/templates',
             static_folder='backend/static')
+
+if CORS_AVAILABLE:
+    CORS(app)
 
 # ── Report Archive DB (SQLite — persistent across restarts) ───
 REPORT_ARCHIVE_DIR = os.path.join(os.path.dirname(__file__), 'backend', 'data')
@@ -185,6 +196,44 @@ def battery_sim():
 def edge_spec():
     """BEI Edge 디바이스 규격 + bei_agent.py 문서화 페이지"""
     return render_template('edge.html')
+
+@app.route('/gotham')
+def gotham():
+    """Gotham AIP — 작전 상황인식 플랫폼 (백엔드 연동 v2.0)"""
+    return render_template('gotham.html')
+
+# ── Gotham API Proxy (FastAPI → Flask 프록시) ──────────────────
+GOTHAM_BACKEND_URL = os.environ.get('GOTHAM_BACKEND_URL', 'http://localhost:8766')
+
+@app.route('/gotham-api/<path:subpath>', methods=['GET', 'POST', 'PUT', 'DELETE'])
+def gotham_api_proxy(subpath):
+    """Gotham FastAPI 백엔드를 Flask가 프록시 (CORS 우회)"""
+    try:
+        target_url = f"{GOTHAM_BACKEND_URL}/api/{subpath}"
+        query = request.query_string.decode()
+        if query:
+            target_url += '?' + query
+
+        method = request.method
+        data   = request.get_data()
+        headers = {'Content-Type': 'application/json'} if data else {}
+
+        req = urllib.request.Request(
+            target_url, data=data if data else None,
+            headers=headers, method=method
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            body   = resp.read()
+            status = resp.status
+        return app.response_class(
+            response=body, status=status, mimetype='application/json'
+        )
+    except urllib.error.HTTPError as e:
+        return app.response_class(
+            response=e.read(), status=e.code, mimetype='application/json'
+        )
+    except Exception as e:
+        return jsonify({'error': str(e), 'backend': GOTHAM_BACKEND_URL}), 502
 
 @app.route('/static/<path:filename>')
 def serve_static(filename):
