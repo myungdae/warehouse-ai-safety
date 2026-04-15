@@ -7,6 +7,20 @@ Gotham AIP — FastAPI + Neo4j Backend
 • MOE Stats: 기여자 통계 트래킹
 """
 
+import subprocess, sys
+
+def _ensure_pkg(pkg, import_name=None):
+    """설치 안 된 패키지를 자동 설치"""
+    import_name = import_name or pkg
+    try:
+        __import__(import_name)
+    except ImportError:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", pkg, "-q"])
+
+# WebSocket 지원 라이브러리 자동 설치
+_ensure_pkg("websockets")
+_ensure_pkg("uvicorn[standard]", "uvicorn")
+
 from fastapi import FastAPI, HTTPException, Depends, WebSocket, WebSocketDisconnect, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -803,7 +817,12 @@ ws_manager = ConnectionManager()
 @app.websocket("/ws/cop")
 async def cop_websocket(websocket: WebSocket):
     """COP (Common Operating Picture) WebSocket 스트림"""
-    await ws_manager.connect(websocket)
+    try:
+        await ws_manager.connect(websocket)
+    except Exception as e:
+        logger.warning(f"WS accept failed (websockets 라이브러리 미설치?): {e}")
+        return
+
     logger.info(f"WS connected: {websocket.client}")
     try:
         # 초기 센서 상태 전송
@@ -857,6 +876,9 @@ async def cop_websocket(websocket: WebSocket):
     except WebSocketDisconnect:
         ws_manager.disconnect(websocket)
         logger.info("WS disconnected")
+    except Exception as e:
+        ws_manager.disconnect(websocket)
+        logger.warning(f"WS error: {e}")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
