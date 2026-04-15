@@ -1,33 +1,48 @@
 #!/bin/bash
 # =========================================================
-# Gotham AIP 서버 수정 스크립트
+# Gotham AIP 서버 수정 스크립트 v2
 # 실행: bash fix_gotham_server.sh
 # =========================================================
-set -e
 
 VENV="/home/ubuntu/defcon/defcon-web-app/venv"
 GOTHAM_DIR="/home/ubuntu/defcon/defcon-web-app/gotham"
+PYTHON="$VENV/bin/python3"
+UVICORN="$VENV/bin/uvicorn"
 
-echo "=== [1/4] uvicorn[standard] + websockets 설치 ==="
-$VENV/bin/pip install "uvicorn[standard]" websockets -q
+echo "=== [1/5] 패키지 설치 ==="
+$PYTHON -m pip install "uvicorn[standard]" websockets fastapi pydantic -q
 echo "✅ 설치 완료"
+$UVICORN --version
 
 echo ""
-echo "=== [2/4] 기존 gotham-api pm2 프로세스 삭제 ==="
+echo "=== [2/5] 기존 gotham-api 삭제 ==="
 pm2 delete gotham-api 2>/dev/null || true
+sleep 1
 
 echo ""
-echo "=== [3/4] gotham-api pm2 재시작 ==="
-pm2 start \
-  "$VENV/bin/python3 -m uvicorn gotham_backend:app --host 0.0.0.0 --port 8766" \
+echo "=== [3/5] gotham 디렉토리 최신화 ==="
+# warehouse-ai-safety의 최신 gotham_backend.py를 defcon-web-app에 복사
+cp /home/ubuntu/warehouse-ai-safety/backend/gotham/gotham_backend.py "$GOTHAM_DIR/gotham_backend.py"
+echo "✅ gotham_backend.py 복사 완료 ($(wc -l < $GOTHAM_DIR/gotham_backend.py) lines)"
+
+echo ""
+echo "=== [4/5] pm2 시작 (uvicorn 직접 실행) ==="
+pm2 start "$UVICORN" \
   --name "gotham-api" \
-  --cwd "$GOTHAM_DIR"
+  --cwd "$GOTHAM_DIR" \
+  --interpreter "$PYTHON" \
+  -- gotham_backend:app --host 0.0.0.0 --port 8766
 pm2 save
+echo "✅ pm2 등록 완료"
 
 echo ""
-echo "=== [4/4] 헬스체크 ==="
-sleep 3
-curl -s http://localhost:8766/api/health | python3 -m json.tool || echo "❌ 헬스체크 실패 — pm2 logs gotham-api --lines 20 확인"
-
-echo ""
-pm2 status gotham-api
+echo "=== [5/5] 헬스체크 (10초 대기) ==="
+sleep 10
+HEALTH=$(curl -s --max-time 5 http://localhost:8766/api/health)
+if echo "$HEALTH" | grep -q '"status"'; then
+  echo "✅ 백엔드 정상:"
+  echo "$HEALTH" | python3 -m json.tool
+else
+  echo "❌ 헬스체크 실패 — 로그 확인:"
+  pm2 logs gotham-api --lines 30 --nostream
+fi
