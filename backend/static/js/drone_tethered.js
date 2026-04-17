@@ -128,122 +128,45 @@ const DRONE_CONFIG = {
 };
 
 // ══════════════════════════════════════════════════════════════
-// 라벨 유형 정의 (삼성 반도체 창고)
+// 스캔 필드 정의 (삼성 반도체 창고)
 // ──────────────────────────────────────────────────────────────
-// 각 라벨 유형별로 드론이 읽어야 할 필드가 다릅니다:
-//
-//  ┌─────────────┬──────────────────────────────────┬─────────────────┐
-//  │ 라벨 유형   │ 읽는 필드 (PRIMARY)              │ 비고            │
-//  ├─────────────┼──────────────────────────────────┼─────────────────┤
-//  │ 웨이퍼      │ PT번호  (PT64090302)             │ 바코드 하단     │
-//  │             │ ← DVC(K93KGD8J0C) 아님!          │ 삼성 요청 확인  │
-//  ├─────────────┼──────────────────────────────────┼─────────────────┤
-//  │ HBM         │ DVC Part No. (H6-... 형태)       │ 상단 파트번호   │
-//  ├─────────────┼──────────────────────────────────┼─────────────────┤
-//  │ 브랜드      │ MODEL CODE (MZ-77E1T0B/EU 등)    │ 상단 모델코드   │
-//  ├─────────────┼──────────────────────────────────┼─────────────────┤
-//  │ 롱시스      │ UPC (887276265858 형태)           │ EAN/UPC 필드    │
-//  └─────────────┴──────────────────────────────────┴─────────────────┘
+// 삼성 요청: 모든 박스에서 PT번호를 읽어야 함
+// DVC(K93KGD8J0C) 가 아닌 PT번호(PT64090302) 읽기
+// Dock A / Dock B 구별 없이 전 구역 동일 적용
 // ══════════════════════════════════════════════════════════════
 
-// ── 라벨 유형 상수 ───────────────────────────────────────────
-const LABEL_TYPES = {
-    WAFER:  'WAFER',   // 웨이퍼 라벨  → PT번호 읽기
-    HBM:    'HBM',    // HBM 라벨    → DVC Part No. 읽기
-    BRAND:  'BRAND',  // 브랜드 라벨  → MODEL CODE 읽기
-    LONGYS: 'LONGYS', // 롱시스 라벨  → UPC 읽기
-};
+// ── 스캔 필드 메타 (전 구역 통일) ────────────────────────────
+const LABEL_FIELD_META = { fieldName: 'PT번호', fieldKey: 'pt_number', icon: '🔵', color: '#22d3ee' };
 
-// ── 라벨 유형별 스캔 필드 설명 ───────────────────────────────
-const LABEL_FIELD_MAP = {
-    [LABEL_TYPES.WAFER]:  { fieldName: 'PT번호',       fieldKey: 'pt_number',    icon: '🔵', color: '#22d3ee' },
-    [LABEL_TYPES.HBM]:   { fieldName: 'DVC Part No.', fieldKey: 'dvc_part',     icon: '🟣', color: '#a78bfa' },
-    [LABEL_TYPES.BRAND]: { fieldName: 'MODEL CODE',   fieldKey: 'model_code',   icon: '⚪', color: '#94a3b8' },
-    [LABEL_TYPES.LONGYS]:{ fieldName: 'UPC',          fieldKey: 'upc',          icon: '🟡', color: '#fbbf24' },
-};
-
-// ══════════════════════════════════════════════════════════════
-// MOCK INVENTORY — 삼성 반도체 라벨 체계 반영
-// ══════════════════════════════════════════════════════════════
-
-// ── 웨이퍼 라벨: PT번호 목록 (삼성 요청 기준) ────────────────
-// DVC(K93KGD8J0C) 가 아닌 PT번호(PT64090302 등)를 읽어야 함
+// ── PT번호 목록 (삼성 요청 기준) ─────────────────────────────
 const WAFER_PT_LIST = [
     'PT64090302', 'PT64090303', 'PT64090304', 'PT64090305',
     'PT64090306', 'PT64090307', 'PT64090308', 'PT64090309',
     'PT64090310', 'PT64090311',
 ];
 
-// ── HBM 라벨: DVC Part No. 목록 ─────────────────────────────
-const HBM_DVC_LIST = [
-    'H6-HX01AAGP16-H29', 'H6-HX02AAGP24-H36',
-    'H6-HX04BAGT32-H48', 'H6-HX08CAGU64-H96',
-];
-
-// ── 브랜드 라벨: MODEL CODE 목록 ─────────────────────────────
-const BRAND_MODEL_LIST = [
-    'MZ-77E1T0B/EU', 'MZ-77E2T0B/KR', 'MZ-V8P1T0B/AM',
-    'MZ-V9P2T0B/JP', 'MUF-128BE3/AM',
-];
-
-// ── 롱시스 라벨: UPC 목록 ────────────────────────────────────
-const LONGYS_UPC_LIST = [
-    '887276265858', '887276265865', '887276265872',
-    '887276265889', '887276265896',
-];
-
-// ── 창고 구역별 라벨 유형 배정 ───────────────────────────────
-// Aisle 1~4:  웨이퍼 라벨  (PT번호)
-// Aisle 5~8:  HBM 라벨    (DVC Part No.)
-// Aisle 9~12: 브랜드 라벨  (MODEL CODE)
-// Aisle 13~15:롱시스 라벨  (UPC)
-function getLabelTypeForAisle(aisleId) {
-    const id = parseInt(aisleId);
-    if (id >= 1  && id <= 4)  return LABEL_TYPES.WAFER;
-    if (id >= 5  && id <= 8)  return LABEL_TYPES.HBM;
-    if (id >= 9  && id <= 12) return LABEL_TYPES.BRAND;
-    return LABEL_TYPES.LONGYS;
+// ── 모든 구역에서 PT번호 반환 ────────────────────────────────
+function getLabelTypeForAisle(_aisleId) {
+    return 'WAFER';  // 전 구역 동일
 }
 
-// ── 라벨 유형별 스캔 ID 생성 ─────────────────────────────────
-// 각 박스마다 라벨 유형에 맞는 필드를 읽어 고유 ID 반환
-function generateScanId(shelf, labelType) {
+function generateScanId(shelf) {
     const seed = Math.abs(shelf.id.charCodeAt(0) * 13 + shelf.rack * 7 + shelf.layerIdx * 3);
-    switch (labelType) {
-        case LABEL_TYPES.WAFER:
-            // 삼성 요청: DVC(K93KGD8J0C) 아닌 PT번호 읽기
-            return WAFER_PT_LIST[seed % WAFER_PT_LIST.length];
-        case LABEL_TYPES.HBM:
-            return HBM_DVC_LIST[seed % HBM_DVC_LIST.length];
-        case LABEL_TYPES.BRAND:
-            return BRAND_MODEL_LIST[seed % BRAND_MODEL_LIST.length];
-        case LABEL_TYPES.LONGYS:
-            return LONGYS_UPC_LIST[seed % LONGYS_UPC_LIST.length];
-        default:
-            return `ID-${seed}`;
-    }
+    return WAFER_PT_LIST[seed % WAFER_PT_LIST.length];
 }
 
 function buildInventory() {
     const db = {};
     WAREHOUSE.shelves.forEach(shelf => {
         const hasItem = Math.random() > 0.15;
-        const labelType = getLabelTypeForAisle(shelf.aisle);
-        const labelMeta = LABEL_FIELD_MAP[labelType];
         if (!hasItem) {
-            db[shelf.id] = { sku: null, qty: 0, labelType, labelMeta };
+            db[shelf.id] = { sku: null, qty: 0 };
             return;
         }
-        const scanId = generateScanId(shelf, labelType);
+        const ptNumber = generateScanId(shelf);
         db[shelf.id] = {
-            // sku 필드에 라벨 유형별 스캔 ID 저장 (하위 호환 유지)
-            sku: scanId,
-            // 라벨 유형 메타
-            labelType,
-            labelMeta,
-            // 실제 스캔한 필드값 (labelType에 따라 다름)
-            scannedField: labelMeta.fieldKey,
-            scannedValue: scanId,
+            sku: ptNumber,          // PT번호 (삼성 요청)
+            scannedValue: ptNumber,
             qty: Math.floor(Math.random() * 15) + 5,
             location: `Aisle-${shelf.aisle} / Rack-${shelf.rack} / ${shelf.side === 'L' ? 'Side A' : 'Side B'} / ${shelf.layer}`
         };
@@ -629,7 +552,7 @@ async function processScanWithDelay(droneId, task, onComplete) {
     drone.currentLevel = task.layerId;
     updateDroneElement(droneId);
     
-    // ── 공통: 선반 스캔 처리 함수 (라벨 유형별 필드 구별) ──────
+    // ── 선반 스캔 처리 함수 — 전 구역 PT번호 읽기 ──────────────
     async function scanShelf(shelf, side) {
         drone.currentLevel = shelf.layer;
         updateDroneElement(droneId);
@@ -637,22 +560,7 @@ async function processScanWithDelay(droneId, task, onComplete) {
 
         state.scannedShelves.add(shelf.id);
         const item = inv[shelf.id];
-
-        // 라벨 유형 & 읽어야 할 필드 결정
-        const labelType = item?.labelType || getLabelTypeForAisle(shelf.aisle);
-        const labelMeta = LABEL_FIELD_MAP[labelType] || LABEL_FIELD_MAP[LABEL_TYPES.WAFER];
-        const scannedValue = item?.scannedValue || item?.sku || null;
-
-        // 라벨 유형별 피드 메시지 구성
-        let scanMsg;
-        if (item?.qty > 0 && scannedValue) {
-            // 라벨 유형에 따라 읽은 필드를 다르게 표시
-            scanMsg = `${labelMeta.icon} [${labelType}] ${labelMeta.fieldName}: `
-                    + `<b style="color:${labelMeta.color}">${scannedValue}</b>`
-                    + ` × ${item.qty}`;
-        } else {
-            scanMsg = `${labelMeta.icon} [${labelType}] 빈 선반 (Empty)`;
-        }
+        const ptNumber = item?.sku || null;
 
         const event = {
             id: `SE-${Date.now()}-${shelf.id}`,
@@ -663,12 +571,7 @@ async function processScanWithDelay(droneId, task, onComplete) {
             rack: shelf.rack,
             side,
             layer: shelf.layer,
-            labelType,
-            labelMeta,
-            // 하위호환: sku 필드 유지
-            sku: scannedValue,
-            scannedField: labelMeta.fieldKey,
-            scannedValue,
+            sku: ptNumber,
             qty: item?.qty || 0,
         };
 
@@ -680,18 +583,16 @@ async function processScanWithDelay(droneId, task, onComplete) {
 
         drone.scannedCount++;
 
-        // 선반 색상: 라벨 유형별 색상 구분
         const shelfEl = document.getElementById(`shelf-${shelf.id}`);
         if (shelfEl) {
-            const fillColor = item?.qty > 0
-                ? `${labelMeta.color}44`   // 라벨 유형 고유색 반투명
-                : 'rgba(248,113,113,0.2)';
-            const strokeColor = item?.qty > 0 ? labelMeta.color : '#f87171';
-            shelfEl.setAttribute('fill', fillColor);
-            shelfEl.setAttribute('stroke', strokeColor);
+            shelfEl.setAttribute('fill', item?.qty > 0 ? 'rgba(34,211,238,0.3)' : 'rgba(248,113,113,0.2)');
+            shelfEl.setAttribute('stroke', item?.qty > 0 ? '#22d3ee' : '#f87171');
             shelfEl.setAttribute('stroke-width', '2');
         }
 
+        const scanMsg = item?.qty > 0
+            ? `🔵 PT번호: <b style="color:#22d3ee">${ptNumber}</b> × ${item.qty}`
+            : `빈 선반 (Empty)`;
         addFeed(`Drone ${droneId}: 📦 Side ${side} ${shelf.layer} — ${scanMsg}`, 'scan');
         await sleep(DRONE_CONFIG.scanDelay / 2);
     }
@@ -706,15 +607,11 @@ async function processScanWithDelay(droneId, task, onComplete) {
         await scanShelf(task.shelvesRight[i], 'B');
     }
     
-    // Step 4: Rack complete — 라벨 유형별 통계 포함
+    // Step 4: Rack complete
     const totalItems = task.shelvesLeft.length + task.shelvesRight.length;
     const tag = task.isRescan ? ' [RE-SCAN]' : '';
     const layerLabel = task.layerId || drone.currentLevel || '?';
-    // 이 rack의 구역 라벨 유형 확인
-    const aisleId = task.aisleId;
-    const rackLabelType = getLabelTypeForAisle(aisleId);
-    const rackLabelMeta = LABEL_FIELD_MAP[rackLabelType];
-    addFeed(`Drone ${droneId}: ✅ Rack ${task.rack} [${layerLabel}] complete${tag} — ${totalItems}건 스캔 완료 | ${rackLabelMeta.icon} ${rackLabelType} 구역 (${rackLabelMeta.fieldName} 기준)`, 'success');
+    addFeed(`Drone ${droneId}: ✅ Rack ${task.rack} [${layerLabel}] complete${tag} — ${totalItems}건 스캔 완료 | 🔵 PT번호 기준`, 'success');
     await sleep(DRONE_CONFIG.scanDelay);
 
     // If this was a re-scan task, mark it done in the compare view
@@ -754,41 +651,16 @@ function renderPatrolView(content) {
             <div style="display:flex;gap:10px">
                 <!-- Dock Status Panel -->
                 <div style="width:200px;display:flex;flex-direction:column;gap:8px;padding:10px;background:rgba(15,23,42,0.8);border-radius:8px">
-                    <!-- 라벨 유형 범례 (Samsung 요청 기준) -->
-                    <div style="padding:8px;background:rgba(30,41,59,0.8);border-radius:6px;border:1px solid rgba(34,211,238,0.25)">
-                        <div style="font-size:0.68rem;color:#22d3ee;font-weight:700;margin-bottom:6px">🏷️ 라벨 유형별 읽기 필드</div>
-                        <div style="display:flex;flex-direction:column;gap:4px;font-size:0.62rem">
-                            <div style="display:flex;align-items:center;gap:5px;padding:3px 5px;background:rgba(34,211,238,0.07);border-radius:3px;border-left:2px solid #22d3ee">
-                                <span style="font-size:0.8rem">🔵</span>
-                                <div>
-                                    <div style="color:#22d3ee;font-weight:700">WAFER (A1−4)</div>
-                                    <div style="color:#94a3b8">PT번호 읽기</div>
-                                    <div style="color:#64748b;font-family:monospace;font-size:0.58rem">PT64090302 등</div>
-                                </div>
-                            </div>
-                            <div style="display:flex;align-items:center;gap:5px;padding:3px 5px;background:rgba(167,139,250,0.07);border-radius:3px;border-left:2px solid #a78bfa">
-                                <span style="font-size:0.8rem">🟣</span>
-                                <div>
-                                    <div style="color:#a78bfa;font-weight:700">HBM (A5−8)</div>
-                                    <div style="color:#94a3b8">DVC Part No. 읽기</div>
-                                    <div style="color:#64748b;font-family:monospace;font-size:0.58rem">H6-HX01... 등</div>
-                                </div>
-                            </div>
-                            <div style="display:flex;align-items:center;gap:5px;padding:3px 5px;background:rgba(148,163,184,0.07);border-radius:3px;border-left:2px solid #94a3b8">
-                                <span style="font-size:0.8rem">⚪</span>
-                                <div>
-                                    <div style="color:#94a3b8;font-weight:700">BRAND (A9−12)</div>
-                                    <div style="color:#94a3b8">MODEL CODE 읽기</div>
-                                    <div style="color:#64748b;font-family:monospace;font-size:0.58rem">MZ-77E1T0B... 등</div>
-                                </div>
-                            </div>
-                            <div style="display:flex;align-items:center;gap:5px;padding:3px 5px;background:rgba(251,191,36,0.07);border-radius:3px;border-left:2px solid #fbbf24">
-                                <span style="font-size:0.8rem">🟡</span>
-                                <div>
-                                    <div style="color:#fbbf24;font-weight:700">LONGYS (A13−15)</div>
-                                    <div style="color:#94a3b8">UPC 읽기</div>
-                                    <div style="color:#64748b;font-family:monospace;font-size:0.58rem">887276265... 등</div>
-                                </div>
+                    <!-- 스캔 기준 안내 (삼성 요청 — 전 구역 동일) -->
+                    <div style="padding:8px;background:rgba(30,41,59,0.8);border-radius:6px;border:1px solid rgba(34,211,238,0.35)">
+                        <div style="font-size:0.68rem;color:#22d3ee;font-weight:700;margin-bottom:6px">🏷️ 스캔 기준 (Dock A/B 전 구역)</div>
+                        <div style="display:flex;align-items:flex-start;gap:6px;padding:6px;background:rgba(34,211,238,0.08);border-radius:4px;border-left:3px solid #22d3ee;font-size:0.62rem">
+                            <span style="font-size:1rem;line-height:1.2">🔵</span>
+                            <div>
+                                <div style="color:#22d3ee;font-weight:700;margin-bottom:2px">PT번호 읽기</div>
+                                <div style="color:#94a3b8">전체 Aisle 1 ~ 15</div>
+                                <div style="color:#64748b;font-family:monospace;margin-top:3px">PT64090302<br>PT64090303 …</div>
+                                <div style="color:#f87171;margin-top:4px;font-size:0.6rem">✗ DVC(K93KGD8J0C) 아님</div>
                             </div>
                         </div>
                     </div>
@@ -861,42 +733,20 @@ function renderWarehouseElements() {
         docksG.appendChild(label);
     });
     
-    // 라벨 유형별 배경색 맵
-    const AISLE_LABEL_COLORS = {
-        [LABEL_TYPES.WAFER]:  { fill: 'rgba(34,211,238,0.04)',  stroke: 'rgba(34,211,238,0.25)' },
-        [LABEL_TYPES.HBM]:   { fill: 'rgba(167,139,250,0.04)', stroke: 'rgba(167,139,250,0.25)' },
-        [LABEL_TYPES.BRAND]: { fill: 'rgba(148,163,184,0.04)', stroke: 'rgba(148,163,184,0.2)' },
-        [LABEL_TYPES.LONGYS]:{ fill: 'rgba(251,191,36,0.04)',  stroke: 'rgba(251,191,36,0.2)' },
-    };
-
-    // Render aisles
+    // Render aisles — 전 구역 동일 색상 (PT번호 기준)
     WAREHOUSE.aisles.forEach(aisle => {
-        const lType  = getLabelTypeForAisle(aisle.id);
-        const lColor = AISLE_LABEL_COLORS[lType];
-        const lMeta  = LABEL_FIELD_MAP[lType];
-
         const rect = createSVG('rect', {
             x: aisle.x, y: aisle.y, width: aisle.w, height: aisle.h,
-            fill: lColor.fill, stroke: lColor.stroke, 'stroke-width': '1', rx: '2'
+            fill: 'rgba(34,211,238,0.03)', stroke: 'rgba(34,211,238,0.2)', 'stroke-width': '1', rx: '2'
         });
         aislesG.appendChild(rect);
 
-        // 열제목: "Aisle N" 하단에 라벨 유형 표시
         const label = createSVG('text', {
-            x: aisle.x + aisle.w / 2, y: aisle.y - 10,
+            x: aisle.x + aisle.w / 2, y: aisle.y - 5,
             fill: '#64748b', 'font-size': '8', 'text-anchor': 'middle'
         });
         label.textContent = aisle.label;
         aislesG.appendChild(label);
-
-        // 라벨 유형 라벨 (구역 상단에 아이콘+유형 표시)
-        const typeLabel = createSVG('text', {
-            x: aisle.x + aisle.w / 2, y: aisle.y - 2,
-            fill: lMeta.color, 'font-size': '6', 'text-anchor': 'middle', 'font-weight': '700',
-            opacity: '0.85'
-        });
-        typeLabel.textContent = lMeta.icon + lType.slice(0,3);
-        aislesG.appendChild(typeLabel);
     });
     
     // Render shelves (L1, L2 only)
@@ -965,16 +815,12 @@ function updateDroneElement(droneId) {
         statusEl.textContent = `Status: ${drone.status === 'working' ? 'Working' : 'Standby'}`;
     }
     
-    // Update current aisle + 라벨 유형 표시
+    // Update current aisle
     const aisleEl = document.getElementById(`drone${droneId}-aisle`);
     if (aisleEl) {
-        if (drone.currentAisle) {
-            const lt = getLabelTypeForAisle(drone.currentAisle);
-            const lm = LABEL_FIELD_MAP[lt];
-            aisleEl.innerHTML = `Current: Aisle ${drone.currentAisle} <span style="color:${lm.color}">${lm.icon}${lt}</span>`;
-        } else {
-            aisleEl.textContent = 'Current: -';
-        }
+        aisleEl.innerHTML = drone.currentAisle
+            ? `Current: Aisle ${drone.currentAisle} <span style="color:#22d3ee">🔵PT</span>`
+            : 'Current: -';
     }
     
     // Update current level with color (use layer's defined color)
