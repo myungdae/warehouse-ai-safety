@@ -244,6 +244,7 @@ const state = {
     feedLog: [],
     svg: null,
     animFrames: {},
+    _reportFired: false,   // ← 순찰 완료 보고서 중복 실행 방지
 };
 
 // ══════════════════════════════════════════════════════════════
@@ -365,6 +366,7 @@ function startPatrol() {
     
     console.log('🚀 Starting Tethered Drone Patrol');
     state.patrolActive = true;
+    state._reportFired = false;   // 매 순찰 시작마다 초기화
 
     // 순찰 세션 ID 생성 (Edge DB 저장용)
     const now = new Date();
@@ -408,6 +410,18 @@ function resetPatrol() {
     state.scannedShelves.clear();
     state.scanEvents = [];
     state.feedLog = [];
+    state._reportFired = false;   // ← 리셋 시 플래그 초기화
+    state.sessionId = null;
+
+    // 배너 제거
+    const oldBanner = document.getElementById('erpResultBanner');
+    if (oldBanner) oldBanner.remove();
+
+    // ERP 카드 초기화
+    const erpCardVal = document.getElementById('erpCardVal');
+    if (erpCardVal) { erpCardVal.textContent = 'Day1 vs Day2'; erpCardVal.style.color = '#fbbf24'; }
+    const erpCardHint = document.getElementById('erpCardHint');
+    if (erpCardHint) erpCardHint.textContent = '순찰 후 자동 비교';
     
     ['A', 'B'].forEach(dockId => {
         const drone = state.drones[dockId];
@@ -522,9 +536,10 @@ function droneLoop(droneId) {
             drone.status = 'standby';
             addFeed(`✅ Drone ${droneId} patrol complete — ${drone.scannedCount} items scanned`, 'success');
             updateDroneElement(droneId);
-            // Check if ALL drones are now standby → trigger auto-report
+            // Check if ALL drones are now standby → trigger auto-report (한 번만 실행 보장)
             const allDone = Object.values(state.drones).every(d => d.status === 'standby');
-            if (allDone && state.patrolActive) {
+            if (allDone && state.patrolActive && !state._reportFired) {
+                state._reportFired = true;   // ← 중복 실행 방지 플래그
                 state.patrolActive = false;
                 const btn = document.getElementById('patrolBtn');
                 if (btn) btn.textContent = '▶ Start Patrol';
