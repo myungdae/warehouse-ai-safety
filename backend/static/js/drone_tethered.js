@@ -244,7 +244,9 @@ const state = {
     feedLog: [],
     svg: null,
     animFrames: {},
-    _reportFired: false,   // ← 순찰 완료 보고서 중복 실행 방지
+    _reportFired: false,    // ← 순찰 완료 보고서 중복 실행 방지
+    _edgeSaveCount: 0,      // ← Edge DB 저장 성공 카운트
+    _edgeSaveError: 0,      // ← Edge DB 저장 실패 카운트
 };
 
 // ══════════════════════════════════════════════════════════════
@@ -367,6 +369,8 @@ function startPatrol() {
     console.log('🚀 Starting Tethered Drone Patrol');
     state.patrolActive = true;
     state._reportFired = false;   // 매 순찰 시작마다 초기화
+    state._edgeSaveCount = 0;
+    state._edgeSaveError = 0;
 
     // 순찰 세션 ID 생성 (Edge DB 저장용)
     const now = new Date();
@@ -412,6 +416,8 @@ function resetPatrol() {
     state.feedLog = [];
     state._reportFired = false;   // ← 리셋 시 플래그 초기화
     state.sessionId = null;
+    state._edgeSaveCount = 0;
+    state._edgeSaveError = 0;
 
     // 배너 제거
     const oldBanner = document.getElementById('erpResultBanner');
@@ -609,22 +615,29 @@ async function processScanWithDelay(droneId, task, onComplete) {
 
         // ── Edge DB에 즉시 저장 (/api/scan/event) ────────────────
         if (state.sessionId) {
+            const scanPayload = {
+                session_id: state.sessionId,
+                drone_id:   droneId,
+                aisle:      shelf.aisle,
+                rack:       shelf.rack,
+                side:       side,
+                layer:      shelf.layer,
+                shelf_id:   shelf.id,
+                pt_number:  ptNumber,
+                qty:        qty,
+                location:   location,
+            };
             fetch('/api/scan/event', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    session_id: state.sessionId,
-                    drone_id:   droneId,
-                    aisle:      shelf.aisle,
-                    rack:       shelf.rack,
-                    side:       side,
-                    layer:      shelf.layer,
-                    shelf_id:   shelf.id,
-                    pt_number:  ptNumber,
-                    qty:        qty,
-                    location:   location,
-                }),
-            }).catch(() => { /* silent — edge저장 실패해도 UI 영향 없음 */ });
+                body: JSON.stringify(scanPayload),
+            }).then(r => {
+                if (!r.ok) console.warn(`[scan/event] HTTP ${r.status} for ${shelf.id}`);
+                else state._edgeSaveCount = (state._edgeSaveCount || 0) + 1;
+            }).catch(e => {
+                console.warn(`[scan/event] fetch error: ${e.message}`);
+                state._edgeSaveError = (state._edgeSaveError || 0) + 1;
+            });
         }
 
         const shelfEl = document.getElementById(`shelf-${shelf.id}`);
@@ -1874,20 +1887,28 @@ function _showErpResultBanner(r) {
     const old = document.getElementById('erpResultBanner');
     if (old) old.remove();
 
-    const accColor = r.accuracy_rate >= 95 ? '#34d399' : r.accuracy_rate >= 90 ? '#fbbf24' : '#f87171';
-    const accLabel = r.accuracy_rate >= 95 ? '🟢 양호' : r.accuracy_rate >= 90 ? '🟡 주의' : '🔴 긴급';
+    const acc = parseFloat(r.accuracy_rate);
+    const accColor = acc >= 95 ? '#34d399' : acc >= 90 ? '#fbbf24' : '#f87171';
+    const accLabel = acc >= 95 ? '🟢 양호' : acc >= 90 ? '🟡 주의' : '🔴 긴급';
 
     const banner = document.createElement('div');
     banner.id = 'erpResultBanner';
-    banner.style.cssText = 'margin-top:10px;padding:14px 16px;background:rgba(15,23,42,0.95);border-radius:10px;border:2px solid rgba(34,211,238,0.4);font-size:0.8rem';
+    banner.style.cssText = [
+        'position:fixed','bottom:20px','left:50%',
+        'transform:translateX(-50%)','width:min(860px,96vw)',
+        'z-index:9990','padding:16px 20px',
+        'background:rgba(10,18,35,0.97)',
+        'border-radius:14px','border:2px solid rgba(34,211,238,0.7)',
+        'font-size:0.82rem','box-shadow:0 8px 40px rgba(0,0,0,0.7)',
+    ].join(';');
     banner.innerHTML = `
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
-            <div style="font-weight:700;color:#22d3ee;font-size:0.92rem">
-                📊 Edge ERP 비교 결과 — 세션 <span style="font-family:monospace;font-size:0.78rem;color:#a78bfa">${r.session_id}</span>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+            <div style="font-weight:800;color:#22d3ee;font-size:1rem">
+                🏭 Edge ERP 실시간 비교 결과 <span style="font-family:monospace;font-size:0.75rem;color:#a78bfa">[${r.session_id}]</span>
             </div>
             <div style="display:flex;gap:8px;align-items:center">
-                <span style="font-size:0.78rem;color:#64748b">${new Date(r.compared_at).toLocaleString('ko-KR')}</span>
-                <button onclick="showErpCompareModal()" style="background:linear-gradient(135deg,#22d3ee,#6366f1);color:#fff;border:none;padding:5px 14px;border-radius:6px;cursor:pointer;font-size:0.75rem;font-weight:700">상세 보기 →</button>
+                <span style="font-size:0.75rem;color:#64748b">${new Date(r.compared_at).toLocaleString('ko-KR')}</span>
+                <button onclick="showErpCompareModal()" style="background:linear-gradient(135deg,#22d3ee,#6366f1);color:#fff;border:none;padding:6px 16px;border-radius:8px;cursor:pointer;font-size:0.78rem;font-weight:700">상세 보기 →</button>
             </div>
         </div>
         <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:10px">
@@ -1921,22 +1942,6 @@ function _showErpResultBanner(r) {
         </div>
     `;
 
-    // ── 항상 보이는 고정 위치: body에 fixed 팝업으로 표시 ────────
-    banner.style.cssText = [
-        'position:fixed',
-        'bottom:20px',
-        'left:50%',
-        'transform:translateX(-50%)',
-        'width:min(820px, 95vw)',
-        'z-index:9990',
-        'padding:14px 16px',
-        'background:rgba(10,18,35,0.97)',
-        'border-radius:12px',
-        'border:2px solid rgba(34,211,238,0.6)',
-        'font-size:0.8rem',
-        'box-shadow:0 8px 32px rgba(0,0,0,0.6)',
-    ].join(';');
-
     // 닫기 버튼 추가
     const closeBtn = document.createElement('button');
     closeBtn.textContent = '✕';
@@ -1949,9 +1954,8 @@ function _showErpResultBanner(r) {
     // 상단 ERP COMPARE 카드 값 업데이트
     const erpCardVal = document.getElementById('erpCardVal');
     if (erpCardVal) {
-        const accColor = r.accuracy_rate >= 95 ? '#34d399' : r.accuracy_rate >= 90 ? '#fbbf24' : '#f87171';
         erpCardVal.style.color = accColor;
-        erpCardVal.textContent = `✅ ${r.accuracy_rate}% — 상세보기`;
+        erpCardVal.textContent = `🏭 ${r.accuracy_rate}% — ERP비교`;
     }
     const compareCard = document.getElementById('compareCard');
     if (compareCard) {
@@ -2160,23 +2164,34 @@ async function onPatrolComplete() {
         addFeed(`⚠️ 보고서 저장 오류: ${e.message}`, 'alert');
     }
 
-    // ── 결과 배너: 항상 Day1/Day2 내부 비교 먼저 표시 + Edge API 결과로 교체 ──────
-    setTimeout(() => {
-        // 1) 즉시 Day1/Day2 내부 비교 배너 표시 (항상 동작 보장)
-        addFeed('📊 재고 비교 결과 표시 중…', 'system');
-        _showDay1Day2Banner();
+    // ── 결과 배너: Edge 저장 확인 후 ERP 비교, 실패 시 Day1/Day2 표시 ──────
+    setTimeout(async () => {
+        const savedCount = state._edgeSaveCount || 0;
+        const errorCount = state._edgeSaveError || 0;
 
-        // 2) Edge API도 시도 — 성공 시 배너를 Edge 결과로 교체
-        if (state.sessionId) {
-            runErpCompare().then(r => {
-                if (r && r.accuracy_rate > 0) {
+        addFeed(`📡 Edge 저장 현황: ${savedCount}개 저장 / ${errorCount}개 오류`, 'system');
+
+        if (savedCount > 100 && state.sessionId) {
+            // Edge DB에 충분히 저장됨 → 실제 ERP 비교 실행
+            addFeed('🏭 Edge ERP 비교 실행 중…', 'system');
+            try {
+                const r = await runErpCompare();
+                if (r && parseFloat(r.accuracy_rate) >= 0) {
+                    // Edge ERP 비교 성공 → Edge 배너 표시
                     addFeed(`✅ Edge ERP 비교 완료 — 정확도: ${r.accuracy_rate}%`, 'success');
-                    // Edge 결과로 배너 교체
-                    _showErpResultBanner(r);
+                    return; // _showErpResultBanner는 runErpCompare() 내부에서 호출됨
                 }
-            }).catch(() => { /* silent */ });
+            } catch(e) {
+                addFeed(`⚠️ Edge ERP 비교 오류: ${e.message}`, 'alert');
+            }
         }
-    }, 1200);
+
+        // Edge 저장 실패 or 저장 수 부족 → Day1/Day2 내부 비교 표시
+        if (savedCount < 100) {
+            addFeed(`⚠️ Edge 저장 ${savedCount}개 — 브라우저 내부 Day1/Day2 비교로 표시`, 'alert');
+        }
+        _showDay1Day2Banner();
+    }, 2000);
 }
 
 // ── Day1/Day2 내부 비교 결과 배너 (Edge API 없을 때 fallback) ─────────────

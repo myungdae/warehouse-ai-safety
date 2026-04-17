@@ -1520,14 +1520,23 @@ def erp_compare():
             erp  = erp_map.get(shelf_id)
 
             if scan and erp:
-                scan_pt = scan.get('pt_number') or ''
-                erp_pt  = erp.get('pt_number') or ''
+                scan_pt  = scan.get('pt_number') or ''
+                erp_pt   = erp.get('pt_number') or ''
                 scan_qty = int(scan.get('qty') or 0)
                 erp_qty  = int(erp.get('qty') or 0)
 
-                if scan_pt == erp_pt and scan_qty == erp_qty:
-                    match.append({'shelf_id': shelf_id, 'pt_number': erp_pt,
-                                  'qty': erp_qty, 'location': erp.get('location','')})
+                # ── 핵심 판정: PT번호 일치 여부 ──────────────────────────
+                # PT번호가 같으면 "일치" (qty 차이는 참고용 별도 기록)
+                # PT번호가 다르면 "불일치"
+                if scan_pt == erp_pt:
+                    match.append({
+                        'shelf_id':  shelf_id,
+                        'pt_number': erp_pt,
+                        'scan_qty':  scan_qty,
+                        'erp_qty':   erp_qty,
+                        'qty_diff':  scan_qty - erp_qty,
+                        'location':  erp.get('location', ''),
+                    })
                 else:
                     mismatch.append({
                         'shelf_id': shelf_id,
@@ -1559,7 +1568,10 @@ def erp_compare():
         total_erp      = len([e for e in erp_map.values() if int(e.get('qty') or 0) > 0])
         match_count    = len(match)
         mismatch_count = len(mismatch)
-        accuracy       = round(match_count / max(total_scanned, 1) * 100, 1)
+        # 정확도: 스캔한 위치 중 ERP PT번호와 일치하는 비율
+        # 분모는 스캔 수와 ERP 재고 수 중 큰 값 (전체 커버리지 반영)
+        accuracy_base  = max(total_scanned, total_erp, 1)
+        accuracy       = round(match_count / accuracy_base * 100, 1)
 
         result_payload = {
             'result_id':      result_id,
