@@ -1653,6 +1653,60 @@ def _build_compare_summary(accuracy, mismatch, missing_scan, extra_found):
     return alerts
 
 
+@app.route('/api/erp/sync', methods=['POST'])
+def erp_sync():
+    """
+    삼성 ERP → Edge DB 동기화 엔드포인트
+    실제 환경에서는 삼성 ERP 시스템이 이 API를 호출하거나
+    Edge 서버가 ERP API를 polling하여 재고 데이터를 가져옴.
+    현재는 Mock ERP 데이터를 그대로 반환 (이미 seed됨).
+
+    POST body: { "force": true }  → 강제 재시드
+    """
+    try:
+        body  = request.get_json(force=True) or {}
+        force = body.get('force', False)
+
+        with get_db() as conn:
+            cnt = conn.execute('SELECT COUNT(*) FROM erp_inventory').fetchone()[0]
+            if cnt == 0 or force:
+                # 재시드
+                conn.execute('DELETE FROM erp_inventory')
+                conn.commit()
+                # seed_erp_inventory 재실행
+                import random
+                rows = []
+                for aisle in range(1, 16):
+                    for rack in range(1, 21):
+                        for side in ['L', 'R']:
+                            for layer in ['L1', 'L2']:
+                                shelf_id = f"{aisle}-{side}{rack}-{layer}"
+                                seed = abs(ord(shelf_id[0]) * 13 + rack * 7)
+                                has_item = random.random() > 0.15
+                                pt = WAFER_PT_LIST[seed % len(WAFER_PT_LIST)] if has_item else None
+                                qty = random.randint(5, 20) if has_item else 0
+                                loc = f"Aisle-{aisle} / Rack-{rack} / {'Side A' if side=='L' else 'Side B'} / {layer}"
+                                rows.append((shelf_id, pt, qty, loc, datetime.now().isoformat()))
+                conn.executemany(
+                    'INSERT OR IGNORE INTO erp_inventory (shelf_id, pt_number, qty, location, last_updated) VALUES (?,?,?,?,?)',
+                    rows
+                )
+                conn.commit()
+                synced = len(rows)
+            else:
+                synced = cnt
+
+        return jsonify({
+            'ok': True,
+            'source': 'samsung_erp_mock',
+            'synced_count': synced,
+            'synced_at': datetime.now().isoformat(),
+            'message': f'ERP → Edge 동기화 완료 ({synced}개 위치)'
+        })
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
 @app.route('/api/erp/compare/latest', methods=['GET'])
 def get_latest_compare():
     """가장 최근 ERP 비교 결과 조회"""

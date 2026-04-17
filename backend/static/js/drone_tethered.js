@@ -1734,7 +1734,7 @@ async function saveDailyReport(reportId) {
         rescan_total: Object.keys(rescanStatus).length,
         rescan_done: Object.values(rescanStatus).filter(s=>s==='done').length,
         rescan_results: rescanResults,
-        rescan_log: state.feedLog.filter(f => f.includes('Re-scan') || f.includes('재스캔')),
+        rescan_log: state.feedLog.filter(f => (f.message||f).includes('Re-scan') || (f.message||f).includes('재스캔')),
         needs_rescan_list: needsRescan,
         missing_details: missing.slice(0, 50),
         decreased_details: decreased.slice(0, 50),
@@ -1857,6 +1857,24 @@ async function runErpCompare() {
         addFeed('⚠️ 세션 ID 없음 — 순찰 후 비교 가능', 'alert');
         return null;
     }
+
+    // ── Step 1: ERP → Edge 동기화 (삼성 ERP에서 재고 데이터를 Edge로 가져오기) ──
+    addFeed('🔗 삼성 ERP → Edge 동기화 중…', 'system');
+    try {
+        const syncResp = await fetch('/api/erp/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({}),
+        });
+        const syncData = await syncResp.json();
+        if (syncData.ok) {
+            addFeed(`✅ ERP 동기화 완료 — ${syncData.synced_count}개 위치`, 'success');
+        }
+    } catch(e) {
+        addFeed(`⚠️ ERP 동기화 오류 (계속 진행): ${e.message}`, 'alert');
+    }
+
+    // ── Step 2: 드론 스캔(Edge DB) vs ERP 재고(Edge DB) 비교 ──
     addFeed(`🔄 Edge ERP 비교 시작 (세션: ${state.sessionId})…`, 'system');
     try {
         const resp = await fetch('/api/erp/compare', {
@@ -1869,6 +1887,13 @@ async function runErpCompare() {
             state.erpCompareResult = data.result;
             const r = data.result;
             addFeed(`✅ ERP 비교 완료 — 정확도: ${r.accuracy_rate}% (일치: ${r.match_count} / 불일치: ${r.mismatch_count} / 미스캔: ${r.missing_scan})`, 'success');
+
+            // 스캔 데이터가 Edge DB에 없으면(total_scanned=0) 경고 후 Day1/Day2 배너 표시
+            if (r.total_scanned === 0) {
+                addFeed('⚠️ Edge DB에 스캔 데이터 없음 — 브라우저 내부 비교로 대체', 'alert');
+                return null;  // 호출 측에서 _showDay1Day2Banner() 실행
+            }
+
             // 화면에 ERP 결과 배너 표시
             _showErpResultBanner(r);
             return r;
@@ -1911,28 +1936,45 @@ function _showErpResultBanner(r) {
                 <button onclick="showErpCompareModal()" style="background:linear-gradient(135deg,#22d3ee,#6366f1);color:#fff;border:none;padding:6px 16px;border-radius:8px;cursor:pointer;font-size:0.78rem;font-weight:700">상세 보기 →</button>
             </div>
         </div>
-        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:10px">
+        <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:10px">
             <div style="background:rgba(34,211,238,0.08);border:1px solid rgba(34,211,238,0.25);border-radius:6px;padding:10px;text-align:center">
                 <div style="color:#22d3ee;font-size:1.3rem;font-weight:800">${r.total_scanned}</div>
                 <div style="color:#64748b;font-size:0.65rem">스캔 위치</div>
             </div>
+            <div style="background:rgba(34,211,238,0.05);border:1px solid rgba(34,211,238,0.15);border-radius:6px;padding:10px;text-align:center">
+                <div style="color:#7dd3fc;font-size:1.3rem;font-weight:800">${r.total_erp || '—'}</div>
+                <div style="color:#64748b;font-size:0.65rem">ERP 위치</div>
+            </div>
             <div style="background:rgba(52,211,153,0.08);border:1px solid rgba(52,211,153,0.25);border-radius:6px;padding:10px;text-align:center">
                 <div style="color:${accColor};font-size:1.3rem;font-weight:800">${r.accuracy_rate}%</div>
-                <div style="color:#64748b;font-size:0.65rem">ERP 정확도 ${accLabel}</div>
+                <div style="color:#64748b;font-size:0.65rem">정확도 ${accLabel}</div>
             </div>
             <div style="background:rgba(52,211,153,0.06);border:1px solid rgba(52,211,153,0.2);border-radius:6px;padding:10px;text-align:center">
                 <div style="color:#34d399;font-size:1.3rem;font-weight:800">${r.match_count}</div>
-                <div style="color:#64748b;font-size:0.65rem">✅ ERP 일치</div>
+                <div style="color:#64748b;font-size:0.65rem">✅ PT일치</div>
             </div>
             <div style="background:rgba(248,113,113,0.06);border:1px solid rgba(248,113,113,0.2);border-radius:6px;padding:10px;text-align:center">
                 <div style="color:#f87171;font-size:1.3rem;font-weight:800">${r.mismatch_count}</div>
-                <div style="color:#64748b;font-size:0.65rem">⚠️ 불일치</div>
+                <div style="color:#64748b;font-size:0.65rem">⚠️ PT불일치</div>
             </div>
             <div style="background:rgba(251,191,36,0.06);border:1px solid rgba(251,191,36,0.2);border-radius:6px;padding:10px;text-align:center">
                 <div style="color:#fbbf24;font-size:1.3rem;font-weight:800">${r.missing_scan}</div>
                 <div style="color:#64748b;font-size:0.65rem">📭 미스캔</div>
             </div>
         </div>
+        <!-- PT 불일치 상세 (최대 5개) -->
+        ${(r.details?.mismatch || []).length > 0 ? `
+        <div style="background:rgba(248,113,113,0.06);border:1px solid rgba(248,113,113,0.25);border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:0.76rem">
+            <div style="color:#f87171;font-weight:700;margin-bottom:6px">⚠️ PT번호 불일치 위치 (상위 5개)</div>
+            ${(r.details.mismatch || []).slice(0,5).map(m => `
+            <div style="display:flex;gap:8px;align-items:center;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.04)">
+                <span style="font-family:monospace;color:#94a3b8;font-size:0.7rem;min-width:100px">${m.shelf_id}</span>
+                <span style="color:#fca5a5">스캔: ${m.scan?.pt_number||'없음'}</span>
+                <span style="color:#64748b">→</span>
+                <span style="color:#34d399">ERP: ${m.erp?.pt_number||'없음'}</span>
+                <span style="color:#fbbf24;font-size:0.68rem">[${m.issue||''}]</span>
+            </div>`).join('')}
+        </div>` : ''}
         <!-- Summary alerts -->
         <div style="display:flex;flex-direction:column;gap:4px">
             ${(r.summary || []).map(s => `
@@ -1955,14 +1997,19 @@ function _showErpResultBanner(r) {
     const erpCardVal = document.getElementById('erpCardVal');
     if (erpCardVal) {
         erpCardVal.style.color = accColor;
-        erpCardVal.textContent = `🏭 ${r.accuracy_rate}% — ERP비교`;
+        erpCardVal.textContent = `🏭 ${r.accuracy_rate}% — 실ERP비교`;
+        erpCardVal.style.cursor = 'pointer';
+        erpCardVal.onclick = () => {
+            const b = document.getElementById('erpResultBanner');
+            if (b) b.style.display = b.style.display === 'none' ? 'block' : 'none';
+        };
     }
     const compareCard = document.getElementById('compareCard');
     if (compareCard) {
         compareCard.style.borderColor = 'rgba(34,211,238,0.6)';
     }
     const erpCardHintEdge = document.getElementById('erpCardHint');
-    if (erpCardHintEdge) erpCardHintEdge.textContent = '클릭하면 결과 토글';
+    if (erpCardHintEdge) erpCardHintEdge.textContent = '삼성ERP 실시간 비교 — 클릭 토글';
 }
 
 // ERP 비교 상세 모달
@@ -2129,7 +2176,7 @@ async function onPatrolComplete() {
         rescan_total: Object.keys(rescanStatus).length,
         rescan_done:  Object.values(rescanStatus).filter(s => s === 'done').length,
         rescan_results: rescanResults,
-        rescan_log: state.feedLog.filter(f => f.includes('Re-scan') || f.includes('재스캔')),
+        rescan_log: state.feedLog.filter(f => (f.message||f).includes('Re-scan') || (f.message||f).includes('재스캔')),
         needs_rescan_list: needsRescan,
         missing_details:   missing.slice(0, 50),
         decreased_details: decreased.slice(0, 50),
@@ -2164,34 +2211,38 @@ async function onPatrolComplete() {
         addFeed(`⚠️ 보고서 저장 오류: ${e.message}`, 'alert');
     }
 
-    // ── 결과 배너: Edge 저장 확인 후 ERP 비교, 실패 시 Day1/Day2 표시 ──────
+    // ── 결과 배너: 3초 후 Edge 저장 현황 확인 → ERP 비교 또는 Day1/Day2 폴백 ──
     setTimeout(async () => {
         const savedCount = state._edgeSaveCount || 0;
         const errorCount = state._edgeSaveError || 0;
+        const totalScanned = state.scanEvents.length;
 
-        addFeed(`📡 Edge 저장 현황: ${savedCount}개 저장 / ${errorCount}개 오류`, 'system');
+        addFeed(`📡 Edge 저장 현황: ${savedCount}/${totalScanned}개 저장 / ${errorCount}개 오류`, 'system');
 
-        if (savedCount > 100 && state.sessionId) {
+        // 스캔된 아이템의 30% 이상이 Edge에 저장됐을 경우 실제 ERP 비교
+        const edgeSaveOk = savedCount > 0 && (savedCount / Math.max(totalScanned, 1)) >= 0.3;
+
+        if (edgeSaveOk && state.sessionId) {
             // Edge DB에 충분히 저장됨 → 실제 ERP 비교 실행
-            addFeed('🏭 Edge ERP 비교 실행 중…', 'system');
+            addFeed('🏭 삼성 ERP ↔ Edge DB 비교 실행 중…', 'system');
             try {
                 const r = await runErpCompare();
-                if (r && parseFloat(r.accuracy_rate) >= 0) {
-                    // Edge ERP 비교 성공 → Edge 배너 표시
+                if (r && r.total_scanned > 0) {
+                    // Edge ERP 비교 성공 → Edge 배너 표시 (runErpCompare 내부에서 호출됨)
                     addFeed(`✅ Edge ERP 비교 완료 — 정확도: ${r.accuracy_rate}%`, 'success');
-                    return; // _showErpResultBanner는 runErpCompare() 내부에서 호출됨
+                    return;
                 }
             } catch(e) {
                 addFeed(`⚠️ Edge ERP 비교 오류: ${e.message}`, 'alert');
             }
         }
 
-        // Edge 저장 실패 or 저장 수 부족 → Day1/Day2 내부 비교 표시
-        if (savedCount < 100) {
-            addFeed(`⚠️ Edge 저장 ${savedCount}개 — 브라우저 내부 Day1/Day2 비교로 표시`, 'alert');
+        // Edge 저장 부족 or 비교 실패 → Day1/Day2 내부 비교 표시 (항상 동작)
+        if (savedCount < 10) {
+            addFeed(`⚠️ Edge 저장 ${savedCount}개 — 브라우저 내부 Day1/Day2 비교로 결과 표시`, 'alert');
         }
         _showDay1Day2Banner();
-    }, 2000);
+    }, 3000);
 }
 
 // ── Day1/Day2 내부 비교 결과 배너 (Edge API 없을 때 fallback) ─────────────
