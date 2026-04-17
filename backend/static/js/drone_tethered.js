@@ -122,9 +122,9 @@ WAREHOUSE.aisles.forEach(aisle => {
 
 const DRONE_CONFIG = {
     size: 12,
-    speed: 3.0,  // Increased speed (was 2.5)
+    speed: 8.0,  // 빠른 이동 속도
     scanRadius: 40,
-    scanDelay: 800,  // ms delay for rack ID and completion pause
+    scanDelay: 80,   // 스캔 딜레이 800ms → 80ms (10배 빠름)
 };
 
 // ══════════════════════════════════════════════════════════════
