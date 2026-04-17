@@ -2142,6 +2142,7 @@ async function onPatrolComplete() {
         auto_generated: true,
     };
 
+    // 보고서 저장 (실패해도 ERP 비교는 반드시 실행)
     try {
         const resp = await fetch('/api/archive_report', {
             method: 'POST',
@@ -2151,7 +2152,6 @@ async function onPatrolComplete() {
         const result = await resp.json();
         if (result.ok) {
             addFeed(`💾 보고서 자동 저장 완료: ${result.id}`, 'success');
-            // Update MCP floating badge
             _updateMcpBadge('saved', result.id);
         } else {
             addFeed(`⚠️ 보고서 저장 실패: ${result.error}`, 'alert');
@@ -2160,17 +2160,21 @@ async function onPatrolComplete() {
         addFeed(`⚠️ 보고서 저장 오류: ${e.message}`, 'alert');
     }
 
-    // ── ERP 자동 비교 (순찰 완료 후 Edge에서 즉시 실행) ──────────
+    // ── ERP 비교 + 결과 배너 — 보고서 저장 성공/실패와 무관하게 항상 실행 ──────
     setTimeout(async () => {
         addFeed('🏭 Edge ERP 자동 비교 시작…', 'system');
-        const result = await runErpCompare();
+        let erpOk = false;
+        try {
+            const result = await runErpCompare();
+            if (result) erpOk = true;
+        } catch(e) { /* silent */ }
 
-        // ── fallback: Edge API 실패 시 Day1 vs Day2 브라우저 내부 비교 결과를 배너로 표시 ──
-        if (!result) {
-            addFeed('ℹ️ Edge API 미응답 — 브라우저 내부 Day1/Day2 비교 결과를 표시합니다', 'system');
+        // Edge API 실패 시 항상 Day1/Day2 내부 비교 배너 표시
+        if (!erpOk) {
+            addFeed('ℹ️ Day1/Day2 내부 비교 결과를 표시합니다', 'system');
             _showDay1Day2Banner();
         }
-    }, 1500);
+    }, 1200);
 }
 
 // ── Day1/Day2 내부 비교 결과 배너 (Edge API 없을 때 fallback) ─────────────
