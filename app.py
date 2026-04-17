@@ -74,10 +74,93 @@ def init_db():
                 note        TEXT DEFAULT ''
             )
         ''')
+        # ── 드론 스캔 이벤트 테이블 (실시간 즉시 저장) ────────────
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS scan_events (
+                id          TEXT PRIMARY KEY,
+                scanned_at  TEXT NOT NULL,
+                session_id  TEXT NOT NULL,
+                drone_id    TEXT NOT NULL,
+                aisle       TEXT NOT NULL,
+                rack        INTEGER NOT NULL,
+                side        TEXT NOT NULL,
+                layer       TEXT NOT NULL,
+                shelf_id    TEXT NOT NULL,
+                pt_number   TEXT,
+                qty         INTEGER DEFAULT 0,
+                location    TEXT
+            )
+        ''')
+        # ── Mock ERP 재고 테이블 ──────────────────────────────────
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS erp_inventory (
+                shelf_id    TEXT PRIMARY KEY,
+                pt_number   TEXT,
+                qty         INTEGER DEFAULT 0,
+                location    TEXT,
+                last_updated TEXT
+            )
+        ''')
+        # ── ERP 비교 결과 테이블 ──────────────────────────────────
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS erp_compare_results (
+                id          TEXT PRIMARY KEY,
+                session_id  TEXT NOT NULL,
+                compared_at TEXT NOT NULL,
+                total_scanned INTEGER DEFAULT 0,
+                match_count   INTEGER DEFAULT 0,
+                mismatch_count INTEGER DEFAULT 0,
+                missing_in_scan INTEGER DEFAULT 0,
+                missing_in_erp  INTEGER DEFAULT 0,
+                accuracy_rate   REAL DEFAULT 0,
+                payload     TEXT
+            )
+        ''')
         conn.commit()
 
 # 앱 시작 시 DB 초기화
 init_db()
+
+# ══════════════════════════════════════════════════════════════
+# Mock ERP 데이터 초기화
+# ══════════════════════════════════════════════════════════════
+
+WAFER_PT_LIST = [
+    'PT64090302', 'PT64090303', 'PT64090304', 'PT64090305',
+    'PT64090306', 'PT64090307', 'PT64090308', 'PT64090309',
+    'PT64090310', 'PT64090311',
+]
+
+def seed_erp_inventory():
+    """ERP Mock 데이터 생성 — 아직 없을 때만 실행"""
+    import random
+    with get_db() as conn:
+        cnt = conn.execute('SELECT COUNT(*) FROM erp_inventory').fetchone()[0]
+        if cnt > 0:
+            return  # 이미 있으면 스킵
+
+        rows = []
+        for aisle in range(1, 16):
+            for rack in range(1, 21):
+                for side in ['L', 'R']:
+                    for layer in ['L1', 'L2']:
+                        shelf_id = f"{aisle}-{side}{rack}-{layer}"
+                        seed = abs(ord(shelf_id[0]) * 13 + rack * 7)
+                        # ERP상 85% 재고 보유
+                        has_item = random.random() > 0.15
+                        pt = WAFER_PT_LIST[seed % len(WAFER_PT_LIST)] if has_item else None
+                        qty = random.randint(5, 20) if has_item else 0
+                        loc = f"Aisle-{aisle} / Rack-{rack} / {'Side A' if side=='L' else 'Side B'} / {layer}"
+                        rows.append((shelf_id, pt, qty, loc, datetime.now().isoformat()))
+
+        conn.executemany(
+            'INSERT OR IGNORE INTO erp_inventory (shelf_id, pt_number, qty, location, last_updated) VALUES (?,?,?,?,?)',
+            rows
+        )
+        conn.commit()
+        print(f"[ERP] Mock ERP 재고 초기화 완료 ({len(rows)}개 위치)")
+
+seed_erp_inventory()
 
 # ── JSON → SQLite 마이그레이션 (기존 데이터 보존) ─────────────
 def migrate_json_to_sqlite():
@@ -1275,6 +1358,328 @@ def get_patrol_signal():
         except Exception:
             pass
     return jsonify({'ok': True, 'signal': False})
+
+
+# ══════════════════════════════════════════════════════════════
+# SCAN EVENT API — 드론 스캔 즉시 저장
+# ══════════════════════════════════════════════════════════════
+
+@app.route('/api/scan/event', methods=['POST'])
+def save_scan_event():
+    """드론이 박스 하나 읽을 때마다 즉시 Edge DB에 저장"""
+    try:
+        body = request.get_json(force=True) or {}
+        sid  = f"SE-{uuid.uuid4().hex[:12].upper()}"
+        now  = datetime.now().isoformat()
+
+        with get_db() as conn:
+            conn.execute('''
+                INSERT OR REPLACE INTO scan_events
+                (id, scanned_at, session_id, drone_id, aisle, rack, side, layer,
+                 shelf_id, pt_number, qty, location)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+            ''', (
+                sid, now,
+                body.get('session_id', 'default'),
+                body.get('drone_id', 'A'),
+                str(body.get('aisle', '')),
+                int(body.get('rack', 0)),
+                body.get('side', ''),
+                body.get('layer', ''),
+                body.get('shelf_id', ''),
+                body.get('pt_number'),
+                int(body.get('qty', 0)),
+                body.get('location', ''),
+            ))
+            conn.commit()
+
+        return jsonify({'ok': True, 'id': sid})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@app.route('/api/scan/session/<session_id>', methods=['GET'])
+def get_scan_session(session_id):
+    """특정 세션의 스캔 결과 조회"""
+    try:
+        with get_db() as conn:
+            rows = conn.execute(
+                'SELECT * FROM scan_events WHERE session_id=? ORDER BY scanned_at',
+                (session_id,)
+            ).fetchall()
+        return jsonify({'ok': True, 'count': len(rows),
+                        'events': [dict(r) for r in rows]})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@app.route('/api/scan/latest', methods=['GET'])
+def get_latest_scans():
+    """최근 스캔 이벤트 조회"""
+    try:
+        limit = int(request.args.get('limit', 100))
+        with get_db() as conn:
+            rows = conn.execute(
+                'SELECT * FROM scan_events ORDER BY scanned_at DESC LIMIT ?',
+                (limit,)
+            ).fetchall()
+        return jsonify({'ok': True, 'events': [dict(r) for r in rows]})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+# ══════════════════════════════════════════════════════════════
+# MOCK ERP API
+# ══════════════════════════════════════════════════════════════
+
+@app.route('/api/erp/inventory', methods=['GET'])
+def erp_inventory():
+    """Mock ERP 재고 조회 — 실제 ERP와 동일한 인터페이스"""
+    try:
+        aisle  = request.args.get('aisle')
+        shelf  = request.args.get('shelf_id')
+        with get_db() as conn:
+            if shelf:
+                rows = conn.execute(
+                    'SELECT * FROM erp_inventory WHERE shelf_id=?', (shelf,)
+                ).fetchall()
+            elif aisle:
+                rows = conn.execute(
+                    "SELECT * FROM erp_inventory WHERE shelf_id LIKE ?",
+                    (f"{aisle}-%",)
+                ).fetchall()
+            else:
+                rows = conn.execute('SELECT * FROM erp_inventory').fetchall()
+        return jsonify({'ok': True, 'source': 'mock_erp',
+                        'count': len(rows),
+                        'inventory': [dict(r) for r in rows]})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@app.route('/api/erp/inventory', methods=['PUT'])
+def update_erp_inventory():
+    """ERP 재고 수동 업데이트 (테스트용)"""
+    try:
+        body = request.get_json(force=True) or {}
+        shelf_id = body.get('shelf_id')
+        if not shelf_id:
+            return jsonify({'ok': False, 'error': 'shelf_id 필수'}), 400
+        with get_db() as conn:
+            conn.execute('''
+                INSERT OR REPLACE INTO erp_inventory (shelf_id, pt_number, qty, location, last_updated)
+                VALUES (?,?,?,?,?)
+            ''', (shelf_id, body.get('pt_number'), int(body.get('qty', 0)),
+                  body.get('location', ''), datetime.now().isoformat()))
+            conn.commit()
+        return jsonify({'ok': True, 'shelf_id': shelf_id})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+# ══════════════════════════════════════════════════════════════
+# ERP 비교 엔진 API
+# ══════════════════════════════════════════════════════════════
+
+@app.route('/api/erp/compare', methods=['POST'])
+def erp_compare():
+    """
+    드론 스캔 결과 vs Mock ERP 재고 비교
+    POST body: { session_id: '...' }
+    Edge에서 직접 비교 수행 → 결과 DB 저장 → 보고서 반환
+    """
+    try:
+        body       = request.get_json(force=True) or {}
+        session_id = body.get('session_id', 'default')
+        now        = datetime.now().isoformat()
+        result_id  = f"CMP-{uuid.uuid4().hex[:8].upper()}"
+
+        with get_db() as conn:
+            # 1. 이번 세션 스캔 결과 가져오기
+            scan_rows = conn.execute(
+                'SELECT * FROM scan_events WHERE session_id=?', (session_id,)
+            ).fetchall()
+
+            # 2. ERP 전체 재고 가져오기
+            erp_rows = conn.execute('SELECT * FROM erp_inventory').fetchall()
+
+        scan_map = {r['shelf_id']: dict(r) for r in scan_rows}
+        erp_map  = {r['shelf_id']: dict(r) for r in erp_rows}
+
+        # 3. 비교 로직
+        match       = []   # 일치
+        mismatch    = []   # PT번호 or 수량 불일치
+        missing_scan= []   # ERP엔 있는데 스캔 못한 위치
+        missing_erp = []   # 스캔됐는데 ERP에 없는 위치
+        extra_found = []   # ERP에 없지만 스캔에서 발견 (신규입고 추정)
+
+        all_shelves = set(list(scan_map.keys()) + list(erp_map.keys()))
+
+        for shelf_id in all_shelves:
+            scan = scan_map.get(shelf_id)
+            erp  = erp_map.get(shelf_id)
+
+            if scan and erp:
+                scan_pt = scan.get('pt_number') or ''
+                erp_pt  = erp.get('pt_number') or ''
+                scan_qty = int(scan.get('qty') or 0)
+                erp_qty  = int(erp.get('qty') or 0)
+
+                if scan_pt == erp_pt and scan_qty == erp_qty:
+                    match.append({'shelf_id': shelf_id, 'pt_number': erp_pt,
+                                  'qty': erp_qty, 'location': erp.get('location','')})
+                else:
+                    mismatch.append({
+                        'shelf_id': shelf_id,
+                        'location': erp.get('location', ''),
+                        'scan': {'pt_number': scan_pt, 'qty': scan_qty},
+                        'erp':  {'pt_number': erp_pt,  'qty': erp_qty},
+                        'issue': _mismatch_type(scan_pt, erp_pt, scan_qty, erp_qty),
+                    })
+            elif erp and not scan:
+                # ERP엔 재고 있는데 드론이 못 읽음
+                if int(erp.get('qty') or 0) > 0:
+                    missing_scan.append({
+                        'shelf_id': shelf_id,
+                        'location': erp.get('location', ''),
+                        'erp_pt':  erp.get('pt_number',''),
+                        'erp_qty': int(erp.get('qty') or 0),
+                    })
+            elif scan and not erp:
+                # 스캔에선 발견됐는데 ERP에 없음
+                if int(scan.get('qty') or 0) > 0:
+                    extra_found.append({
+                        'shelf_id': shelf_id,
+                        'location': scan.get('location', ''),
+                        'scan_pt':  scan.get('pt_number',''),
+                        'scan_qty': int(scan.get('qty') or 0),
+                    })
+
+        total_scanned  = len(scan_map)
+        total_erp      = len([e for e in erp_map.values() if int(e.get('qty') or 0) > 0])
+        match_count    = len(match)
+        mismatch_count = len(mismatch)
+        accuracy       = round(match_count / max(total_scanned, 1) * 100, 1)
+
+        result_payload = {
+            'result_id':      result_id,
+            'session_id':     session_id,
+            'compared_at':    now,
+            'total_scanned':  total_scanned,
+            'total_erp':      total_erp,
+            'match_count':    match_count,
+            'mismatch_count': mismatch_count,
+            'missing_scan':   len(missing_scan),
+            'extra_found':    len(extra_found),
+            'accuracy_rate':  accuracy,
+            'details': {
+                'match':        match[:50],
+                'mismatch':     mismatch,
+                'missing_scan': missing_scan[:50],
+                'extra_found':  extra_found[:50],
+            },
+            'summary': _build_compare_summary(
+                accuracy, mismatch, missing_scan, extra_found
+            ),
+        }
+
+        # 4. 결과 DB 저장
+        with get_db() as conn:
+            conn.execute('''
+                INSERT OR REPLACE INTO erp_compare_results
+                (id, session_id, compared_at, total_scanned, match_count,
+                 mismatch_count, missing_in_scan, missing_in_erp, accuracy_rate, payload)
+                VALUES (?,?,?,?,?,?,?,?,?,?)
+            ''', (
+                result_id, session_id, now,
+                total_scanned, match_count, mismatch_count,
+                len(missing_scan), len(extra_found),
+                accuracy,
+                json.dumps(result_payload, ensure_ascii=False)
+            ))
+            conn.commit()
+
+        print(f"[ERP Compare] {result_id} — 정확도 {accuracy}% ({match_count}/{total_scanned})")
+        return jsonify({'ok': True, 'result': result_payload})
+
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+def _mismatch_type(scan_pt, erp_pt, scan_qty, erp_qty):
+    if scan_pt != erp_pt and scan_qty != erp_qty:
+        return 'PT번호·수량 불일치'
+    if scan_pt != erp_pt:
+        return 'PT번호 불일치'
+    if scan_qty == 0 and erp_qty > 0:
+        return '재고 소진 (ERP 미반영)'
+    if scan_qty > erp_qty:
+        return f'수량 초과 (+{scan_qty - erp_qty})'
+    return f'수량 부족 (-{erp_qty - scan_qty})'
+
+
+def _build_compare_summary(accuracy, mismatch, missing_scan, extra_found):
+    alerts = []
+    if accuracy < 90:
+        alerts.append({'level': '🔴 긴급', 'msg': f'재고 정확도 {accuracy}% — 즉시 현장 점검 필요'})
+    elif accuracy < 95:
+        alerts.append({'level': '🟡 주의', 'msg': f'재고 정확도 {accuracy}% — 추가 확인 권고'})
+    else:
+        alerts.append({'level': '🟢 양호', 'msg': f'재고 정확도 {accuracy}% — 정상 범위'})
+
+    pt_mismatch = [m for m in mismatch if 'PT번호' in m.get('issue','')]
+    if pt_mismatch:
+        alerts.append({'level': '🔴 긴급',
+                       'msg': f'PT번호 불일치 {len(pt_mismatch)}건 — 잘못된 상품 위치 가능성'})
+    if missing_scan:
+        alerts.append({'level': '🟡 주의',
+                       'msg': f'미스캔 위치 {len(missing_scan)}건 — 드론 재순찰 또는 수동 확인 필요'})
+    if extra_found:
+        alerts.append({'level': '🔵 정보',
+                       'msg': f'ERP 미등록 재고 {len(extra_found)}건 — 신규 입고 ERP 반영 필요'})
+    return alerts
+
+
+@app.route('/api/erp/compare/latest', methods=['GET'])
+def get_latest_compare():
+    """가장 최근 ERP 비교 결과 조회"""
+    try:
+        with get_db() as conn:
+            row = conn.execute(
+                'SELECT * FROM erp_compare_results ORDER BY compared_at DESC LIMIT 1'
+            ).fetchone()
+        if not row:
+            return jsonify({'ok': False, 'error': '비교 결과 없음'}), 404
+        r = dict(row)
+        try:
+            r['data'] = json.loads(r.get('payload') or '{}')
+        except Exception:
+            r['data'] = {}
+        return jsonify({'ok': True, 'result': r['data'], 'meta': {
+            k: r[k] for k in ['id','session_id','compared_at','accuracy_rate',
+                               'match_count','mismatch_count']
+        }})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@app.route('/api/erp/compare/history', methods=['GET'])
+def compare_history():
+    """ERP 비교 이력 조회"""
+    try:
+        limit = int(request.args.get('limit', 20))
+        with get_db() as conn:
+            rows = conn.execute('''
+                SELECT id, session_id, compared_at, total_scanned,
+                       match_count, mismatch_count, missing_in_scan,
+                       missing_in_erp, accuracy_rate
+                FROM erp_compare_results
+                ORDER BY compared_at DESC LIMIT ?
+            ''', (limit,)).fetchall()
+        return jsonify({'ok': True, 'history': [dict(r) for r in rows]})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
 
 
 if __name__ == '__main__':

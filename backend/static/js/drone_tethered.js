@@ -231,6 +231,8 @@ const state = {
     view: 'patrol',  // 'patrol' | 'compare' | 'report'
     currentDay: 1,
     patrolActive: false,
+    sessionId: null,          // ← 순찰 세션 ID (Edge DB 기록용)
+    erpCompareResult: null,   // ← ERP 비교 결과 캐시
     drones: {
         A: { id: 'A', dockId: 'A', x: 90, y: 25, angle: 0, status: 'standby', currentAisle: null, currentLevel: null, path: [], pathIndex: 0, scannedCount: 0, isScanning: false },
         B: { id: 'B', dockId: 'B', x: 1310, y: 25, angle: 0, status: 'standby', currentAisle: null, currentLevel: null, path: [], pathIndex: 0, scannedCount: 0, isScanning: false },
@@ -363,6 +365,11 @@ function startPatrol() {
     
     console.log('🚀 Starting Tethered Drone Patrol');
     state.patrolActive = true;
+
+    // 순찰 세션 ID 생성 (Edge DB 저장용)
+    const now = new Date();
+    state.sessionId = `SES-${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}-${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}-${Math.random().toString(36).substr(2,6).toUpperCase()}`;
+    addFeed(`🔑 세션 시작: ${state.sessionId}`, 'system');
     
     // Build tasks for each dock
     ['A', 'B'].forEach(dockId => {
@@ -561,6 +568,8 @@ async function processScanWithDelay(droneId, task, onComplete) {
         state.scannedShelves.add(shelf.id);
         const item = inv[shelf.id];
         const ptNumber = item?.sku || null;
+        const qty = item?.qty || 0;
+        const location = item?.location || `Aisle-${shelf.aisle} / Rack-${shelf.rack} / Side ${side} / ${shelf.layer}`;
 
         const event = {
             id: `SE-${Date.now()}-${shelf.id}`,
@@ -572,7 +581,7 @@ async function processScanWithDelay(droneId, task, onComplete) {
             side,
             layer: shelf.layer,
             sku: ptNumber,
-            qty: item?.qty || 0,
+            qty,
         };
 
         if (state.currentDay === 1) {
@@ -583,15 +592,35 @@ async function processScanWithDelay(droneId, task, onComplete) {
 
         drone.scannedCount++;
 
+        // ── Edge DB에 즉시 저장 (/api/scan/event) ────────────────
+        if (state.sessionId) {
+            fetch('/api/scan/event', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    session_id: state.sessionId,
+                    drone_id:   droneId,
+                    aisle:      shelf.aisle,
+                    rack:       shelf.rack,
+                    side:       side,
+                    layer:      shelf.layer,
+                    shelf_id:   shelf.id,
+                    pt_number:  ptNumber,
+                    qty:        qty,
+                    location:   location,
+                }),
+            }).catch(() => { /* silent — edge저장 실패해도 UI 영향 없음 */ });
+        }
+
         const shelfEl = document.getElementById(`shelf-${shelf.id}`);
         if (shelfEl) {
-            shelfEl.setAttribute('fill', item?.qty > 0 ? 'rgba(34,211,238,0.3)' : 'rgba(248,113,113,0.2)');
-            shelfEl.setAttribute('stroke', item?.qty > 0 ? '#22d3ee' : '#f87171');
+            shelfEl.setAttribute('fill', qty > 0 ? 'rgba(34,211,238,0.3)' : 'rgba(248,113,113,0.2)');
+            shelfEl.setAttribute('stroke', qty > 0 ? '#22d3ee' : '#f87171');
             shelfEl.setAttribute('stroke-width', '2');
         }
 
-        const scanMsg = item?.qty > 0
-            ? `🔵 PT번호: <b style="color:#22d3ee">${ptNumber}</b> × ${item.qty}`
+        const scanMsg = qty > 0
+            ? `🔵 PT번호: <b style="color:#22d3ee">${ptNumber}</b> × ${qty}`
             : `빈 선반 (Empty)`;
         addFeed(`Drone ${droneId}: 📦 Side ${side} ${shelf.layer} — ${scanMsg}`, 'scan');
         await sleep(DRONE_CONFIG.scanDelay / 2);
@@ -1333,6 +1362,12 @@ function showCompareView() {
         <div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap">
             <button class="btn-start" onclick="exportReport('rescan')">📋 재스캔 목록 내보내기</button>
             <button class="btn-start" onclick="exportReport('full')">📊 전체 보고서 내보내기</button>
+            <button onclick="runErpCompare()"
+                style="background:linear-gradient(135deg,#22d3ee,#6366f1);color:#fff;border:none;padding:8px 18px;border-radius:8px;cursor:pointer;font-size:0.82rem;font-weight:700;transition:transform 0.15s"
+                onmouseover="this.style.transform='scale(1.03)'" onmouseout="this.style.transform='scale(1)'">
+                🏭 Edge ERP 비교 실행
+            </button>
+            ${state.erpCompareResult ? `<button onclick="showErpCompareModal()" style="background:rgba(34,211,238,0.15);color:#22d3ee;border:1px solid rgba(34,211,238,0.4);padding:8px 18px;border-radius:8px;cursor:pointer;font-size:0.82rem;font-weight:600">📊 ERP 비교 결과 보기</button>` : ''}
             <button class="btn-start" onclick="sendToERP()">🔄 Samsung ERP 전송</button>
             <button onclick="showDailyReportModal()"
                 style="background:linear-gradient(135deg,#34d399,#059669);color:#fff;border:none;padding:8px 18px;border-radius:8px;cursor:pointer;font-size:0.82rem;font-weight:700;transition:transform 0.15s"
@@ -1785,6 +1820,240 @@ function showPatrolView() {
 // MCP AUTO-PRINT INTEGRATION
 // ══════════════════════════════════════════════════════════════
 
+// ══════════════════════════════════════════════════════════════
+// ERP COMPARE — Edge에서 스캔 결과 vs Mock ERP 비교
+// ══════════════════════════════════════════════════════════════
+
+async function runErpCompare() {
+    if (!state.sessionId) {
+        addFeed('⚠️ 세션 ID 없음 — 순찰 후 비교 가능', 'alert');
+        return null;
+    }
+    addFeed(`🔄 Edge ERP 비교 시작 (세션: ${state.sessionId})…`, 'system');
+    try {
+        const resp = await fetch('/api/erp/compare', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ session_id: state.sessionId }),
+        });
+        const data = await resp.json();
+        if (data.ok) {
+            state.erpCompareResult = data.result;
+            const r = data.result;
+            addFeed(`✅ ERP 비교 완료 — 정확도: ${r.accuracy_rate}% (일치: ${r.match_count} / 불일치: ${r.mismatch_count} / 미스캔: ${r.missing_scan})`, 'success');
+            // 화면에 ERP 결과 배너 표시
+            _showErpResultBanner(r);
+            return r;
+        } else {
+            addFeed(`❌ ERP 비교 실패: ${data.error}`, 'alert');
+            return null;
+        }
+    } catch(e) {
+        addFeed(`❌ ERP 비교 오류: ${e.message}`, 'alert');
+        return null;
+    }
+}
+
+function _showErpResultBanner(r) {
+    // 기존 배너 제거
+    const old = document.getElementById('erpResultBanner');
+    if (old) old.remove();
+
+    const accColor = r.accuracy_rate >= 95 ? '#34d399' : r.accuracy_rate >= 90 ? '#fbbf24' : '#f87171';
+    const accLabel = r.accuracy_rate >= 95 ? '🟢 양호' : r.accuracy_rate >= 90 ? '🟡 주의' : '🔴 긴급';
+
+    const banner = document.createElement('div');
+    banner.id = 'erpResultBanner';
+    banner.style.cssText = 'margin-top:10px;padding:14px 16px;background:rgba(15,23,42,0.95);border-radius:10px;border:2px solid rgba(34,211,238,0.4);font-size:0.8rem';
+    banner.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+            <div style="font-weight:700;color:#22d3ee;font-size:0.92rem">
+                📊 Edge ERP 비교 결과 — 세션 <span style="font-family:monospace;font-size:0.78rem;color:#a78bfa">${r.session_id}</span>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center">
+                <span style="font-size:0.78rem;color:#64748b">${new Date(r.compared_at).toLocaleString('ko-KR')}</span>
+                <button onclick="showErpCompareModal()" style="background:linear-gradient(135deg,#22d3ee,#6366f1);color:#fff;border:none;padding:5px 14px;border-radius:6px;cursor:pointer;font-size:0.75rem;font-weight:700">상세 보기 →</button>
+            </div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:10px">
+            <div style="background:rgba(34,211,238,0.08);border:1px solid rgba(34,211,238,0.25);border-radius:6px;padding:10px;text-align:center">
+                <div style="color:#22d3ee;font-size:1.3rem;font-weight:800">${r.total_scanned}</div>
+                <div style="color:#64748b;font-size:0.65rem">스캔 위치</div>
+            </div>
+            <div style="background:rgba(52,211,153,0.08);border:1px solid rgba(52,211,153,0.25);border-radius:6px;padding:10px;text-align:center">
+                <div style="color:${accColor};font-size:1.3rem;font-weight:800">${r.accuracy_rate}%</div>
+                <div style="color:#64748b;font-size:0.65rem">ERP 정확도 ${accLabel}</div>
+            </div>
+            <div style="background:rgba(52,211,153,0.06);border:1px solid rgba(52,211,153,0.2);border-radius:6px;padding:10px;text-align:center">
+                <div style="color:#34d399;font-size:1.3rem;font-weight:800">${r.match_count}</div>
+                <div style="color:#64748b;font-size:0.65rem">✅ ERP 일치</div>
+            </div>
+            <div style="background:rgba(248,113,113,0.06);border:1px solid rgba(248,113,113,0.2);border-radius:6px;padding:10px;text-align:center">
+                <div style="color:#f87171;font-size:1.3rem;font-weight:800">${r.mismatch_count}</div>
+                <div style="color:#64748b;font-size:0.65rem">⚠️ 불일치</div>
+            </div>
+            <div style="background:rgba(251,191,36,0.06);border:1px solid rgba(251,191,36,0.2);border-radius:6px;padding:10px;text-align:center">
+                <div style="color:#fbbf24;font-size:1.3rem;font-weight:800">${r.missing_scan}</div>
+                <div style="color:#64748b;font-size:0.65rem">📭 미스캔</div>
+            </div>
+        </div>
+        <!-- Summary alerts -->
+        <div style="display:flex;flex-direction:column;gap:4px">
+            ${(r.summary || []).map(s => `
+            <div style="padding:6px 10px;background:rgba(0,0,0,0.2);border-radius:4px;font-size:0.75rem;color:#e2e8f0">
+                ${s.level} ${s.msg}
+            </div>`).join('')}
+        </div>
+    `;
+
+    // liveFeed 아래에 삽입
+    const feed = document.getElementById('liveFeed');
+    if (feed && feed.parentNode) {
+        feed.parentNode.insertBefore(banner, feed.nextSibling);
+    } else {
+        // fallback: dashboardContent 끝에 추가
+        const dash = document.getElementById('dashboardContent');
+        if (dash) dash.appendChild(banner);
+    }
+}
+
+// ERP 비교 상세 모달
+function showErpCompareModal() {
+    const r = state.erpCompareResult;
+    if (!r) {
+        addFeed('⚠️ ERP 비교 결과 없음 — 먼저 순찰을 완료하세요', 'alert');
+        return;
+    }
+
+    // 모달 요소가 없으면 생성
+    let modal = document.getElementById('erpCompareModal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'erpCompareModal';
+        modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:9998;overflow-y:auto;padding:20px';
+        modal.onclick = (e) => { if (e.target === modal) modal.style.display = 'none'; };
+        document.body.appendChild(modal);
+    }
+    modal.style.display = 'block';
+
+    const accColor = r.accuracy_rate >= 95 ? '#34d399' : r.accuracy_rate >= 90 ? '#fbbf24' : '#f87171';
+    const d = r.details || {};
+    const mismatches = d.mismatch || [];
+    const missingScan = d.missing_scan || [];
+    const extraFound  = d.extra_found || [];
+
+    modal.innerHTML = `
+    <div style="max-width:950px;margin:0 auto;background:#0f172a;border-radius:16px;border:1px solid rgba(34,211,238,0.3);overflow:hidden">
+
+        <!-- Header -->
+        <div style="background:linear-gradient(135deg,rgba(34,211,238,0.15),rgba(99,102,241,0.15));padding:24px 28px;border-bottom:1px solid rgba(255,255,255,0.07)">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px">
+                <div>
+                    <div style="font-size:0.7rem;color:#22d3ee;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px">Edge ERP 비교 보고서</div>
+                    <h2 style="color:#f1f5f9;font-size:1.3rem;font-weight:800;margin:0">📊 스캔 데이터 vs Mock ERP 재고</h2>
+                    <div style="color:#64748b;font-size:0.78rem;margin-top:4px">세션: <span style="color:#a78bfa;font-family:monospace">${r.session_id}</span> · ${new Date(r.compared_at).toLocaleString('ko-KR')}</div>
+                </div>
+                <button onclick="document.getElementById('erpCompareModal').style.display='none'"
+                    style="background:rgba(248,113,113,0.2);color:#f87171;border:1px solid rgba(248,113,113,0.3);padding:8px 16px;border-radius:8px;cursor:pointer;font-size:0.82rem;font-weight:600">✕ 닫기</button>
+            </div>
+            <!-- KPI -->
+            <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:18px">
+                ${[
+                    { v: r.total_scanned,    l: '스캔 위치',    c: '#22d3ee' },
+                    { v: r.total_erp,        l: 'ERP 재고 위치', c: '#818cf8' },
+                    { v: r.accuracy_rate+'%', l: 'ERP 정확도',  c: accColor },
+                    { v: r.match_count,      l: '✅ 일치',       c: '#34d399' },
+                    { v: r.mismatch_count,   l: '⚠️ 불일치',    c: '#f87171' },
+                ].map(k => `
+                <div style="background:rgba(0,0,0,0.3);border-radius:8px;padding:12px;text-align:center;border:1px solid rgba(255,255,255,0.06)">
+                    <div style="color:${k.c};font-size:1.4rem;font-weight:800">${k.v}</div>
+                    <div style="color:#64748b;font-size:0.65rem;margin-top:3px">${k.l}</div>
+                </div>`).join('')}
+            </div>
+        </div>
+
+        <!-- Body -->
+        <div style="padding:20px 28px;display:flex;flex-direction:column;gap:20px">
+
+            <!-- Summary Alerts -->
+            <section>
+                <h3 style="color:#a78bfa;font-size:0.85rem;font-weight:700;margin-bottom:8px">💡 Edge AI 분석 요약</h3>
+                <div style="display:flex;flex-direction:column;gap:6px">
+                    ${(r.summary || []).map(s => `
+                    <div style="padding:10px 14px;border-radius:6px;background:rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.05);font-size:0.82rem;color:#e2e8f0">
+                        ${s.level} &nbsp; ${s.msg}
+                    </div>`).join('')}
+                </div>
+            </section>
+
+            <!-- Mismatches -->
+            ${mismatches.length > 0 ? `
+            <section>
+                <h3 style="color:#f87171;font-size:0.85rem;font-weight:700;margin-bottom:8px">⚠️ PT번호·수량 불일치 (${mismatches.length}건)</h3>
+                <div style="max-height:280px;overflow-y:auto;display:flex;flex-direction:column;gap:5px">
+                    ${mismatches.map(m => `
+                    <div style="background:rgba(248,113,113,0.05);border:1px solid rgba(248,113,113,0.2);border-radius:6px;padding:10px 14px;font-size:0.78rem">
+                        <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+                            <span style="font-family:monospace;color:#e2e8f0;font-weight:700">${m.shelf_id}</span>
+                            <span style="color:#f87171;font-size:0.72rem">${m.issue}</span>
+                        </div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;color:#64748b">
+                            <div>📦 스캔: <span style="color:#22d3ee">${m.scan.pt_number || 'Empty'}</span> × ${m.scan.qty}</div>
+                            <div>🏭 ERP: <span style="color:#818cf8">${m.erp.pt_number || 'Empty'}</span> × ${m.erp.qty}</div>
+                        </div>
+                        <div style="font-size:0.68rem;color:#475569;margin-top:3px">${m.location}</div>
+                    </div>`).join('')}
+                </div>
+            </section>` : ''}
+
+            <!-- Missing Scan -->
+            ${missingScan.length > 0 ? `
+            <section>
+                <h3 style="color:#fbbf24;font-size:0.85rem;font-weight:700;margin-bottom:8px">📭 ERP 재고 있으나 미스캔 위치 (${missingScan.length}건)</h3>
+                <div style="max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:4px">
+                    ${missingScan.map(m => `
+                    <div style="background:rgba(251,191,36,0.05);border-left:3px solid #fbbf24;padding:8px 12px;border-radius:4px;font-size:0.78rem">
+                        <span style="font-family:monospace;color:#e2e8f0">${m.shelf_id}</span>
+                        <span style="color:#fbbf24;margin-left:10px">${m.erp_pt} × ${m.erp_qty}</span>
+                        <span style="color:#475569;font-size:0.68rem;margin-left:10px">${m.location}</span>
+                    </div>`).join('')}
+                </div>
+            </section>` : ''}
+
+            <!-- Extra Found (ERP에 없는 재고) -->
+            ${extraFound.length > 0 ? `
+            <section>
+                <h3 style="color:#34d399;font-size:0.85rem;font-weight:700;margin-bottom:8px">📦 ERP 미등록 재고 발견 — 신규 입고 추정 (${extraFound.length}건)</h3>
+                <div style="max-height:180px;overflow-y:auto;display:flex;flex-direction:column;gap:4px">
+                    ${extraFound.map(m => `
+                    <div style="background:rgba(52,211,153,0.05);border-left:3px solid #34d399;padding:8px 12px;border-radius:4px;font-size:0.78rem">
+                        <span style="font-family:monospace;color:#e2e8f0">${m.shelf_id}</span>
+                        <span style="color:#34d399;margin-left:10px">${m.scan_pt} × ${m.scan_qty}</span>
+                        <span style="color:#475569;font-size:0.68rem;margin-left:10px">${m.location}</span>
+                    </div>`).join('')}
+                </div>
+            </section>` : ''}
+
+            <!-- Footer -->
+            <div style="display:flex;gap:10px;justify-content:flex-end;padding-top:8px;border-top:1px solid rgba(255,255,255,0.06);flex-wrap:wrap">
+                <button onclick="exportErpCompareJSON()" style="background:rgba(99,102,241,0.15);color:#a78bfa;border:1px solid rgba(99,102,241,0.4);padding:8px 18px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600">⬇️ JSON 내보내기</button>
+                <button onclick="document.getElementById('erpCompareModal').style.display='none'" style="background:rgba(100,116,139,0.3);color:#94a3b8;border:1px solid rgba(100,116,139,0.4);padding:8px 18px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600">✕ 닫기</button>
+            </div>
+        </div>
+    </div>`;
+}
+
+function exportErpCompareJSON() {
+    const r = state.erpCompareResult;
+    if (!r) return;
+    const blob = new Blob([JSON.stringify(r, null, 2)], { type:'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `erp-compare-${r.session_id || 'result'}.json`;
+    a.click();
+    addFeed('⬇️ ERP 비교 결과 JSON 내보내기 완료', 'success');
+}
+
 // Called when patrol completes (all drones standby) → auto-save + trigger MCP
 async function onPatrolComplete() {
     addFeed('🎉 전체 순찰 완료 — 보고서 자동 저장 중…', 'success');
@@ -1846,6 +2115,12 @@ async function onPatrolComplete() {
     } catch(e) {
         addFeed(`⚠️ 보고서 저장 오류: ${e.message}`, 'alert');
     }
+
+    // ── ERP 자동 비교 (순찰 완료 후 Edge에서 즉시 실행) ──────────
+    setTimeout(() => {
+        addFeed('🏭 Edge ERP 자동 비교 시작…', 'system');
+        runErpCompare();
+    }, 1500);
 }
 
 // Poll backend for nightly patrol start signal (MCP scheduler)
