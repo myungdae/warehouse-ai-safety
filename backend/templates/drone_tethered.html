@@ -201,9 +201,9 @@
                 <div class="stat-label">Coverage</div>
                 <div class="stat-value" id="coveragePct">0%</div>
             </div>
-            <div class="stat-card" style="cursor:pointer;transition:all 0.3s" onclick="showCompareView()" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'" id="compareCard">
+            <div class="stat-card" style="cursor:pointer;transition:all 0.3s" onclick="state.erpCompareResult ? showErpCompareModal() : showCompareView()" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'" id="compareCard">
                 <div class="stat-label">📊 ERP Compare</div>
-                <div class="stat-value" style="font-size:0.9rem;color:#fbbf24">Day1 vs Day2</div>
+                <div class="stat-value" style="font-size:0.9rem;color:#fbbf24" id="erpCardVal">Day1 vs Day2</div>
             </div>
             <div class="stat-card" style="cursor:pointer;transition:all 0.3s;border-color:rgba(34,211,238,.3)"
                 onclick="window.open('/mcp','_blank')"
