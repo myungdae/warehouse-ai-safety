@@ -2160,19 +2160,21 @@ async function onPatrolComplete() {
         addFeed(`⚠️ 보고서 저장 오류: ${e.message}`, 'alert');
     }
 
-    // ── ERP 비교 + 결과 배너 — 보고서 저장 성공/실패와 무관하게 항상 실행 ──────
-    setTimeout(async () => {
-        addFeed('🏭 Edge ERP 자동 비교 시작…', 'system');
-        let erpOk = false;
-        try {
-            const result = await runErpCompare();
-            if (result) erpOk = true;
-        } catch(e) { /* silent */ }
+    // ── 결과 배너: 항상 Day1/Day2 내부 비교 먼저 표시 + Edge API 결과로 교체 ──────
+    setTimeout(() => {
+        // 1) 즉시 Day1/Day2 내부 비교 배너 표시 (항상 동작 보장)
+        addFeed('📊 재고 비교 결과 표시 중…', 'system');
+        _showDay1Day2Banner();
 
-        // Edge API 실패 시 항상 Day1/Day2 내부 비교 배너 표시
-        if (!erpOk) {
-            addFeed('ℹ️ Day1/Day2 내부 비교 결과를 표시합니다', 'system');
-            _showDay1Day2Banner();
+        // 2) Edge API도 시도 — 성공 시 배너를 Edge 결과로 교체
+        if (state.sessionId) {
+            runErpCompare().then(r => {
+                if (r && r.accuracy_rate > 0) {
+                    addFeed(`✅ Edge ERP 비교 완료 — 정확도: ${r.accuracy_rate}%`, 'success');
+                    // Edge 결과로 배너 교체
+                    _showErpResultBanner(r);
+                }
+            }).catch(() => { /* silent */ });
         }
     }, 1200);
 }
