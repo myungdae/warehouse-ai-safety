@@ -1906,14 +1906,41 @@ function _showErpResultBanner(r) {
         </div>
     `;
 
-    // liveFeed 아래에 삽입
-    const feed = document.getElementById('liveFeed');
-    if (feed && feed.parentNode) {
-        feed.parentNode.insertBefore(banner, feed.nextSibling);
-    } else {
-        // fallback: dashboardContent 끝에 추가
-        const dash = document.getElementById('dashboardContent');
-        if (dash) dash.appendChild(banner);
+    // ── 항상 보이는 고정 위치: body에 fixed 팝업으로 표시 ────────
+    banner.style.cssText = [
+        'position:fixed',
+        'bottom:20px',
+        'left:50%',
+        'transform:translateX(-50%)',
+        'width:min(820px, 95vw)',
+        'z-index:9990',
+        'padding:14px 16px',
+        'background:rgba(10,18,35,0.97)',
+        'border-radius:12px',
+        'border:2px solid rgba(34,211,238,0.6)',
+        'font-size:0.8rem',
+        'box-shadow:0 8px 32px rgba(0,0,0,0.6)',
+    ].join(';');
+
+    // 닫기 버튼 추가
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '✕';
+    closeBtn.style.cssText = 'position:absolute;top:8px;right:10px;background:none;border:none;color:#64748b;font-size:1rem;cursor:pointer;padding:2px 6px';
+    closeBtn.onclick = () => banner.remove();
+    banner.appendChild(closeBtn);
+
+    document.body.appendChild(banner);
+
+    // 상단 ERP COMPARE 카드 값 업데이트
+    const erpCardVal = document.getElementById('erpCardVal');
+    if (erpCardVal) {
+        const accColor = r.accuracy_rate >= 95 ? '#34d399' : r.accuracy_rate >= 90 ? '#fbbf24' : '#f87171';
+        erpCardVal.style.color = accColor;
+        erpCardVal.textContent = `✅ ${r.accuracy_rate}% — 상세보기`;
+    }
+    const compareCard = document.getElementById('compareCard');
+    if (compareCard) {
+        compareCard.style.borderColor = 'rgba(34,211,238,0.6)';
     }
 }
 
