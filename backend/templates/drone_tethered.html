@@ -201,10 +201,10 @@
                 <div class="stat-label">Coverage</div>
                 <div class="stat-value" id="coveragePct">0%</div>
             </div>
-            <div class="stat-card" style="cursor:pointer;transition:all 0.3s" onclick="(function(){ if(document.getElementById('erpResultBanner')){ const b=document.getElementById('erpResultBanner'); b.style.display=b.style.display==='none'?'block':'none'; } else if(state.erpCompareResult){ showErpCompareModal(); } else { showCompareView(); } })()" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'" id="compareCard">
+            <div class="stat-card" style="cursor:pointer;transition:all 0.3s" onclick="(function(){ const b=document.getElementById('erpResultBanner'); if(b){ b.style.display=b.style.display==='none'?'block':'none'; } else if(state.erpCompareResult){ showErpCompareModal(); } else if(typeof _showDay1Day2Banner==='function'){ _showDay1Day2Banner(); } else { showCompareView(); } })()" onmouseover="this.style.transform='translateY(-2px)';this.style.borderColor='rgba(34,211,238,0.5)'" onmouseout="this.style.transform='translateY(0)';this.style.borderColor=''" id="compareCard">
                 <div class="stat-label">📊 ERP Compare</div>
                 <div class="stat-value" style="font-size:0.9rem;color:#fbbf24" id="erpCardVal">Day1 vs Day2</div>
-                <div style="font-size:0.65rem;color:#475569;margin-top:3px" id="erpCardHint">순찰 후 자동 비교</div>
+                <div style="font-size:0.65rem;color:#475569;margin-top:3px" id="erpCardHint">클릭하면 결과 확인</div>
             </div>
             <div class="stat-card" style="cursor:pointer;transition:all 0.3s;border-color:rgba(34,211,238,.3)"
                 onclick="window.open('/mcp','_blank')"
