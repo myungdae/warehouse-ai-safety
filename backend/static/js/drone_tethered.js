@@ -1942,6 +1942,8 @@ function _showErpResultBanner(r) {
     if (compareCard) {
         compareCard.style.borderColor = 'rgba(34,211,238,0.6)';
     }
+    const erpCardHintEdge = document.getElementById('erpCardHint');
+    if (erpCardHintEdge) erpCardHintEdge.textContent = '클릭하면 결과 토글';
 }
 
 // ERP 비교 상세 모달
@@ -2144,10 +2146,110 @@ async function onPatrolComplete() {
     }
 
     // ── ERP 자동 비교 (순찰 완료 후 Edge에서 즉시 실행) ──────────
-    setTimeout(() => {
+    setTimeout(async () => {
         addFeed('🏭 Edge ERP 자동 비교 시작…', 'system');
-        runErpCompare();
+        const result = await runErpCompare();
+
+        // ── fallback: Edge API 실패 시 Day1 vs Day2 브라우저 내부 비교 결과를 배너로 표시 ──
+        if (!result) {
+            addFeed('ℹ️ Edge API 미응답 — 브라우저 내부 Day1/Day2 비교 결과를 표시합니다', 'system');
+            _showDay1Day2Banner();
+        }
     }, 1500);
+}
+
+// ── Day1/Day2 내부 비교 결과 배너 (Edge API 없을 때 fallback) ─────────────
+function _showDay1Day2Banner() {
+    const { missing, decreased, increased, totalItems, accuracyRate, needsRescan } = _buildCompareData();
+
+    const old = document.getElementById('erpResultBanner');
+    if (old) old.remove();
+
+    const acc = parseFloat(accuracyRate);
+    const accColor = acc >= 95 ? '#34d399' : acc >= 90 ? '#fbbf24' : '#f87171';
+    const accLabel = acc >= 95 ? '🟢 양호' : acc >= 90 ? '🟡 주의' : '🔴 긴급';
+
+    const banner = document.createElement('div');
+    banner.id = 'erpResultBanner';
+    banner.style.cssText = [
+        'position:fixed',
+        'bottom:20px',
+        'left:50%',
+        'transform:translateX(-50%)',
+        'width:min(860px, 96vw)',
+        'z-index:9990',
+        'padding:16px 20px',
+        'background:rgba(10,18,35,0.97)',
+        'border-radius:14px',
+        'border:2px solid rgba(34,211,238,0.7)',
+        'font-size:0.82rem',
+        'box-shadow:0 8px 40px rgba(0,0,0,0.7)',
+    ].join(';');
+
+    banner.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+            <div style="font-weight:800;color:#22d3ee;font-size:1rem">
+                📊 순찰 완료 — 재고 비교 결과 (Day ${state.currentDay})
+            </div>
+            <div style="display:flex;gap:8px;align-items:center">
+                <span style="font-size:0.75rem;color:#64748b">${new Date().toLocaleString('ko-KR')}</span>
+                <button onclick="document.getElementById('erpResultBanner')?.remove(); showCompareView();" style="background:linear-gradient(135deg,#22d3ee,#6366f1);color:#fff;border:none;padding:6px 16px;border-radius:8px;cursor:pointer;font-size:0.78rem;font-weight:700">📋 상세 보기 →</button>
+            </div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:12px">
+            <div style="background:rgba(34,211,238,0.08);border:1px solid rgba(34,211,238,0.25);border-radius:8px;padding:12px;text-align:center">
+                <div style="color:#22d3ee;font-size:1.5rem;font-weight:800">${totalItems}</div>
+                <div style="color:#64748b;font-size:0.68rem;margin-top:2px">총 스캔 위치</div>
+            </div>
+            <div style="background:rgba(52,211,153,0.08);border:1px solid rgba(52,211,153,0.25);border-radius:8px;padding:12px;text-align:center">
+                <div style="color:${accColor};font-size:1.5rem;font-weight:800">${accuracyRate}%</div>
+                <div style="color:#64748b;font-size:0.68rem;margin-top:2px">정확도 ${accLabel}</div>
+            </div>
+            <div style="background:rgba(248,113,113,0.06);border:1px solid rgba(248,113,113,0.2);border-radius:8px;padding:12px;text-align:center">
+                <div style="color:#f87171;font-size:1.5rem;font-weight:800">${missing.length}</div>
+                <div style="color:#64748b;font-size:0.68rem;margin-top:2px">❌ 분실/누락</div>
+            </div>
+            <div style="background:rgba(251,191,36,0.06);border:1px solid rgba(251,191,36,0.2);border-radius:8px;padding:12px;text-align:center">
+                <div style="color:#fbbf24;font-size:1.5rem;font-weight:800">${decreased.length}</div>
+                <div style="color:#64748b;font-size:0.68rem;margin-top:2px">📉 수량 감소</div>
+            </div>
+            <div style="background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.2);border-radius:8px;padding:12px;text-align:center">
+                <div style="color:#818cf8;font-size:1.5rem;font-weight:800">${increased.length}</div>
+                <div style="color:#64748b;font-size:0.68rem;margin-top:2px">📈 수량 증가</div>
+            </div>
+        </div>
+        ${needsRescan.length > 0 ? `
+        <div style="background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.3);border-radius:8px;padding:10px 14px;font-size:0.78rem;color:#fca5a5">
+            ⚠️ 재스캔 필요 위치 (${needsRescan.length}개):
+            <span style="font-family:monospace;color:#f87171;font-weight:600">${needsRescan.slice(0, 5).map(r => r.shelfId || r).join(', ')}${needsRescan.length > 5 ? ` … 외 ${needsRescan.length - 5}개` : ''}</span>
+        </div>` : `
+        <div style="background:rgba(52,211,153,0.08);border:1px solid rgba(52,211,153,0.2);border-radius:8px;padding:10px 14px;font-size:0.78rem;color:#6ee7b7">
+            ✅ 재스캔 필요 없음 — 재고 상태 정상
+        </div>`}
+    `;
+
+    // 닫기 버튼
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '✕';
+    closeBtn.style.cssText = 'position:absolute;top:10px;right:14px;background:none;border:none;color:#64748b;font-size:1.1rem;cursor:pointer;padding:2px 8px;font-weight:700';
+    closeBtn.onclick = () => banner.remove();
+    banner.appendChild(closeBtn);
+
+    document.body.appendChild(banner);
+
+    // 상단 ERP COMPARE 카드 업데이트
+    const erpCardVal = document.getElementById('erpCardVal');
+    if (erpCardVal) {
+        erpCardVal.style.color = accColor;
+        erpCardVal.textContent = `✅ ${accuracyRate}% — 상세보기`;
+        erpCardVal.style.cursor = 'pointer';
+        erpCardVal.onclick = () => { banner.style.display = banner.style.display === 'none' ? 'block' : 'none'; };
+    }
+    const compareCard = document.getElementById('compareCard');
+    if (compareCard) compareCard.style.borderColor = 'rgba(34,211,238,0.6)';
+
+    const erpCardHint = document.getElementById('erpCardHint');
+    if (erpCardHint) erpCardHint.textContent = '클릭하면 결과 토글';
 }
 
 // Poll backend for nightly patrol start signal (MCP scheduler)
