@@ -3323,12 +3323,49 @@ async function renderVideoScanView(container) {
             </div>` : ''}
           </div>
 
-          <!-- 업로드 폼 -->
+          <!-- 자동 전송 방법 안내 -->
+          <div style="background:rgba(15,23,42,0.7);border:1px solid rgba(6,182,212,0.25);
+                      border-radius:14px;padding:16px 18px;margin-bottom:16px">
+            <div style="font-size:0.82rem;font-weight:700;color:#22d3ee;margin-bottom:12px;
+                        display:flex;align-items:center;gap:6px">
+              📡 드론 Wi-Fi 자동 전송 방법 (사람 개입 없음)
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px;font-size:0.76rem">
+              ${[
+                ['✅ 권장', 'rsync (자동)', 'rsync -av /drone_video/ user@server:~/warehouse-ai-safety/backend/drone_drop/', '#34d399'],
+                ['🔧 가능', 'FTP 서버',    'vsftpd 설정 → DJI Pilot 2 앱에서 FTP 자동 업로드 주소 지정', '#fbbf24'],
+                ['🔧 가능', 'Samba 공유',  'drone_drop/ 폴더를 네트워크 드라이브로 공유, 드론 PC에서 자동 복사', '#fbbf24'],
+                ['🔧 가능', 'DJI SDK',     'MediaManager.fetchFileData() → POST /api/video-scan 직접 호출', '#fbbf24'],
+              ].map(([badge, method, desc, color]) => `
+                <div style="display:flex;align-items:flex-start;gap:8px;padding:8px 10px;
+                            background:rgba(0,0,0,0.2);border-radius:8px">
+                  <span style="background:${color}22;color:${color};font-size:0.65rem;
+                               font-weight:700;padding:2px 6px;border-radius:4px;
+                               white-space:nowrap;flex-shrink:0">${badge}</span>
+                  <div>
+                    <div style="color:#e2e8f0;font-weight:600;margin-bottom:2px">${method}</div>
+                    <div style="color:#64748b;font-size:0.71rem;font-family:monospace">${desc}</div>
+                  </div>
+                </div>`).join('')}
+            </div>
+            <div style="margin-top:10px;padding:8px 10px;background:rgba(34,211,238,0.07);
+                        border:1px solid rgba(34,211,238,0.2);border-radius:8px;
+                        font-size:0.73rem;color:#22d3ee">
+              ⚡ 드론이 <b>backend/drone_drop/</b> 폴더에 파일을 전송하면
+              서버가 <b>5초 이내 자동 감지 → 분석 → DB 저장</b>까지 처리합니다.
+              사람이 아무것도 할 필요 없습니다.
+            </div>
+          </div>
+
+          <!-- 수동 업로드 폼 (드론 없을 때 또는 테스트용) -->
           <div style="background:rgba(15,23,42,0.7);border:1px solid rgba(255,255,255,0.07);
                       border-radius:14px;padding:20px 22px">
-            <div style="font-size:0.9rem;font-weight:700;color:#e2e8f0;margin-bottom:18px;
+            <div style="font-size:0.9rem;font-weight:700;color:#e2e8f0;margin-bottom:4px;
                         display:flex;align-items:center;gap:8px">
-              <span>📤</span> 드론 영상 업로드
+              <span>📤</span> 수동 영상 업로드 <span style="font-size:0.7rem;color:#64748b;font-weight:400">(테스트 / 드론 없을 때)</span>
+            </div>
+            <div style="font-size:0.72rem;color:#475569;margin-bottom:14px">
+              실제 운영 시에는 위의 자동 전송 방법을 사용하세요. 이 업로드는 테스트 목적입니다.
             </div>
 
             <!-- 드래그 앤 드롭 영역 -->

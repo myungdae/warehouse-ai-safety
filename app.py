@@ -1973,6 +1973,12 @@ except ImportError:
 UPLOAD_DIR = os.path.join(os.path.dirname(__file__), 'backend', 'uploads')
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+# ── 드론 자동 수신 폴더 (Wi-Fi/FTP/rsync로 드론이 파일을 여기에 보냄) ──
+# DJI M30: 'DJI Pilot 2' 앱 → Media Manager → Auto Upload 설정 또는
+# 드론 SDK / FTP 서버가 이 폴더에 저장하도록 구성
+DRONE_DROP_DIR = os.path.join(os.path.dirname(__file__), 'backend', 'drone_drop')
+os.makedirs(DRONE_DROP_DIR, exist_ok=True)
+
 # PT번호 패턴: PT + 8자리 숫자 (예: PT64090302)
 PT_PATTERN = _re.compile(r'\bPT\d{8}\b')
 
@@ -2336,6 +2342,128 @@ def video_scan_sessions():
         return jsonify({'ok': False, 'error': str(e)}), 500
 
 
+def _start_drone_drop_watcher():
+    """
+    drone_drop/ 폴더를 감시하다가 새 영상 파일이 들어오면 자동으로 분석 시작.
+
+    드론이 Dock에 착륙 후 Wi-Fi로 영상을 전송하는 방법:
+      방법 A (권장) — rsync/scp:
+        드론 연결 PC에서: rsync -av /drone_video/ user@server:/path/drone_drop/
+      방법 B — FTP:
+        vsftpd 설정 후 드론 앱(DJI Pilot 2)에서 FTP 자동 업로드 지정
+      방법 C — 네트워크 공유:
+        Samba 공유 폴더를 drone_drop/으로 설정
+      방법 D — DJI SDK:
+        DJI Mobile SDK의 MediaManager.fetchFileData()로 직접 서버 전송
+    """
+    import time as _wtime
+    import threading
+
+    VIDEO_EXTS = {'.mp4', '.avi', '.mov', '.mkv', '.webm', '.ts'}
+    seen = set()  # 이미 처리한 파일
+
+    def _process(fpath):
+        fname = os.path.basename(fpath)
+        session_id = f"AUTO-{uuid.uuid4().hex[:8].upper()}"
+        app.logger.info(f"[AUTO-SCAN] 새 파일 감지: {fname} → 자동 분석 시작")
+
+        # 파일이 완전히 쓰여질 때까지 대기 (최대 60초)
+        prev_size = -1
+        for _ in range(60):
+            try:
+                cur_size = os.path.getsize(fpath)
+                if cur_size == prev_size and cur_size > 0:
+                    break
+                prev_size = cur_size
+                _wtime.sleep(1)
+            except OSError:
+                _wtime.sleep(1)
+
+        # 실제 분석 실행 (video_scan API 내부 로직 재사용)
+        try:
+            pt_map = {}
+            if CV2_AVAILABLE:
+                pt_map = _extract_pt_from_video(fpath, fps_sample=5)
+            if not pt_map:
+                pt_map = _extract_pt_from_video_ffmpeg(fpath, fps_sample=5)
+
+            saved = _save_video_scan_to_db(pt_map, session_id, 'DRONE-AUTO', None)
+            pt_count = len(pt_map)
+            extract_rate = round(pt_count / max(1, 4500) * 100, 1)
+
+            app.logger.info(
+                f"[AUTO-SCAN] 완료: PT {pt_count}개 추출, DB {saved}건 저장 "
+                f"(추출률 {extract_rate}%)"
+            )
+
+            # 추출률 95% 미만이면 로그 경고 (실제 운영에서는 재촬영 알림)
+            if extract_rate < 95:
+                app.logger.warning(
+                    f"[AUTO-SCAN] ⚠️ 추출률 {extract_rate}% < 95% — 재촬영 권장"
+                )
+
+            # 처리 완료 파일은 uploads/로 이동 (drone_drop에서 제거)
+            dest = os.path.join(UPLOAD_DIR, fname)
+            os.rename(fpath, dest)
+
+        except Exception as e:
+            app.logger.error(f"[AUTO-SCAN] 분석 오류: {e}")
+
+    def _watcher_loop():
+        app.logger.info(
+            f"[AUTO-SCAN] 드론 자동 수신 폴더 감시 시작: {DRONE_DROP_DIR}"
+        )
+        while True:
+            try:
+                for fname in os.listdir(DRONE_DROP_DIR):
+                    fpath = os.path.join(DRONE_DROP_DIR, fname)
+                    ext = os.path.splitext(fname)[1].lower()
+                    if ext in VIDEO_EXTS and fpath not in seen:
+                        seen.add(fpath)
+                        # 별도 스레드에서 분석 (서버 블로킹 방지)
+                        t = threading.Thread(
+                            target=_process, args=(fpath,), daemon=True
+                        )
+                        t.start()
+            except Exception as e:
+                app.logger.error(f"[AUTO-SCAN] 감시 오류: {e}")
+            _wtime.sleep(5)  # 5초마다 폴더 확인
+
+    watcher = threading.Thread(target=_watcher_loop, daemon=True)
+    watcher.start()
+
+
+# ── drone_drop 폴더 수동 확인 API ────────────────────────────
+@app.route('/api/video-scan/auto-status', methods=['GET'])
+def auto_scan_status():
+    """drone_drop 폴더 상태 및 자동 처리 현황"""
+    VIDEO_EXTS = {'.mp4', '.avi', '.mov', '.mkv', '.webm', '.ts'}
+    try:
+        pending = [
+            f for f in os.listdir(DRONE_DROP_DIR)
+            if os.path.splitext(f)[1].lower() in VIDEO_EXTS
+        ]
+    except Exception:
+        pending = []
+
+    return jsonify({
+        'ok': True,
+        'drone_drop_dir': DRONE_DROP_DIR,
+        'pending_files': pending,
+        'pending_count': len(pending),
+        'message': (
+            '드론이 이 폴더에 영상을 전송하면 자동으로 분석이 시작됩니다. '
+            '연결 방법: rsync / FTP / Samba / DJI SDK'
+        ),
+        'connection_methods': {
+            'rsync': f'rsync -av /drone_video/ user@server:{DRONE_DROP_DIR}/',
+            'ftp':   f'vsftpd → local_root={DRONE_DROP_DIR}',
+            'samba': f'[drone_drop] path={DRONE_DROP_DIR} writable=yes',
+            'dji_sdk': 'MediaManager.fetchFileData() → POST /api/video-scan',
+        }
+    })
+
+
 if __name__ == '__main__':
     print("=" * 60)
     print("🏭 Warehouse AI Safety System")
@@ -2345,5 +2473,7 @@ if __name__ == '__main__':
     mail_status = "✅ 설정됨" if (MAIL_PASSWORD and MAIL_PASSWORD != 'placeholder_replace_with_apppassword') else "⚠️  데모 모드 (App Password 미설정)"
     print(f"📧 Email : {mail_status}")
     print("🖨️  MCP   : Auto-print scheduler active (see /mcp)")
+    print(f"📡 AUTO  : 드론 자동 수신 폴더 감시 중 → {DRONE_DROP_DIR}")
     print("=" * 60)
+    _start_drone_drop_watcher()   # ← 자동 감시 시작
     app.run(host='0.0.0.0', port=5002, debug=False)
