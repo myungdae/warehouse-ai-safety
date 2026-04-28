@@ -3199,8 +3199,8 @@ async function printArchivedReport(reportId) {
 // ══════════════════════════════════════════════════════════════
 
 async function renderVideoScanView(container) {
-    document.getElementById('pageTitle').textContent    = '🎥 드론 영상 스캔 (Batch 방식)';
-    document.getElementById('pageSubtitle').textContent = '영상 업로드 → PT번호 자동 추출 → ERP 비교 DB 저장';
+    document.getElementById('pageTitle').textContent    = '🎥 STEP 1 — 드론 비행 & 4K 영상 촬영';
+    document.getElementById('pageSubtitle').textContent = '드론 이륙 → Aisle별 4K 연속 촬영 → Dock 귀환 → Wi-Fi 자동 업로드 (촬영만 담당, 분석은 자동화 미션에서)';
 
     // 서버 기능 상태 확인
     let caps = { opencv: false, pyzbar: false, easyocr: false, ffmpeg: false };
@@ -3230,23 +3230,71 @@ async function renderVideoScanView(container) {
     container.innerHTML = `
     <div style="padding:24px;max-width:1100px;margin:0 auto">
 
-      <!-- 방식 설명 배너 -->
-      <div style="background:linear-gradient(135deg,rgba(16,185,129,0.12),rgba(6,182,212,0.10));
-                  border:1px solid rgba(16,185,129,0.3);border-radius:14px;padding:18px 22px;
-                  margin-bottom:22px;display:flex;gap:18px;align-items:flex-start">
-        <span style="font-size:2.2rem;flex-shrink:0">🚁</span>
-        <div>
-          <div style="font-size:1.05rem;font-weight:700;color:#34d399;margin-bottom:6px">
-            Batch 방식 (방법 A) — 권장 ✅
+      <!-- 역할 명확화 배너 — 2단계 구조 -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:22px">
+
+        <!-- STEP 1: 이 페이지 (촬영) -->
+        <div style="background:linear-gradient(135deg,rgba(16,185,129,0.15),rgba(6,182,212,0.10));
+                    border:2px solid #34d399;border-radius:14px;padding:16px 18px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+            <span style="background:#34d399;color:#000;font-size:0.7rem;font-weight:900;
+                         padding:2px 8px;border-radius:20px">STEP 1</span>
+            <span style="font-size:0.95rem;font-weight:700;color:#34d399">🎥 이 페이지 — 드론 비행 & 촬영</span>
           </div>
-          <div style="font-size:0.82rem;color:#94a3b8;line-height:1.65">
-            드론이 <strong style="color:#e2e8f0">고속 비행</strong>하며 창고 전체(15통로 × 20랙 × 15단 = 4,500위치)를 영상 촬영 →
-            비행 완료 후 영상을 서버에 업로드 → 서버가 <strong style="color:#e2e8f0">프레임별 바코드/OCR 분석</strong>으로
-            PT번호 추출 → ERP 비교 DB에 자동 저장.<br>
-            <span style="color:#fbbf24">⚡ 속도:</span> 비행 5~10분 + 서버 분석 2~3분 = 총 약 8~13분 (기존 하나씩 스캔 대비 80% 단축)<br>
-            <span style="color:#34d399">✅ 정확도:</span> 99%+ (바코드) / 95%+ (텍스트 OCR) — 흔들린 프레임 자동 제외, 복수 프레임 교차 검증
+          <div style="font-size:0.78rem;color:#94a3b8;line-height:1.7">
+            ① 드론 Dock 출발<br>
+            ② 15 Aisle × 4K 연속 촬영 (위→아래 sweep)<br>
+            ③ Dock 귀환 후 <strong style="color:#22d3ee">Wi-Fi 자동 업로드</strong><br>
+            <span style="color:#fbbf24">⏱ 약 10분 / 배터리 1개</span>
+          </div>
+          <div style="margin-top:10px;padding:8px 10px;background:rgba(34,211,238,0.08);
+                      border-radius:8px;border:1px solid rgba(34,211,238,0.2);
+                      font-size:0.73rem;color:#22d3ee">
+            📤 또는 아래에서 직접 영상 파일 업로드 가능
           </div>
         </div>
+
+        <!-- STEP 2: 자동화 미션 페이지 (분석) -->
+        <div style="background:linear-gradient(135deg,rgba(168,85,247,0.10),rgba(99,102,241,0.08));
+                    border:1px solid rgba(168,85,247,0.35);border-radius:14px;padding:16px 18px;
+                    cursor:pointer;transition:border-color .2s"
+             onclick="showView('agentmission')"
+             onmouseover="this.style.borderColor='#a855f7'"
+             onmouseout="this.style.borderColor='rgba(168,85,247,0.35)'">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+            <span style="background:#a855f7;color:#fff;font-size:0.7rem;font-weight:900;
+                         padding:2px 8px;border-radius:20px">STEP 2</span>
+            <span style="font-size:0.95rem;font-weight:700;color:#a78bfa">🤖 자동화 미션 — 분석 & ERP 동기화</span>
+          </div>
+          <div style="font-size:0.78rem;color:#94a3b8;line-height:1.7">
+            ① 영상 프레임 추출 → OpenCV/OCR<br>
+            ② PT번호 인식 → <strong style="color:#34d399">scan_events DB 저장</strong><br>
+            ③ ERP 재고와 자동 비교<br>
+            ④ 보고서 생성 → 경보 → ERP 자동 수정
+          </div>
+          <div style="margin-top:10px;padding:8px 10px;background:rgba(168,85,247,0.08);
+                      border-radius:8px;border:1px solid rgba(168,85,247,0.2);
+                      font-size:0.73rem;color:#a78bfa">
+            👆 클릭하여 자동화 미션 페이지로 이동 →
+          </div>
+        </div>
+      </div>
+
+      <!-- 흐름 화살표 -->
+      <div style="display:flex;align-items:center;justify-content:center;gap:10px;
+                  margin-bottom:20px;padding:10px;background:rgba(0,0,0,0.2);
+                  border-radius:10px;font-size:0.78rem">
+        <span style="color:#34d399;font-weight:700">🎥 촬영 완료</span>
+        <span style="color:#475569">→</span>
+        <span style="color:#22d3ee">📡 Wi-Fi 자동 전송</span>
+        <span style="color:#475569">→</span>
+        <span style="color:#a78bfa">🤖 서버 자동 분석</span>
+        <span style="color:#475569">→</span>
+        <span style="color:#fbbf24">💾 DB 저장</span>
+        <span style="color:#475569">→</span>
+        <span style="color:#f87171">🔄 ERP 비교·수정</span>
+        <span style="color:#475569">→</span>
+        <span style="color:#34d399;font-weight:700">✅ 완료</span>
       </div>
 
       <div style="display:grid;grid-template-columns:1fr 380px;gap:22px">
@@ -3766,9 +3814,9 @@ async function vsLoadSession(sessionId) {
 let _amPollTimer = null;   // 실시간 폴링 타이머
 
 async function renderAgentMissionView(container) {
-    document.getElementById('pageTitle').textContent    = '🤖 Agentic AI 자동화 미션';
+    document.getElementById('pageTitle').textContent    = '🤖 STEP 2 — 자동 분석 & ERP 동기화';
     document.getElementById('pageSubtitle').textContent =
-        '드론 이륙 → 영상 촬영 → PT번호 추출 → ERP 비교 → 보고서 → 경보 → ERP 동기화 (사람 개입 0)';
+        '영상 분석(PT추출) → scan_events DB 저장 → ERP 재고 비교 → 보고서 생성 → 경보 → ERP 자동 수정 (사람 개입 0)';
 
     // 폴링 중지 (뷰 전환 시)
     if (_amPollTimer) { clearInterval(_amPollTimer); _amPollTimer = null; }
@@ -3791,13 +3839,31 @@ async function renderAgentMissionView(container) {
     container.innerHTML = `
     <div style="padding:22px;max-width:1200px;margin:0 auto">
 
+      <!-- STEP 2 역할 명확화 -->
+      <div style="background:rgba(251,191,36,0.07);border:1px solid rgba(251,191,36,0.25);
+                  border-radius:12px;padding:12px 18px;margin-bottom:16px;
+                  display:flex;align-items:center;gap:14px">
+        <span style="font-size:1.6rem">🤖</span>
+        <div style="font-size:0.82rem;color:#94a3b8;line-height:1.6">
+          <strong style="color:#fbbf24">STEP 2 — 여기서 모든 분석이 자동으로 실행됩니다</strong><br>
+          드론이 촬영한 영상이 Wi-Fi로 서버에 도착하면 → 이 파이프라인이 자동 시작 →
+          <strong style="color:#34d399">PT번호 추출 → scan_events DB 저장 → ERP 비교 → 보고서 → 경보 → ERP 수정</strong>
+          까지 사람 개입 없이 완전 자동 처리됩니다.
+        </div>
+        <button onclick="showView('videoscan')"
+                style="flex-shrink:0;padding:6px 14px;border-radius:8px;border:1px solid rgba(52,211,153,0.4);
+                       background:rgba(52,211,153,0.1);color:#34d399;font-size:0.75rem;cursor:pointer">
+          ← STEP1 촬영으로
+        </button>
+      </div>
+
       <!-- 파이프라인 다이어그램 -->
       <div style="background:linear-gradient(135deg,rgba(168,85,247,0.1),rgba(99,102,241,0.08));
                   border:1px solid rgba(168,85,247,0.25);border-radius:14px;
                   padding:18px 22px;margin-bottom:20px">
         <div style="font-size:0.78rem;color:#a78bfa;font-weight:700;margin-bottom:14px;
                     text-transform:uppercase;letter-spacing:0.06em">
-          🔄 완전 자동화 파이프라인 (사람 개입 0)
+          🔄 STEP 2 완전 자동화 파이프라인 (사람 개입 0)
         </div>
         <div style="display:flex;align-items:center;gap:0;flex-wrap:wrap;row-gap:10px">
           ${[
