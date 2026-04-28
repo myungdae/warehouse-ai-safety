@@ -1,0 +1,21 @@
+# Warehouse AI Safety System — Python dependencies
+# 설치: python3 -m venv venv && venv/bin/pip install -r requirements.txt
+
+# ── Web Framework ──────────────────────────────────────────────
+flask>=3.0.0
+flask-cors>=4.0.0
+gunicorn>=21.2.0
+python-dotenv>=1.0.0
+
+# ── 영상 분석 — 드론 Batch 스캔 (PT번호 추출) ──────────────────
+# 1순위: OpenCV + pyzbar (바코드/QR 인식, CPU만으로 99%+ 정확도)
+opencv-python-headless>=4.9.0.80
+pyzbar>=0.1.9
+
+# 2순위: EasyOCR (텍스트 OCR, 바코드 없는 경우 fallback)
+# GPU 없어도 CPU로 동작 (느리지만 on-prem에서 충분)
+easyocr>=1.7.1
+
+# ── 유틸리티 ───────────────────────────────────────────────────
+Pillow>=10.0.0
+requests>=2.31.0

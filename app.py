@@ -2,6 +2,7 @@
 """
 Warehouse AI Safety System - Flask Application
 Real-time sensor monitoring dashboard + Drone Inventory Intelligence
++ Agentic AI Orchestrator (완전 자동화 재고 파이프라인)
 """
 
 from flask import Flask, render_template, send_from_directory, request, jsonify, send_file
@@ -17,6 +18,15 @@ import uuid
 import threading
 import socket
 import subprocess
+
+# ── Agentic AI Orchestrator 로드 ───────────────────────────────
+try:
+    import agent_orchestrator as _agent
+    AGENT_AVAILABLE = True
+    print("[App] ✅ Agentic AI Orchestrator 로드 완료")
+except Exception as _ae:
+    AGENT_AVAILABLE = False
+    print(f"[App] ⚠️  Agentic AI Orchestrator 로드 실패: {_ae}")
 
 try:
     from dotenv import load_dotenv
@@ -1209,6 +1219,20 @@ def _mcp_scheduler_tick():
                 _save_mcp_config(cfg)
                 with _scheduler_lock:
                     _last_sched_date['patrol'] = today_str
+
+                # ── Agentic AI 전체 자동 미션 트리거 ──────────────
+                if AGENT_AVAILABLE:
+                    try:
+                        _agent.run_mission_async(trigger='scheduler_nightly')
+                        print(f"[MCP Scheduler] 🤖 Agentic AI 미션 자동 시작")
+                        _append_mcp_log({
+                            "timestamp": now.isoformat(),
+                            "triggered_by": "scheduler",
+                            "status": "agent_mission_started",
+                            "message": "Agentic AI 전체 자동화 미션 시작 (드론→스캔→ERP비교→보고서→경보)",
+                        })
+                    except Exception as ae:
+                        print(f"[MCP Scheduler] Agent 미션 시작 실패: {ae}")
         except Exception as e:
             print(f"[MCP Scheduler] Error in patrol check: {e}")
 
@@ -1747,6 +1771,171 @@ def compare_history():
                 ORDER BY compared_at DESC LIMIT ?
             ''', (limit,)).fetchall()
         return jsonify({'ok': True, 'history': [dict(r) for r in rows]})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+# ══════════════════════════════════════════════════════════════
+# AGENTIC AI API — 완전 자동화 미션 제어
+# ══════════════════════════════════════════════════════════════
+
+@app.route('/api/agent/mission/start', methods=['POST'])
+def agent_mission_start():
+    """
+    Agentic AI 전체 자동화 미션 수동 시작
+    Body (선택): { "video_path": "/path/to/video.mp4" }
+    → 드론제어 → 영상분석 → ERP비교 → 보고서 → 경보 → ERP동기화
+    """
+    if not AGENT_AVAILABLE:
+        return jsonify({'ok': False, 'error': 'Agent 모듈 로드 실패'}), 503
+    try:
+        body       = request.get_json(force=True) or {}
+        video_path = body.get('video_path')
+        mission_id = _agent.run_mission_async(trigger='manual', video_path=video_path)
+        return jsonify({
+            'ok': True,
+            'mission_id': mission_id,
+            'message': '🤖 Agentic AI 미션 시작 — 백그라운드 실행 중',
+            'monitor': f'/api/agent/mission/{mission_id}'
+        })
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@app.route('/api/agent/mission/<mission_id>', methods=['GET'])
+def agent_mission_detail(mission_id):
+    """미션 상세 조회 (단계별 실시간 로그)"""
+    if not AGENT_AVAILABLE:
+        return jsonify({'ok': False, 'error': 'Agent 모듈 로드 실패'}), 503
+    try:
+        detail = _agent.get_mission_detail(mission_id)
+        if not detail:
+            return jsonify({'ok': False, 'error': '미션을 찾을 수 없음'}), 404
+        return jsonify({'ok': True, 'mission': detail})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@app.route('/api/agent/missions', methods=['GET'])
+def agent_mission_list():
+    """미션 목록 조회"""
+    if not AGENT_AVAILABLE:
+        return jsonify({'ok': False, 'missions': [], 'agent_available': False})
+    try:
+        limit    = int(request.args.get('limit', 20))
+        missions = _agent.get_mission_list(limit)
+        return jsonify({'ok': True, 'missions': missions, 'agent_available': True})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@app.route('/api/agent/config', methods=['GET'])
+def agent_config_get():
+    """Agent 설정 조회"""
+    if not AGENT_AVAILABLE:
+        return jsonify({'ok': False, 'error': 'Agent 모듈 로드 실패'}), 503
+    return jsonify({'ok': True, 'config': _agent.load_agent_config()})
+
+
+@app.route('/api/agent/config', methods=['POST'])
+def agent_config_set():
+    """Agent 설정 변경"""
+    if not AGENT_AVAILABLE:
+        return jsonify({'ok': False, 'error': 'Agent 모듈 로드 실패'}), 503
+    try:
+        body = request.get_json(force=True) or {}
+        cfg  = _agent.load_agent_config()
+        allowed = [
+            'auto_mission_enabled', 'mission_cron', 'drone_host', 'drone_port',
+            'flight_speed_ms', 'flight_levels_per_pass',
+            'warehouse_aisles', 'warehouse_racks', 'warehouse_levels',
+            'fps_sample', 'pt_confidence_min',
+            'rescan_threshold_pct', 'erp_mismatch_alert_pct', 'erp_auto_sync_pct',
+            'alert_email', 'printer_ip', 'printer_port',
+        ]
+        for k in allowed:
+            if k in body:
+                cfg[k] = body[k]
+        _agent.save_agent_config(cfg)
+        return jsonify({'ok': True, 'config': cfg})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@app.route('/api/agent/erp-queue', methods=['GET'])
+def agent_erp_queue():
+    """ERP 동기화 승인 대기 큐 조회"""
+    if not AGENT_AVAILABLE:
+        return jsonify({'ok': False, 'queue': []})
+    try:
+        queue = _agent.get_erp_sync_queue()
+        return jsonify({'ok': True, 'queue': queue, 'count': len(queue)})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@app.route('/api/agent/erp-queue/approve', methods=['POST'])
+def agent_erp_queue_approve():
+    """ERP 동기화 승인 (관리자 확인 후 ERP 수정)"""
+    if not AGENT_AVAILABLE:
+        return jsonify({'ok': False, 'error': 'Agent 모듈 로드 실패'}), 503
+    try:
+        body       = request.get_json(force=True) or {}
+        mission_id = body.get('mission_id')
+        updated    = 0
+
+        queue = _agent.get_erp_sync_queue()
+        for entry in queue:
+            if entry.get('mission_id') == mission_id or not mission_id:
+                mismatches = entry.get('mismatches', [])
+                with get_db() as conn:
+                    for m in mismatches:
+                        if m['type'] == 'qty_mismatch':
+                            conn.execute(
+                                "UPDATE erp_inventory SET qty=?, last_updated=? WHERE pt_number=?",
+                                (m['scan_qty'], datetime.now().isoformat(), m['pt'])
+                            )
+                            updated += 1
+                    conn.commit()
+                entry['status'] = 'approved'
+
+        # 큐 업데이트
+        import os as _os
+        queue_file = _os.path.join(REPORT_ARCHIVE_DIR, 'erp_sync_queue.json')
+        with open(queue_file, 'w') as f:
+            json.dump(queue, f, ensure_ascii=False, indent=2)
+
+        return jsonify({'ok': True, 'updated': updated,
+                        'message': f'ERP {updated}건 수정 완료'})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@app.route('/api/agent/status', methods=['GET'])
+def agent_status():
+    """Agent 전체 상태 요약"""
+    try:
+        missions   = _agent.get_mission_list(5) if AGENT_AVAILABLE else []
+        queue      = _agent.get_erp_sync_queue() if AGENT_AVAILABLE else []
+        cfg        = _agent.load_agent_config()  if AGENT_AVAILABLE else {}
+
+        running = [m for m in missions if m.get('status') == 'running']
+        last    = missions[0] if missions else None
+
+        return jsonify({
+            'ok': True,
+            'agent_available': AGENT_AVAILABLE,
+            'running_missions': len(running),
+            'last_mission': {
+                'id':          last['id']          if last else None,
+                'status':      last['status']      if last else None,
+                'started_at':  last['started_at']  if last else None,
+                'finished_at': last['finished_at'] if last else None,
+            } if last else None,
+            'erp_queue_pending': sum(1 for q in queue if q.get('status') == 'pending_approval'),
+            'auto_mission_enabled': cfg.get('auto_mission_enabled', False),
+            'mission_cron': cfg.get('mission_cron', '02:00'),
+        })
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)}), 500
 
