@@ -67,6 +67,12 @@ WAREHOUSE.docks = [
 
 const DRONE = { size: 12, speed: 8.0, scanRadius: 40, batteryDrainRate: 0.005 };  // 4K Batch sweep — 고속 연속 촬영
 
+// ── 배터리 교대 설정 ──────────────────────────────────────────────
+// DJI M30: 최대 41분, 안전 비행 ~30분
+// 15 Aisle / 30분 → 1 Aisle당 ~2분 → 배터리 1개당 8 Aisle 커버
+// Battery-1: Aisle 1~8 (DRONE-01), Battery-2: Aisle 9~15 (DRONE-02)
+const BATTERY_SWAP_AISLE = 8;   // 이 Aisle 완료 후 Dock 귀환 → 배터리 교체 → DRONE-02 출발
+
 // ── Shelves 자동 생성 (15 aisles × 20 racks × 15 levels × 2 sides) ──────────────────────
 WAREHOUSE.aisles.forEach(aisle => {
     const rackCount = 20; // 각 aisle당 20개 rack
@@ -196,6 +202,11 @@ let state = {
     patrolPath: [],      // 방문할 선반 순서
     pathIndex: 0,
     scanQueue: [],
+
+    // 배터리 교대 상태
+    batteryNum:  1,          // 현재 배터리 번호 (1 or 2)
+    droneId:     'DRONE-01', // 현재 투입 드론 ID
+    swapPending: false,      // 배터리 교대 대기 중 플래그
 
     scanEvents: [],      // Day1 스캔 결과
     scanEventsDay2: [],  // Day2 스캔 결과
@@ -471,7 +482,7 @@ function renderPatrolView(content) {
                     </div>
                     <div class="ms-item">
                         <div class="ms-val" id="ms-battery">100%</div>
-                        <div class="ms-label">배터리</div>
+                        <div class="ms-label">배터리 잔량</div>
                     </div>
                     <div class="ms-item">
                         <div class="ms-val" id="ms-aisle">—</div>
@@ -486,6 +497,43 @@ function renderPatrolView(content) {
                     <div class="ms-item">
                         <div class="ms-val" id="ms-layerpct">0%</div>
                         <div class="ms-label">Layer 진행</div>
+                    </div>
+                </div>
+
+                <!-- 배터리 교대 현황 표시 바 -->
+                <div style="margin-top:8px;padding:8px;background:rgba(251,191,36,0.07);
+                            border:1px solid rgba(251,191,36,0.2);border-radius:8px">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+                        <div style="display:flex;align-items:center;gap:5px">
+                            <span style="font-size:0.7rem;color:#64748b;font-weight:600">드론 ID</span>
+                            <span id="sb-droneId" style="font-size:0.82rem;font-weight:700;color:#34d399;
+                                  font-family:monospace">DRONE-01</span>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:5px">
+                            <span id="sb-batteryNum" style="font-size:0.72rem;font-weight:600;
+                                  color:#fbbf24;background:rgba(251,191,36,0.15);
+                                  padding:2px 7px;border-radius:12px">Battery 1/2</span>
+                        </div>
+                        <div style="font-size:0.68rem;color:#64748b">
+                            A1~A8 → <span style="color:#fbbf24">교대</span> → A9~A15
+                        </div>
+                    </div>
+                    <!-- 15개 통로 진행 막대 -->
+                    <div style="display:flex;gap:2px;margin-top:6px">
+                        ${Array.from({length:15},(_,i)=>`
+                        <div id="aisle-prog-${i+1}" title="A${i+1}"
+                             style="flex:1;height:6px;border-radius:2px;
+                                    background:rgba(255,255,255,0.06);
+                                    border:1px solid ${i<BATTERY_SWAP_AISLE?'rgba(251,191,36,0.3)':'rgba(34,211,238,0.3)'}">
+                            <div id="aisle-prog-fill-${i+1}" style="width:0%;height:100%;
+                                 border-radius:2px;
+                                 background:${i<BATTERY_SWAP_AISLE?'#fbbf24':'#22d3ee'};
+                                 transition:width 0.4s"></div>
+                        </div>`).join('')}
+                    </div>
+                    <div style="display:flex;justify-content:space-between;margin-top:2px;font-size:0.58rem;color:#475569">
+                        <span>A1 ─────── Battery-1 ──────── A8</span>
+                        <span>A9 ─── Battery-2 ─── A15</span>
                     </div>
                 </div>
 
@@ -709,49 +757,42 @@ function createSVG(tag, attrs) {
 
 // ── Patrol Control ─────────────────────────────────────────────
 // Batch 4K Camera Sweep:
-//   Dock(A1 상단 입구) → A1 하단 끝까지 sweep → U턴 → A1 상단 복귀
-//   → A2 상단 이동 → A2 sweep ... → A15 완료 → Dock 복귀
+//   [DRONE-01 / Battery-1] Dock → A1~A8 sweep → Dock 복귀 → 배터리 교대 (3분)
+//   [DRONE-02 / Battery-2] Dock → A9~A15 sweep → Dock 복귀 → 완료
 //   각 Aisle당 waypoint 3개만 (smooth 연속 이동, 랙별 멈춤 없음)
 function buildPatrolPath() {
     const path = [];
-    const mode = SCAN_CONFIG.scanMode;
-
-    // Dock 출발점 (Aisle-1 상단 입구 바로 위)
     const dockX = DOCK_X;
-    const dockY = DOCK_Y + 24;  // Dock 하단에서 출발
+    const dockY = DOCK_Y + 24;  // Dock 하단 (출발/복귀 지점)
 
     WAREHOUSE.aisles.forEach((aisle, ai) => {
-        const cx    = aisle.x + aisle.w / 2;   // Aisle 중앙 x
-        const topY  = aisle.y + 5;              // Aisle 입구 상단
-        const botY  = aisle.y + aisle.h - 5;   // Aisle 끝 하단
+        const cx   = aisle.x + aisle.w / 2;   // Aisle 중앙 x
+        const topY = aisle.y + 5;              // Aisle 입구 상단
+        const botY = aisle.y + aisle.h - 5;   // Aisle 끝 하단
+        const aisleNum = parseInt(aisle.id);
 
         // ① Aisle 입구 상단으로 이동
-        path.push({
-            type: 'move',
-            x: cx, y: topY,
-            aisle: aisle.id,
-            label: `A${aisle.id} 진입`
-        });
+        path.push({ type: 'move', x: cx, y: topY, aisle: aisle.id, label: `A${aisle.id} 진입` });
 
-        // ② 아래로 sweep (상단 → 하단, 4K 촬영 중)
-        path.push({
-            type: 'sweep_down',
-            x: cx, y: botY,
-            aisle: aisle.id,
-            label: `A${aisle.id} 아래로 촬영`
-        });
+        // ② 아래로 sweep (4K 촬영)
+        path.push({ type: 'sweep_down', x: cx, y: botY, aisle: aisle.id, label: `A${aisle.id} 하향 촬영` });
 
-        // ③ U턴 후 위로 복귀 (하단 → 상단 입구)
-        path.push({
-            type: 'sweep_up',
-            x: cx, y: topY,
-            aisle: aisle.id,
-            label: `A${aisle.id} 위로 복귀`
-        });
+        // ③ U턴 후 위로 복귀
+        path.push({ type: 'sweep_up', x: cx, y: topY, aisle: aisle.id, label: `A${aisle.id} U턴 복귀` });
+
+        // ④ Battery-1 → Battery-2 교대 지점 (Aisle 8 완료 후)
+        if (aisleNum === BATTERY_SWAP_AISLE) {
+            // Aisle 8 완료 → Dock 복귀 (배터리 교체)
+            path.push({ type: 'return_to_dock', x: dockX, y: dockY, aisle: null, label: '배터리 교체 Dock 복귀' });
+            // 배터리 교대 이벤트 (애니메이션 일시 정지 후 자동 재개)
+            path.push({ type: 'battery_swap', x: dockX, y: dockY, aisle: null, label: '배터리 교대 · DRONE-02 준비' });
+            // DRONE-02 출발 (Dock → A9 입구)
+            path.push({ type: 'drone02_start', x: dockX, y: dockY, aisle: null, label: 'DRONE-02 출발' });
+        }
     });
 
-    // 모든 Aisle 완료 후 Dock으로 귀환
-    path.push({ type: 'dock', x: dockX, y: dockY, aisle: null, label: 'Dock 귀환' });
+    // 모든 Aisle 완료 후 최종 Dock 귀환
+    path.push({ type: 'dock', x: dockX, y: dockY, aisle: null, label: 'DRONE-02 Dock 귀환' });
     return path;
 }
 
@@ -770,28 +811,31 @@ function startPatrol() {
         return;
     }
 
-    state.patrolActive = true;
-    state.patrolPath   = buildPatrolPath();
-    state.pathIndex    = 0;
+    state.patrolActive   = true;
+    state.patrolPath     = buildPatrolPath();
+    state.pathIndex      = 0;
     state.scannedShelves = new Set();
-    state.scanCooldown = 0;
+    state.scanCooldown   = 0;
+    state.batteryNum     = 1;        // 현재 배터리 번호 (1 or 2)
+    state.droneId        = 'DRONE-01'; // 현재 투입 드론
+    state.swapPending    = false;    // 배터리 교대 대기 중 플래그
     SCAN_CONFIG.activeLayerIdx = SCAN_CONFIG.startLayer;
 
     const btn = document.getElementById('patrolBtn');
     if (btn) { btn.textContent = '⏸ 순찰 중지'; btn.className = 'btn-start stop'; }
 
     updateSidebarDroneState('비행 중', 'status-flying');
+    updateDroneIdDisplay();
     updateLayerIndicator(SCAN_CONFIG.startLayer);
 
-    const startLyr = LAYERS[SCAN_CONFIG.startLayer];
-    const endLyr   = LAYERS[SCAN_CONFIG.endLayer];
-    const totalLayers = SCAN_CONFIG.endLayer - SCAN_CONFIG.startLayer + 1;
-    const modeStr  = getScanModeName();
     addFeed(
-        `🚁 DRONE-01 Batch 4K 스윕 시작 — Day ${state.currentDay} (${DAY_DATES[state.currentDay]})<br>` +
+        `🚁 <b>DRONE-01</b> Batch 4K 스윕 시작 — Day ${state.currentDay} (${DAY_DATES[state.currentDay]})<br>` +
         `<span style="font-size:0.75rem;color:#94a3b8">` +
-        `📹 15 Aisle × 20 Rack × 15 Level 연속 촬영 · 속도: 2.5 m/s · ` +
-        `방향: <b style="color:#34d399">Aisle 상단→하단 U턴 반복</b></span>`,
+        `📹 15 Aisle × 20 Rack × 15 Level 연속 촬영 · 속도: 2.5 m/s<br>` +
+        `🔋 <b style="color:#fbbf24">배터리 계획:</b> ` +
+        `Battery-1 (DRONE-01: A1~A8 · ~25분) → ` +
+        `<b style="color:#22d3ee">배터리 교대 3분</b> → ` +
+        `Battery-2 (DRONE-02: A9~A15 · ~20분)</span>`,
         'agent-action'
     );
 
@@ -810,7 +854,10 @@ function stopPatrol() {
 
 function resetPatrol() {
     stopPatrol();
-    state.drone = { x: DOCK_X, y: DOCK_Y + 24, angle: 0, battery: 100 };
+    state.drone    = { x: DOCK_X, y: DOCK_Y + 24, angle: 0, battery: 100 };
+    state.batteryNum  = 1;
+    state.droneId     = 'DRONE-01';
+    state.swapPending = false;
     state.pathIndex = 0;
     state.scannedShelves = new Set();
     state.scanEvents = [];
@@ -865,19 +912,48 @@ function droneLoop() {
             if (aisleEl) aisleEl.textContent = `Aisle-${target.aisle}`;
             updateSidebarAisle(target.aisle);
             addFeed(
-                `📹 <b>Aisle-${target.aisle}</b> 하향 촬영 완료 — 20랙 × 15단 스캔`,
+                `📹 <b style="color:#22d3ee">[${state.droneId}]</b> ` +
+                `<b>Aisle-${target.aisle}</b> 하향 촬영 완료 — 20랙 × 15단 스캔`,
                 'agent-action'
             );
         } else if (target.type === 'sweep_up') {
-            // Aisle 상단 복귀 — 이미 스캔됨, 다음 Aisle로 이동
             addFeed(
                 `↩ <b>Aisle-${target.aisle}</b> U턴 복귀 → 다음 통로로`,
                 'scan-item'
             );
         } else if (target.type === 'move') {
-            // Aisle 입구 진입
             const aisleEl = document.getElementById('ms-aisle');
             if (aisleEl) aisleEl.textContent = `Aisle-${target.aisle}`;
+        } else if (target.type === 'return_to_dock') {
+            // Battery-1 완료 — Dock 복귀 중
+            updateSidebarDroneState('Dock 복귀 중', 'status-standby');
+            addFeed(
+                `🏠 <b style="color:#fbbf24">[DRONE-01]</b> A1~A${BATTERY_SWAP_AISLE} 완료 — ` +
+                `Dock 귀환 중 (배터리 교체 준비)`,
+                'scan-item'
+            );
+        } else if (target.type === 'battery_swap') {
+            // 배터리 교대 이벤트 → 3초 동안 교대 UI 표시 후 자동 재개
+            state.patrolActive = false;  // 일시 중단
+            updateSidebarDroneState('배터리 교대 중', 'status-charging');
+            showBatterySwapUI(() => {
+                // 교대 완료 → DRONE-02로 전환
+                state.batteryNum = 2;
+                state.droneId    = 'DRONE-02';
+                state.drone.battery = 100;   // 새 배터리 100%
+                state.patrolActive = true;
+                updateSidebarDroneState('비행 중', 'status-flying');
+                updateDroneIdDisplay();
+                state.pathIndex++;
+                state.animFrame = requestAnimationFrame(droneLoop);
+            });
+            return;  // droneLoop 루프 멈춤 (showBatterySwapUI 콜백에서 재개)
+        } else if (target.type === 'drone02_start') {
+            addFeed(
+                `🚁 <b style="color:#22d3ee">[DRONE-02]</b> Battery-2 장착 완료 — ` +
+                `A${BATTERY_SWAP_AISLE + 1}~A15 연속 촬영 시작`,
+                'agent-action'
+            );
         } else if (target.type === 'dock') {
             updateSidebarDroneState('충전 중', 'status-charging');
         }
@@ -924,6 +1000,83 @@ function colorShelvesNearDrone(aisleId, droneY, radius) {
             }
         }
     });
+}
+
+// ── 배터리 교대 UI (3초 카운트다운 후 자동 재개) ─────────────────
+function showBatterySwapUI(onComplete) {
+    // 피드에 배터리 교대 카드 삽입
+    const swapId = 'battery-swap-card-' + Date.now();
+    addFeed(
+        `<div id="${swapId}" style="background:rgba(251,191,36,0.12);border:2px solid #fbbf24;
+         border-radius:10px;padding:12px;text-align:center">
+         <div style="font-size:1.1rem;font-weight:700;color:#fbbf24;margin-bottom:6px">
+           🔋 배터리 교대 중 — DRONE-01 → DOCK 복귀
+         </div>
+         <div style="font-size:0.8rem;color:#94a3b8;margin-bottom:8px">
+           A1~A${BATTERY_SWAP_AISLE} 촬영 완료 (Battery-1 소진)<br>
+           충전된 DRONE-02 투입 준비 중...
+         </div>
+         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:0.72rem;margin-bottom:8px">
+           <div style="background:rgba(248,113,113,0.15);border-radius:6px;padding:6px">
+             <div style="color:#f87171;font-weight:600">DRONE-01</div>
+             <div style="color:#64748b">착륙 / 배터리 교체</div>
+           </div>
+           <div style="background:rgba(34,211,238,0.15);border-radius:6px;padding:6px">
+             <div style="color:#22d3ee;font-weight:600">DRONE-02</div>
+             <div style="color:#64748b">배터리 100% 충전 완료</div>
+           </div>
+           <div style="background:rgba(52,211,153,0.15);border-radius:6px;padding:6px">
+             <div style="color:#34d399;font-weight:600">다음 구간</div>
+             <div style="color:#64748b">A${BATTERY_SWAP_AISLE+1}~A15 (7개 통로)</div>
+           </div>
+         </div>
+         <div id="${swapId}-timer" style="font-size:1.4rem;font-weight:700;color:#fbbf24">
+           교대 준비 중... ⏳ 3
+         </div>
+        </div>`,
+        'alert-item'
+    );
+
+    // 3초 카운트다운
+    let countdown = 3;
+    const tick = () => {
+        countdown--;
+        const timerEl = document.getElementById(`${swapId}-timer`);
+        if (timerEl) {
+            if (countdown > 0) {
+                timerEl.innerHTML = `교대 준비 중... ⏳ ${countdown}`;
+                setTimeout(tick, 1000);
+            } else {
+                timerEl.innerHTML = `✅ DRONE-02 출발!`;
+                timerEl.style.color = '#34d399';
+                setTimeout(() => {
+                    addFeed(
+                        `🔋 <b style="color:#22d3ee">배터리 교대 완료</b> — ` +
+                        `<b>DRONE-02</b> Battery-2 (100%) 장착 · A${BATTERY_SWAP_AISLE+1}~A15 촬영 시작`,
+                        'agent-action'
+                    );
+                    onComplete();
+                }, 500);
+            }
+        }
+    };
+    setTimeout(tick, 1000);
+}
+
+// ── 사이드바 드론 ID 표시 업데이트 ───────────────────────────────
+function updateDroneIdDisplay() {
+    const el = document.getElementById('sb-droneId');
+    if (!el) return;
+    const isBat2 = state.batteryNum === 2;
+    el.textContent  = state.droneId;
+    el.style.color  = isBat2 ? '#22d3ee' : '#34d399';
+    el.title        = isBat2 ? 'Battery-2 (A9~A15)' : 'Battery-1 (A1~A8)';
+
+    const batEl = document.getElementById('sb-batteryNum');
+    if (batEl) {
+        batEl.textContent = `Battery ${state.batteryNum}/2`;
+        batEl.style.color = isBat2 ? '#22d3ee' : '#fbbf24';
+    }
 }
 
 // ── Batch Sweep 중 Aisle 전체 선반 일괄 스캔 (도달 시 DB 이벤트) ──
@@ -979,8 +1132,14 @@ function processSweepAisle(aisleId, direction) {
     const pb = document.getElementById('missionProgress');
     if (pb) pb.style.width = pct + '%';
 
+    // 통로별 진행 막대 업데이트
+    const aisleNum = parseInt(aisleId);
+    const aisleProgFill = document.getElementById(`aisle-prog-fill-${aisleNum}`);
+    if (aisleProgFill) aisleProgFill.style.width = '100%';
+
     addFeed(
-        `📦 Aisle-${aisleId} 스캔: <b style="color:#34d399">${count}개</b> 위치 — 진행 ${pct}%`,
+        `📦 <b style="color:#94a3b8">[${state.droneId}]</b> ` +
+        `Aisle-${aisleId} 스캔: <b style="color:#34d399">${count}개</b> 위치 — 전체 진행 ${pct}%`,
         'scan-item', scanTime
     );
 }
@@ -992,6 +1151,12 @@ function updateDroneElement() {
     const x = state.drone.x;
     const y = state.drone.y;
 
+    // DRONE-01: 청록색(#22d3ee), DRONE-02: 오렌지(#f97316) — 배터리 구분
+    const isDrone02  = state.batteryNum === 2;
+    const propColor  = isDrone02 ? 'rgba(249,115,22,0.4)' : 'rgba(34,211,238,0.4)';
+    const propStroke = isDrone02 ? '#f97316' : '#22d3ee';
+    const ledColor   = isDrone02 ? '#f97316' : '#22d3ee';
+
     // 드론 위치 업데이트 (모든 자식 요소 이동)
     const children = droneEl.children;
     // 프로펠러 4개
@@ -999,10 +1164,13 @@ function updateDroneElement() {
     for (let i = 0; i < 4; i++) {
         children[i].setAttribute('cx', x + propOffsets[i][0]);
         children[i].setAttribute('cy', y + propOffsets[i][1]);
+        children[i].setAttribute('fill', propColor);
+        children[i].setAttribute('stroke', propStroke);
     }
     // 중심 + LED
     children[4].setAttribute('cx', x); children[4].setAttribute('cy', y);
     children[5].setAttribute('cx', x); children[5].setAttribute('cy', y);
+    children[5].setAttribute('fill', ledColor);
 
     // 스캔 빔 위치
     if (state.scanBeamEl) {
@@ -1151,11 +1319,18 @@ function updateMissionStats() {
     if (pb) pb.style.width = pct + '%';
 
     const bat = document.getElementById('ms-battery');
-    if (bat) bat.textContent = state.drone.battery.toFixed(0) + '%';
+    if (bat) {
+        const batPct = state.drone.battery.toFixed(0);
+        bat.textContent = batPct + '%';
+        bat.style.color = state.drone.battery < 20 ? '#f87171' : (state.drone.battery < 50 ? '#fbbf24' : '#34d399');
+    }
     const sbBat = document.getElementById('sb-battery');
     if (sbBat) sbBat.textContent = state.drone.battery.toFixed(0) + '%';
     const sbScan = document.getElementById('sb-scanCount');
     if (sbScan) sbScan.textContent = state.scannedShelves.size;
+
+    // 드론 ID / 배터리 번호 업데이트 (교대 시 반영)
+    updateDroneIdDisplay();
 }
 
 function updateSidebarDroneState(text, cls) {
