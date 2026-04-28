@@ -1623,7 +1623,7 @@ function runPostFlightPipeline(isDay1) {
         { icon: '🔤', label: 'EasyOCR PT번호 추출',        delay: 2700, color: '#fbbf24' },
         { icon: '💾', label: 'scan_events DB 저장',        delay: 3600, color: '#6366f1' },
         { icon: '🔄', label: 'ERP 비교 분석',              delay: 4500, color: '#f87171' },
-        { icon: '📊', label: isDay1 ? '스캔 완료 보고서 생성' : 'Agentic AI 판단 시작', delay: 5400, color: '#fb923c' },
+        { icon: '📊', label: isDay1 ? 'Day1 기준재고 DB 저장 + 초기 ERP 비교' : 'Agentic AI 판단 + ERP 자동 동기화', delay: 5400, color: '#fb923c' },
     ];
 
     addFeed(
@@ -1675,25 +1675,29 @@ function runPostFlightPipeline(isDay1) {
                <span style="color:#e2e8f0;font-weight:600">scan_events 완료</span>
                <span style="color:#64748b">🔄 ERP 비교</span>
                <span style="color:#e2e8f0;font-weight:600">자동 완료</span>
+               <span style="color:#64748b">🤖 Agentic AI</span>
+               <span style="color:#a78bfa;font-weight:600">${isDay1 ? '기준재고 구축' : '변화 감지 분석'}</span>
+             </div>
+             <div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.07);
+                         font-size:0.7rem;color:#64748b">
+               ${isDay1
+                 ? '📅 Day 1 기준재고 완료 — Day 2 순찰 후 전일 대비 변화 감지'
+                 : '🎯 전일 대비 불일치 분석 + ERP 자동 업데이트 완료'}
              </div>
              </div>`,
             'agent-action'
         );
 
-        // Day2면 Agentic AI 자동 실행
-        if (!isDay1) {
-            setTimeout(() => {
-                addFeed('🤖 Agentic AI: 재고 비교 분석 시작...', 'agent-action');
-                runInventoryComparison();
-                setTimeout(() => runAgenticAI(), 800);
-            }, 600);
-        } else {
+        // Day1/Day2 모두 ERP 비교 → Agentic AI 자동 실행
+        setTimeout(() => {
             addFeed(
-                `<span style="color:#fbbf24">📅 Day 2로 전환하여 다음날 순찰을 시작하세요.</span><br>
-                 <span style="font-size:0.72rem;color:#64748b">또는 영상 스캔 메뉴에서 실제 드론 영상을 업로드하세요.</span>`,
-                ''
+                `🤖 <b style="color:#a78bfa">Agentic AI</b>: ` +
+                `${isDay1 ? 'Day1 기준 재고 DB 구축 + ERP 초기 비교' : '전일 대비 변화 감지 분석'} 시작...`,
+                'agent-action'
             );
-        }
+            runInventoryComparison();
+            setTimeout(() => runAgenticAI(), 800);
+        }, 600);
     }, totalDelay);
 }
 
