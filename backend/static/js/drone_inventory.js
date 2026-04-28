@@ -58,12 +58,14 @@ for (let i = 0; i < 15; i++) {
     });
 }
 
-// Dock 위치 — 왼쪽 상단 (창고 입구 기준)
+// Dock 위치 — Aisle-1 입구 바로 위 (상단 입구)
+const DOCK_X = 60 + 0 * 88 + 35;  // Aisle-1 중앙 x = 60 + 35 = 95
+const DOCK_Y = 22;                  // Aisle 상단(y=50) 위 → y=22
 WAREHOUSE.docks = [
-    { id: 1, name: 'Dock A',  x: 20, y: 18,  w: 35, h: 55, color: '#f87171', aisles: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15] },
+    { id: 1, name: 'Dock A', x: DOCK_X - 18, y: DOCK_Y, w: 36, h: 24, color: '#f87171', aisles: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15] },
 ];
 
-const DRONE = { size: 12, speed: 2.0, scanRadius: 40, batteryDrainRate: 0.037 };  // 27분에 100% 소모
+const DRONE = { size: 12, speed: 8.0, scanRadius: 40, batteryDrainRate: 0.005 };  // 4K Batch sweep — 고속 연속 촬영
 
 // ── Shelves 자동 생성 (15 aisles × 20 racks × 15 levels × 2 sides) ──────────────────────
 WAREHOUSE.aisles.forEach(aisle => {
@@ -189,7 +191,7 @@ let state = {
     patrolDone:   false,
     day2PatrolDone: false,
 
-    drone: { x: 28, y: 240, angle: 0, battery: 100 },
+    drone: { x: DOCK_X, y: DOCK_Y + 24, angle: 0, battery: 100 },
     droneTarget: null,
     patrolPath: [],      // 방문할 선반 순서
     pathIndex: 0,
@@ -434,12 +436,13 @@ function renderPatrolView(content) {
                     <rect width="${svgW}" height="${svgH}" fill="url(#grid)"/>
                     <rect x="10" y="10" width="${svgW-20}" height="${svgH-20}"
                           fill="none" stroke="rgba(99,102,241,0.25)" stroke-width="1.5" rx="4"/>
-                    <!-- 도킹 스테이션 — 왼쪽 상단 (창고 입구) -->
-                    <rect x="12" y="14" width="32" height="50" rx="4"
-                          fill="rgba(248,113,113,0.15)" stroke="rgba(248,113,113,0.7)" stroke-width="1.5"/>
-                    <text x="28" y="32" fill="#f87171" font-size="7" text-anchor="middle" font-family="monospace" font-weight="bold">DOCK</text>
-                    <text x="28" y="44" fill="#f87171" font-size="6" text-anchor="middle" font-family="monospace">⚡Wi-Fi</text>
-                    <text x="28" y="56" fill="#f87171" font-size="5.5" text-anchor="middle" font-family="monospace">전송</text>
+                    <!-- 도킹 스테이션 — Aisle-1 입구 상단 (빨간선 위) -->
+                    <rect x="77" y="8" width="36" height="22" rx="4"
+                          fill="rgba(248,113,113,0.20)" stroke="#f87171" stroke-width="2"/>
+                    <text x="95" y="19" fill="#f87171" font-size="7" text-anchor="middle" font-family="monospace" font-weight="bold">DOCK</text>
+                    <text x="95" y="28" fill="#f87171" font-size="5.5" text-anchor="middle" font-family="monospace">⚡Wi-Fi</text>
+                    <!-- 빨간 경계선 (Aisle 상단 입구) -->
+                    <line x1="60" y1="46" x2="1380" y2="46" stroke="#f87171" stroke-width="1.5" stroke-dasharray="6,3" opacity="0.6"/>
                     <g id="shelvesGroup"></g>
                     <g id="pathGroup"></g>
                     <g id="scanBeamGroup"></g>
@@ -704,74 +707,50 @@ function createSVG(tag, attrs) {
 }
 
 // ── Patrol Control ─────────────────────────────────────────────
-// Layer-by-Layer 순찰:
-//   시작 Layer부터 끝 Layer까지 각 Layer를 순서대로 완주
-//   각 Layer 내에서 모든 Aisle을 지그재그로 순찰
+// Batch 4K Camera Sweep:
+//   Dock(A1 상단 입구) → A1 하단 끝까지 sweep → U턴 → A1 상단 복귀
+//   → A2 상단 이동 → A2 sweep ... → A15 완료 → Dock 복귀
+//   각 Aisle당 waypoint 3개만 (smooth 연속 이동, 랙별 멈춤 없음)
 function buildPatrolPath() {
     const path = [];
-    const startL = SCAN_CONFIG.startLayer;
-    const endL   = SCAN_CONFIG.endLayer;
-    const mode   = SCAN_CONFIG.scanMode; // 'both' | 'left' | 'right'
+    const mode = SCAN_CONFIG.scanMode;
 
-    for (let li = startL; li <= endL; li++) {
-        const layer = LAYERS[li];
+    // Dock 출발점 (Aisle-1 상단 입구 바로 위)
+    const dockX = DOCK_X;
+    const dockY = DOCK_Y + 24;  // Dock 하단에서 출발
 
-        // Layer 전환 알림 포인트 (도킹 스테이션 경유)
-        if (li > startL) {
-            path.push({
-                type: 'layer_change',
-                x: 27, y: 240,
-                layerIdx: li,
-                layerId: layer.id,
-                label: layer.label,
-                aisle: null
-            });
-        }
+    WAREHOUSE.aisles.forEach((aisle, ai) => {
+        const cx    = aisle.x + aisle.w / 2;   // Aisle 중앙 x
+        const topY  = aisle.y + 5;              // Aisle 입구 상단
+        const botY  = aisle.y + aisle.h - 5;   // Aisle 끝 하단
 
-        WAREHOUSE.aisles.forEach((aisle, ai) => {
-            // 해당 aisle + 해당 layer의 선반만 필터
-            const shelvesL = WAREHOUSE.shelves
-                .filter(s => s.aisle === aisle.id && s.side === 'L' && s.layerIdx === li)
-                .sort((a,b) => ai % 2 === 0 ? a.y - b.y : b.y - a.y);
-            const shelvesR = WAREHOUSE.shelves
-                .filter(s => s.aisle === aisle.id && s.side === 'R' && s.layerIdx === li)
-                .sort((a,b) => ai % 2 === 0 ? a.y - b.y : b.y - a.y);
-
-            // 통로 진입
-            path.push({
-                type: 'move',
-                x: aisle.x + aisle.w / 2,
-                y: ai % 2 === 0 ? aisle.y + 10 : aisle.y + aisle.h - 10,
-                aisle: aisle.id,
-                layerIdx: li,
-                layerId: layer.id
-            });
-
-            const count = Math.max(shelvesL.length, shelvesR.length);
-            for (let i = 0; i < count; i++) {
-                const ri = ai % 2 === 0 ? i : count - 1 - i;
-                const sl = shelvesL[ri];
-                const sr = shelvesR[ri];
-                const refShelf = sl || sr;
-                if (!refShelf) continue;
-
-                path.push({
-                    type: 'scan',
-                    x: aisle.x + aisle.w / 2,
-                    y: refShelf.y + 14,
-                    aisle: aisle.id,
-                    layerIdx: li,
-                    layerId: layer.id,
-                    // scanMode에 따라 어느 선반을 스캔할지 결정
-                    shelfL: (mode === 'right') ? null : sl,
-                    shelfR: (mode === 'left')  ? null : sr,
-                });
-            }
+        // ① Aisle 입구 상단으로 이동
+        path.push({
+            type: 'move',
+            x: cx, y: topY,
+            aisle: aisle.id,
+            label: `A${aisle.id} 진입`
         });
-    }
 
-    // 도킹 귀환 (왼쪽 상단)
-    path.push({ type: 'dock', x: 27, y: 38, aisle: null });
+        // ② 아래로 sweep (상단 → 하단, 4K 촬영 중)
+        path.push({
+            type: 'sweep_down',
+            x: cx, y: botY,
+            aisle: aisle.id,
+            label: `A${aisle.id} 아래로 촬영`
+        });
+
+        // ③ U턴 후 위로 복귀 (하단 → 상단 입구)
+        path.push({
+            type: 'sweep_up',
+            x: cx, y: topY,
+            aisle: aisle.id,
+            label: `A${aisle.id} 위로 복귀`
+        });
+    });
+
+    // 모든 Aisle 완료 후 Dock으로 귀환
+    path.push({ type: 'dock', x: dockX, y: dockY, aisle: null, label: 'Dock 귀환' });
     return path;
 }
 
@@ -808,11 +787,10 @@ function startPatrol() {
     const totalLayers = SCAN_CONFIG.endLayer - SCAN_CONFIG.startLayer + 1;
     const modeStr  = getScanModeName();
     addFeed(
-        `🚁 DRONE-01 순찰 시작 — Day ${state.currentDay} (${DAY_DATES[state.currentDay]})<br>` +
+        `🚁 DRONE-01 Batch 4K 스윕 시작 — Day ${state.currentDay} (${DAY_DATES[state.currentDay]})<br>` +
         `<span style="font-size:0.75rem;color:#94a3b8">` +
-        `Layer: <b style="color:${startLyr.color}">${startLyr.id}</b> ~ ` +
-        `<b style="color:${endLyr.color}">${endLyr.id}</b> (${totalLayers}개 Layer) · ` +
-        `방향: <b style="color:#34d399">${modeStr}</b></span>`,
+        `📹 15 Aisle × 20 Rack × 15 Level 연속 촬영 · 속도: 2.5 m/s · ` +
+        `방향: <b style="color:#34d399">Aisle 상단→하단 U턴 반복</b></span>`,
         'agent-action'
     );
 
@@ -831,7 +809,7 @@ function stopPatrol() {
 
 function resetPatrol() {
     stopPatrol();
-    state.drone = { x: 27, y: 240, angle: 0, battery: 100 };
+    state.drone = { x: DOCK_X, y: DOCK_Y + 24, angle: 0, battery: 100 };
     state.pathIndex = 0;
     state.scannedShelves = new Set();
     state.scanEvents = [];
@@ -857,7 +835,9 @@ function resetPatrol() {
     addFeed('↺ 시스템 초기화 완료. 순찰을 다시 시작할 수 있습니다.', 'agent-action');
 }
 
-// ── Drone Animation Loop ───────────────────────────────────────
+// ── Drone Animation Loop (Batch 4K Sweep) ─────────────────────
+// 각 waypoint 사이를 끊김 없이 smooth 이동
+// sweep_down / sweep_up 이동 중 연속으로 선반 스캔 처리
 function droneLoop() {
     if (!state.patrolActive) return;
 
@@ -872,43 +852,113 @@ function droneLoop() {
     const dy = target.y - state.drone.y;
     const dist = Math.sqrt(dx*dx + dy*dy);
 
-    if (dist < 2.5) {
-        // 목표 도달
-        if (target.type === 'scan') {
-            processScanPoint(target);
-        } else if (target.type === 'layer_change') {
-            // Layer 전환: 드론이 도킹 스테이션으로 돌아와 높이 재조정 후 재출발
-            SCAN_CONFIG.activeLayerIdx = target.layerIdx;
-            updateLayerIndicator(target.layerIdx);
+    if (dist < DRONE.speed + 1) {
+        // 목표 waypoint 도달
+        state.drone.x = target.x;
+        state.drone.y = target.y;
+
+        if (target.type === 'sweep_down') {
+            // Aisle 하단 도달 → 해당 Aisle 모든 선반 일괄 스캔 처리
+            processSweepAisle(target.aisle, 'down');
+            const aisleEl = document.getElementById('ms-aisle');
+            if (aisleEl) aisleEl.textContent = `Aisle-${target.aisle}`;
+            updateSidebarAisle(target.aisle);
             addFeed(
-                `🔼 <b>Layer 전환</b>: ${LAYERS[target.layerIdx - 1]?.id || ''} → <span style="color:${LAYERS[target.layerIdx].color}">${target.layerId}</span> (${target.label})`,
+                `📹 <b>Aisle-${target.aisle}</b> 하향 촬영 완료 — 20랙 × 15단 스캔`,
                 'agent-action'
             );
+        } else if (target.type === 'sweep_up') {
+            // Aisle 상단 복귀 — 이미 스캔됨, 다음 Aisle로 이동
+            addFeed(
+                `↩ <b>Aisle-${target.aisle}</b> U턴 복귀 → 다음 통로로`,
+                'scan-item'
+            );
+        } else if (target.type === 'move') {
+            // Aisle 입구 진입
+            const aisleEl = document.getElementById('ms-aisle');
+            if (aisleEl) aisleEl.textContent = `Aisle-${target.aisle}`;
         } else if (target.type === 'dock') {
             updateSidebarDroneState('충전 중', 'status-charging');
         }
+
         state.pathIndex++;
-        if (target.aisle) {
-            updateSidebarAisle(target.aisle);
-            document.getElementById('ms-aisle').textContent = `Aisle-${target.aisle}`;
-        }
-        if (target.layerId) {
-            const li = target.layerIdx;
-            const lyr = LAYERS[li];
-            const layerEl = document.getElementById('ms-layer');
-            if (layerEl) layerEl.textContent = `${lyr.id}`;
-        }
     } else {
-        // 이동
+        // 연속 smooth 이동 — 멈추지 않음
         state.drone.x += (dx / dist) * DRONE.speed;
         state.drone.y += (dy / dist) * DRONE.speed;
         state.drone.angle = Math.atan2(dy, dx) * 180 / Math.PI;
-        state.drone.battery = Math.max(0, state.drone.battery - 0.015);
+        state.drone.battery = Math.max(0, state.drone.battery - DRONE.batteryDrainRate);
+
+        // 이동 중 실시간 스캔 빔 표시
+        if (target.type === 'sweep_down' || target.type === 'sweep_up') {
+            if (state.scanBeamEl) state.scanBeamEl.setAttribute('opacity', '0.6');
+        } else {
+            if (state.scanBeamEl) state.scanBeamEl.setAttribute('opacity', '0');
+        }
     }
 
     updateDroneElement();
     updateMissionStats();
     state.animFrame = requestAnimationFrame(droneLoop);
+}
+
+// ── Batch Sweep 중 Aisle 전체 선반 일괄 스캔 ────────────────
+function processSweepAisle(aisleId, direction) {
+    const inv = getCurrentInventory();
+    const scanTime = new Date().toLocaleTimeString('ko-KR');
+    let count = 0;
+
+    const aislesShelves = WAREHOUSE.shelves.filter(s => s.aisle === aisleId);
+
+    aislesShelves.forEach(shelf => {
+        if (state.scannedShelves.has(shelf.id)) return;
+        state.scannedShelves.add(shelf.id);
+        count++;
+
+        const item = inv[shelf.id];
+        const event = {
+            id: `SE-${Date.now()}-${shelf.id}`,
+            timestamp: scanTime,
+            day: state.currentDay,
+            shelfId: shelf.id,
+            aisle: shelf.aisle,
+            side: shelf.side,
+            layer: shelf.layer,
+            layerIdx: shelf.layerIdx,
+            height_m: shelf.height_m,
+            sku: item?.sku || null,
+            qty: item?.qty || 0,
+            confidence: Math.min(1.0, (item?.confidence || 0.92) + 0.05),
+            location: `Aisle-${shelf.aisle} / Rack-${shelf.rack} / ${shelf.side === 'L' ? '좌측' : '우측'} / ${shelf.layer}`
+        };
+
+        if (state.currentDay === 1) state.scanEvents.push(event);
+        else state.scanEventsDay2.push(event);
+
+        // 선반 색상 업데이트 (스캔 완료 → 녹색)
+        const shelfEl = document.getElementById(`shelf-${shelf.id}`);
+        if (shelfEl) {
+            shelfEl.setAttribute('fill', event.sku
+                ? 'rgba(52,211,153,0.30)' : 'rgba(248,113,113,0.12)');
+            shelfEl.setAttribute('stroke', event.sku
+                ? 'rgba(52,211,153,0.8)' : 'rgba(248,113,113,0.5)');
+            shelfEl.setAttribute('opacity', '1');
+        }
+    });
+
+    updateTotalScanned();
+    flashScanBeam();
+
+    // 진행률 업데이트
+    const totalShelves = WAREHOUSE.shelves.length;
+    const pct = Math.round(state.scannedShelves.size / totalShelves * 100);
+    const pb = document.getElementById('missionProgress');
+    if (pb) pb.style.width = pct + '%';
+
+    addFeed(
+        `📦 Aisle-${aisleId} 스캔: <b style="color:#34d399">${count}개</b> 위치 — 진행 ${pct}%`,
+        'scan-item', scanTime
+    );
 }
 
 function updateDroneElement() {
