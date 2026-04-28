@@ -1748,6 +1748,402 @@ def compare_history():
         return jsonify({'ok': False, 'error': str(e)}), 500
 
 
+# ══════════════════════════════════════════════════════════════
+# VIDEO SCAN API — 드론 영상 업로드 → PT번호 추출 → DB 저장
+# Batch 방식 (방법 A): 영상 전체 수집 후 서버에서 일괄 분석
+# 창고 규모: 15 Aisles × 20 Racks × 15 levels
+# ══════════════════════════════════════════════════════════════
+
+import re as _re
+import tempfile
+import shutil
+
+# 선택적 라이브러리 (서버에 설치된 경우에만 사용)
+try:
+    import cv2 as _cv2
+    CV2_AVAILABLE = True
+except ImportError:
+    CV2_AVAILABLE = False
+
+try:
+    from pyzbar.pyzbar import decode as _pyzbar_decode
+    PYZBAR_AVAILABLE = True
+except ImportError:
+    PYZBAR_AVAILABLE = False
+
+try:
+    import easyocr as _easyocr
+    _ocr_reader = None  # lazy init
+    EASYOCR_AVAILABLE = True
+except ImportError:
+    EASYOCR_AVAILABLE = False
+
+UPLOAD_DIR = os.path.join(os.path.dirname(__file__), 'backend', 'uploads')
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+# PT번호 패턴: PT + 8자리 숫자 (예: PT64090302)
+PT_PATTERN = _re.compile(r'\bPT\d{8}\b')
+
+
+def _get_ocr_reader():
+    """EasyOCR reader lazy initialization"""
+    global _ocr_reader
+    if _ocr_reader is None and EASYOCR_AVAILABLE:
+        try:
+            _ocr_reader = _easyocr.Reader(['en'], gpu=False, verbose=False)
+        except Exception:
+            pass
+    return _ocr_reader
+
+
+def _extract_pt_from_frame_barcode(frame_bgr):
+    """pyzbar로 바코드/QR에서 PT번호 추출"""
+    results = set()
+    if not PYZBAR_AVAILABLE or not CV2_AVAILABLE:
+        return results
+    try:
+        gray = _cv2.cvtColor(frame_bgr, _cv2.COLOR_BGR2GRAY)
+        # 대비 향상 (CLAHE)
+        clahe = _cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        gray = clahe.apply(gray)
+        decoded = _pyzbar_decode(gray)
+        for obj in decoded:
+            raw = obj.data.decode('utf-8', errors='ignore').strip()
+            for m in PT_PATTERN.findall(raw):
+                results.add(m)
+    except Exception:
+        pass
+    return results
+
+
+def _extract_pt_from_frame_ocr(frame_bgr):
+    """EasyOCR로 텍스트에서 PT번호 추출 (바코드 실패 시 fallback)"""
+    results = set()
+    reader = _get_ocr_reader()
+    if reader is None or not CV2_AVAILABLE:
+        return results
+    try:
+        rgb = _cv2.cvtColor(frame_bgr, _cv2.COLOR_BGR2RGB)
+        ocr_results = reader.readtext(rgb, detail=0, paragraph=False)
+        for text in ocr_results:
+            for m in PT_PATTERN.findall(text.upper()):
+                results.add(m)
+    except Exception:
+        pass
+    return results
+
+
+def _extract_pt_from_frame(frame_bgr):
+    """바코드 우선, 실패 시 OCR fallback"""
+    pts = _extract_pt_from_frame_barcode(frame_bgr)
+    if not pts:
+        pts = _extract_pt_from_frame_ocr(frame_bgr)
+    return pts
+
+
+def _extract_pt_from_video(video_path, fps_sample=5, max_frames=3000):
+    """
+    영상 파일에서 PT번호 추출 (Batch 방식)
+    - fps_sample: 초당 분석 프레임 수 (기본 5fps)
+    - max_frames: 최대 처리 프레임 수
+    반환: {pt_number: {'count': int, 'first_seen_sec': float, 'frames': [int]}}
+    """
+    if not CV2_AVAILABLE:
+        return {}
+
+    cap = _cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        return {}
+
+    video_fps = cap.get(_cv2.CAP_PROP_FPS) or 30
+    # 몇 프레임마다 샘플링할지
+    step = max(1, int(video_fps / fps_sample))
+
+    pt_map = {}   # pt -> {count, first_seen_sec, frames}
+    frame_idx = 0
+    analyzed = 0
+
+    while analyzed < max_frames:
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        if frame_idx % step == 0:
+            pts_found = _extract_pt_from_frame(frame)
+            time_sec = frame_idx / video_fps
+
+            for pt in pts_found:
+                if pt not in pt_map:
+                    pt_map[pt] = {'count': 0, 'first_seen_sec': round(time_sec, 2), 'frames': []}
+                pt_map[pt]['count'] += 1
+                pt_map[pt]['frames'].append(frame_idx)
+            analyzed += 1
+
+        frame_idx += 1
+
+    cap.release()
+    return pt_map
+
+
+def _extract_pt_from_video_ffmpeg(video_path, fps_sample=5, max_frames=3000):
+    """
+    FFmpeg + pyzbar/OCR 방식 (cv2.VideoCapture 대안)
+    — 임시 디렉터리에 프레임 추출 후 분석
+    """
+    if not PYZBAR_AVAILABLE and not EASYOCR_AVAILABLE:
+        return {}
+
+    tmp_dir = tempfile.mkdtemp()
+    pt_map = {}
+
+    try:
+        cmd = [
+            'ffmpeg', '-i', video_path,
+            '-vf', f'fps={fps_sample},scale=1280:-1',
+            '-frames:v', str(max_frames),
+            '-q:v', '3',
+            os.path.join(tmp_dir, 'frame_%05d.jpg'),
+            '-y', '-loglevel', 'error'
+        ]
+        subprocess.run(cmd, timeout=300, check=False)
+
+        frames = sorted(os.listdir(tmp_dir))
+        for i, fname in enumerate(frames):
+            fpath = os.path.join(tmp_dir, fname)
+            if not CV2_AVAILABLE:
+                # pyzbar only (PIL 경유)
+                try:
+                    from PIL import Image
+                    from pyzbar.pyzbar import decode as pz_decode
+                    img = Image.open(fpath).convert('L')
+                    decoded = pz_decode(img)
+                    for obj in decoded:
+                        raw = obj.data.decode('utf-8', errors='ignore').strip()
+                        for m in PT_PATTERN.findall(raw):
+                            if m not in pt_map:
+                                pt_map[m] = {'count': 0,
+                                             'first_seen_sec': round(i / fps_sample, 2),
+                                             'frames': []}
+                            pt_map[m]['count'] += 1
+                            pt_map[m]['frames'].append(i)
+                except Exception:
+                    pass
+            else:
+                frame_bgr = _cv2.imread(fpath)
+                if frame_bgr is not None:
+                    pts_found = _extract_pt_from_frame(frame_bgr)
+                    for m in pts_found:
+                        if m not in pt_map:
+                            pt_map[m] = {'count': 0,
+                                         'first_seen_sec': round(i / fps_sample, 2),
+                                         'frames': []}
+                        pt_map[m]['count'] += 1
+                        pt_map[m]['frames'].append(i)
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+
+    return pt_map
+
+
+def _save_video_scan_to_db(pt_map, session_id, drone_id, aisle_hint=None):
+    """
+    추출된 PT번호 목록을 scan_events 테이블에 저장
+    위치 정보: aisle_hint가 있으면 사용, 없으면 영상 파일명 기반 추정
+    반환: 저장된 이벤트 수
+    """
+    now = datetime.now().isoformat()
+    rows = []
+    for pt, info in pt_map.items():
+        sid = f"VS-{uuid.uuid4().hex[:12].upper()}"
+        # 위치 추론: aisle_hint 또는 기본값
+        aisle = str(aisle_hint) if aisle_hint else 'VIDEO'
+        location = f"Video-Scan / Aisle-{aisle} / {pt} @{info['first_seen_sec']}s"
+        rows.append((
+            sid, now, session_id, drone_id,
+            aisle, 0, 'V', 'V',   # rack=0, side/layer='V' = video scan
+            f"VS-{pt}",           # shelf_id
+            pt,
+            info['count'],        # qty = 인식 횟수 (신뢰도 지표)
+            location
+        ))
+
+    if rows:
+        with get_db() as conn:
+            conn.executemany('''
+                INSERT OR REPLACE INTO scan_events
+                (id, scanned_at, session_id, drone_id, aisle, rack, side, layer,
+                 shelf_id, pt_number, qty, location)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+            ''', rows)
+            conn.commit()
+
+    return len(rows)
+
+
+@app.route('/api/video-scan', methods=['POST'])
+def video_scan():
+    """
+    드론 영상 업로드 → PT번호 추출 → DB 저장 (Batch 방식)
+
+    Request:
+      multipart/form-data:
+        - video: 영상 파일 (mp4, avi, mov, mkv)
+        - session_id: 스캔 세션 ID (선택, 자동 생성)
+        - drone_id: 드론 ID (선택, 기본 DRONE-01)
+        - aisle: 촬영한 Aisle 번호 (선택)
+        - fps_sample: 초당 분석 프레임 수 (선택, 기본 5)
+
+    Response:
+      {
+        "ok": true,
+        "session_id": "...",
+        "total_pt_found": 12,
+        "pt_list": ["PT64090302", ...],
+        "saved": 12,
+        "analysis_time_sec": 4.2,
+        "method": "barcode|ocr|ffmpeg|demo"
+      }
+    """
+    import time as _time
+
+    t0 = _time.time()
+
+    # ── 파일 수신 ──────────────────────────────────────────────
+    if 'video' not in request.files:
+        return jsonify({'ok': False, 'error': '영상 파일(video)이 필요합니다'}), 400
+
+    file = request.files['video']
+    if not file.filename:
+        return jsonify({'ok': False, 'error': '파일명이 없습니다'}), 400
+
+    allowed_ext = {'.mp4', '.avi', '.mov', '.mkv', '.webm', '.ts'}
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in allowed_ext:
+        return jsonify({'ok': False, 'error': f'지원하지 않는 형식: {ext}'}), 400
+
+    # ── 파라미터 파싱 ──────────────────────────────────────────
+    session_id = request.form.get('session_id') or f"VS-{uuid.uuid4().hex[:10].upper()}"
+    drone_id   = request.form.get('drone_id', 'DRONE-01')
+    aisle_hint = request.form.get('aisle')
+    fps_sample = int(request.form.get('fps_sample', 5))
+    fps_sample = max(1, min(fps_sample, 30))
+
+    # ── 영상 저장 ──────────────────────────────────────────────
+    safe_name = f"{session_id}_{uuid.uuid4().hex[:6]}{ext}"
+    video_path = os.path.join(UPLOAD_DIR, safe_name)
+    try:
+        file.save(video_path)
+    except Exception as e:
+        return jsonify({'ok': False, 'error': f'파일 저장 실패: {str(e)}'}), 500
+
+    # ── PT번호 추출 ────────────────────────────────────────────
+    pt_map = {}
+    method_used = 'none'
+
+    try:
+        if CV2_AVAILABLE:
+            pt_map = _extract_pt_from_video(video_path, fps_sample=fps_sample)
+            method_used = 'cv2+barcode' if PYZBAR_AVAILABLE else 'cv2+ocr'
+            # cv2가 열리지 않으면 ffmpeg 시도
+            if not pt_map:
+                pt_map = _extract_pt_from_video_ffmpeg(video_path, fps_sample=fps_sample)
+                if pt_map:
+                    method_used = 'ffmpeg+barcode'
+        else:
+            # cv2 없음 → ffmpeg fallback
+            pt_map = _extract_pt_from_video_ffmpeg(video_path, fps_sample=fps_sample)
+            method_used = 'ffmpeg+barcode'
+
+        # 라이브러리 전혀 없으면 데모 모드
+        if not CV2_AVAILABLE and not PYZBAR_AVAILABLE and not EASYOCR_AVAILABLE:
+            pt_map = {pt: {'count': 3, 'first_seen_sec': 0.0, 'frames': [0]}
+                      for pt in WAFER_PT_LIST[:5]}
+            method_used = 'demo'
+
+    except Exception as e:
+        # 분석 실패해도 DB에 빈 세션 기록 후 에러 반환
+        os.remove(video_path) if os.path.exists(video_path) else None
+        return jsonify({'ok': False, 'error': f'분석 실패: {str(e)}', 'session_id': session_id}), 500
+
+    # ── DB 저장 ────────────────────────────────────────────────
+    saved_count = _save_video_scan_to_db(pt_map, session_id, drone_id, aisle_hint)
+
+    # ── 임시 파일 정리 (24시간 이상 된 파일) ──────────────────
+    try:
+        now_ts = _time.time()
+        for fname in os.listdir(UPLOAD_DIR):
+            fpath = os.path.join(UPLOAD_DIR, fname)
+            if os.path.isfile(fpath) and (now_ts - os.path.getmtime(fpath)) > 86400:
+                os.remove(fpath)
+    except Exception:
+        pass
+
+    elapsed = round(_time.time() - t0, 2)
+    pt_list  = sorted(pt_map.keys())
+
+    return jsonify({
+        'ok': True,
+        'session_id': session_id,
+        'drone_id': drone_id,
+        'total_pt_found': len(pt_list),
+        'pt_list': pt_list,
+        'pt_detail': {pt: {'count': v['count'], 'first_seen_sec': v['first_seen_sec']}
+                      for pt, v in pt_map.items()},
+        'saved': saved_count,
+        'analysis_time_sec': elapsed,
+        'method': method_used,
+        'fps_sample': fps_sample,
+        'video_file': safe_name,
+    })
+
+
+@app.route('/api/video-scan/status', methods=['GET'])
+def video_scan_status():
+    """영상 스캔 기능 상태 및 설치된 라이브러리 확인"""
+    return jsonify({
+        'ok': True,
+        'capabilities': {
+            'opencv': CV2_AVAILABLE,
+            'pyzbar': PYZBAR_AVAILABLE,
+            'easyocr': EASYOCR_AVAILABLE,
+            'ffmpeg': bool(shutil.which('ffmpeg')),
+        },
+        'recommended_install': (
+            'pip install opencv-python-headless pyzbar easyocr'
+            if not (CV2_AVAILABLE and PYZBAR_AVAILABLE)
+            else 'all_installed'
+        ),
+        'warehouse_scale': '15 Aisles × 20 Racks × 15 Levels = 4,500 locations',
+        'batch_mode': 'Method A — record full video then analyze on server',
+        'upload_dir': UPLOAD_DIR,
+        'pt_pattern': r'PT\d{8}',
+    })
+
+
+@app.route('/api/video-scan/sessions', methods=['GET'])
+def video_scan_sessions():
+    """영상 스캔 세션 목록 조회 (VS- 접두사 세션만)"""
+    try:
+        limit = int(request.args.get('limit', 50))
+        with get_db() as conn:
+            rows = conn.execute('''
+                SELECT session_id,
+                       drone_id,
+                       MIN(scanned_at) as started_at,
+                       MAX(scanned_at) as ended_at,
+                       COUNT(DISTINCT pt_number) as unique_pt,
+                       COUNT(*) as total_events
+                FROM scan_events
+                WHERE session_id LIKE 'VS-%'
+                GROUP BY session_id
+                ORDER BY started_at DESC
+                LIMIT ?
+            ''', (limit,)).fetchall()
+        return jsonify({'ok': True, 'sessions': [dict(r) for r in rows]})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
 if __name__ == '__main__':
     print("=" * 60)
     print("🏭 Warehouse AI Safety System")

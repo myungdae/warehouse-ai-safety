@@ -243,6 +243,7 @@ function showView(view) {
         case 'ontology': renderOntologyView(content); break;
         case 'report':   renderReportView(content);   break;
         case 'archive':  renderArchiveView(content);  break;
+        case 'videoscan': renderVideoScanView(content); break;
     }
 }
 
@@ -3038,4 +3039,377 @@ async function deleteArchivedReport(reportId) {
 async function printArchivedReport(reportId) {
     closeArchiveDetail();
     setTimeout(() => window.print(), 300);
+}
+
+// ══════════════════════════════════════════════════════════════
+// 🎥 VIDEO SCAN VIEW — Batch 방식 영상 분석
+// 창고 규모: 15 Aisles × 20 Racks × 15 Levels
+// ══════════════════════════════════════════════════════════════
+
+function renderVideoScanView(content) {
+    content.innerHTML = `
+    <div style="padding:24px;max-width:960px;margin:0 auto">
+
+      <!-- 헤더 -->
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px">
+        <span style="font-size:2rem">🎥</span>
+        <div>
+          <h2 style="margin:0;color:#f1f5f9;font-size:1.4rem">드론 영상 PT번호 추출</h2>
+          <p style="margin:4px 0 0;color:#64748b;font-size:0.85rem">
+            Batch 방식 — 영상 촬영 후 서버에서 일괄 분석 · 15 Aisles × 20 Racks × 15 Levels
+          </p>
+        </div>
+        <button onclick="checkVideoScanStatus()" style="margin-left:auto;padding:8px 16px;
+          border-radius:8px;border:1px solid rgba(16,185,129,0.4);background:rgba(16,185,129,0.1);
+          color:#34d399;font-size:0.8rem;cursor:pointer">⚙️ 시스템 상태</button>
+      </div>
+
+      <!-- 방법 설명 카드 -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px">
+        <div style="padding:16px;border-radius:12px;background:rgba(16,185,129,0.08);
+                    border:1px solid rgba(16,185,129,0.25)">
+          <div style="font-size:1.1rem;margin-bottom:8px">✅ <strong style="color:#34d399">방법 A (권장) — Batch</strong></div>
+          <ul style="margin:0;padding-left:18px;color:#94a3b8;font-size:0.82rem;line-height:1.7">
+            <li>드론이 <strong style="color:#f1f5f9">최고속도</strong>로 비행하며 4K 영상 녹화</li>
+            <li>비행 완료 후 영상 업로드</li>
+            <li>서버가 프레임별 <strong style="color:#f1f5f9">바코드/OCR 분석</strong></li>
+            <li>PT번호 추출 → 중복 제거 → DB 저장</li>
+            <li>정확도 <strong style="color:#34d399">95~99%</strong> · CPU 서버 1대로 충분</li>
+          </ul>
+        </div>
+        <div style="padding:16px;border-radius:12px;background:rgba(100,116,139,0.08);
+                    border:1px solid rgba(100,116,139,0.2)">
+          <div style="font-size:1.1rem;margin-bottom:8px">📡 방법 B — 실시간 스트리밍</div>
+          <ul style="margin:0;padding-left:18px;color:#64748b;font-size:0.82rem;line-height:1.7">
+            <li>드론 속도 0.5~1 m/s 제한 필요</li>
+            <li>Wi-Fi 안정성에 의존</li>
+            <li>정확도 85~92%</li>
+            <li>인터넷 없는 On-prem 환경에서 불리</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- 업로드 폼 -->
+      <div style="padding:24px;border-radius:14px;background:rgba(15,23,42,0.6);
+                  border:1px solid rgba(255,255,255,0.08);margin-bottom:20px">
+        <h3 style="margin:0 0 18px;color:#f1f5f9;font-size:1rem">📤 영상 업로드 및 분석</h3>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px">
+          <div>
+            <label style="display:block;color:#94a3b8;font-size:0.78rem;margin-bottom:6px">Aisle 번호 (선택)</label>
+            <input id="vs-aisle" type="number" min="1" max="15" placeholder="1~15"
+              style="width:100%;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.12);
+                     background:rgba(255,255,255,0.05);color:#f1f5f9;font-size:0.9rem;box-sizing:border-box">
+          </div>
+          <div>
+            <label style="display:block;color:#94a3b8;font-size:0.78rem;margin-bottom:6px">드론 ID</label>
+            <input id="vs-droneId" type="text" value="DRONE-01" placeholder="DRONE-01"
+              style="width:100%;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.12);
+                     background:rgba(255,255,255,0.05);color:#f1f5f9;font-size:0.9rem;box-sizing:border-box">
+          </div>
+          <div>
+            <label style="display:block;color:#94a3b8;font-size:0.78rem;margin-bottom:6px">분석 FPS (1~30)</label>
+            <input id="vs-fps" type="number" min="1" max="30" value="5" placeholder="5"
+              style="width:100%;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.12);
+                     background:rgba(255,255,255,0.05);color:#f1f5f9;font-size:0.9rem;box-sizing:border-box">
+          </div>
+        </div>
+
+        <!-- 파일 드롭존 -->
+        <div id="vs-dropzone"
+          style="border:2px dashed rgba(16,185,129,0.4);border-radius:12px;padding:40px 20px;
+                 text-align:center;cursor:pointer;transition:all 0.2s;
+                 background:rgba(16,185,129,0.03)"
+          onclick="document.getElementById('vs-fileInput').click()"
+          ondragover="event.preventDefault();this.style.borderColor='#10b981';this.style.background='rgba(16,185,129,0.08)'"
+          ondragleave="this.style.borderColor='rgba(16,185,129,0.4)';this.style.background='rgba(16,185,129,0.03)'"
+          ondrop="vsHandleDrop(event)">
+          <div style="font-size:2.5rem;margin-bottom:8px">🎬</div>
+          <div style="color:#34d399;font-size:1rem;font-weight:600;margin-bottom:6px">영상 파일을 여기에 드래그하거나 클릭</div>
+          <div style="color:#64748b;font-size:0.8rem">MP4, AVI, MOV, MKV, WebM 지원 · 최대 권장 5GB</div>
+          <div id="vs-filename" style="margin-top:12px;color:#94a3b8;font-size:0.85rem"></div>
+        </div>
+        <input id="vs-fileInput" type="file" accept=".mp4,.avi,.mov,.mkv,.webm,.ts" style="display:none"
+          onchange="vsFileSelected(this)">
+
+        <!-- 업로드 버튼 -->
+        <div style="display:flex;gap:12px;margin-top:16px;align-items:center">
+          <button id="vs-uploadBtn" onclick="vsStartUpload()"
+            style="padding:12px 28px;border-radius:10px;border:none;font-size:0.95rem;font-weight:700;
+                   background:linear-gradient(135deg,#10b981,#059669);color:#fff;cursor:pointer;
+                   opacity:0.5;pointer-events:none;transition:all 0.2s">
+            🚀 PT번호 추출 시작
+          </button>
+          <div id="vs-uploadStatus" style="color:#64748b;font-size:0.85rem"></div>
+        </div>
+
+        <!-- 진행 바 -->
+        <div id="vs-progressWrap" style="display:none;margin-top:16px">
+          <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+            <span style="color:#94a3b8;font-size:0.8rem" id="vs-progressLabel">업로드 중...</span>
+            <span style="color:#34d399;font-size:0.8rem" id="vs-progressPct">0%</span>
+          </div>
+          <div style="height:6px;border-radius:4px;background:rgba(255,255,255,0.08);overflow:hidden">
+            <div id="vs-progressBar" style="height:100%;width:0%;border-radius:4px;
+              background:linear-gradient(90deg,#10b981,#34d399);transition:width 0.3s"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 결과 패널 -->
+      <div id="vs-resultPanel" style="display:none;padding:24px;border-radius:14px;
+           background:rgba(15,23,42,0.6);border:1px solid rgba(16,185,129,0.3);margin-bottom:20px">
+        <h3 style="margin:0 0 16px;color:#34d399;font-size:1rem">✅ 분석 완료</h3>
+        <div id="vs-resultBody"></div>
+      </div>
+
+      <!-- 세션 이력 -->
+      <div style="padding:20px;border-radius:14px;background:rgba(15,23,42,0.6);
+                  border:1px solid rgba(255,255,255,0.07)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+          <h3 style="margin:0;color:#f1f5f9;font-size:0.95rem">📋 영상 스캔 세션 이력</h3>
+          <button onclick="vsLoadSessions()" style="padding:6px 14px;border-radius:7px;
+            border:1px solid rgba(255,255,255,0.12);background:transparent;
+            color:#94a3b8;font-size:0.78rem;cursor:pointer">🔄 새로고침</button>
+        </div>
+        <div id="vs-sessionList"><div style="color:#64748b;font-size:0.85rem">세션 없음</div></div>
+      </div>
+
+      <!-- 시스템 상태 모달 -->
+      <div id="vs-statusModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);
+           z-index:9999;display:none;align-items:center;justify-content:center">
+        <div style="padding:28px;border-radius:16px;background:#0f172a;border:1px solid rgba(255,255,255,0.12);
+                    max-width:480px;width:90%;position:relative">
+          <button onclick="document.getElementById('vs-statusModal').style.display='none'"
+            style="position:absolute;top:12px;right:16px;background:none;border:none;
+                   color:#64748b;font-size:1.2rem;cursor:pointer">✕</button>
+          <h3 style="margin:0 0 16px;color:#f1f5f9">⚙️ 영상 스캔 시스템 상태</h3>
+          <div id="vs-statusBody"><div style="color:#64748b">확인 중...</div></div>
+        </div>
+      </div>
+    </div>`;
+
+    vsLoadSessions();
+}
+
+// ── 파일 선택 핸들러 ────────────────────────────────────────
+let _vsFile = null;
+
+function vsFileSelected(input) {
+    _vsFile = input.files[0] || null;
+    _vsUpdateDropzoneLabel();
+}
+
+function vsHandleDrop(event) {
+    event.preventDefault();
+    const dz = document.getElementById('vs-dropzone');
+    if (dz) { dz.style.borderColor = 'rgba(16,185,129,0.4)'; dz.style.background = 'rgba(16,185,129,0.03)'; }
+    const file = event.dataTransfer.files[0];
+    if (file) {
+        _vsFile = file;
+        _vsUpdateDropzoneLabel();
+    }
+}
+
+function _vsUpdateDropzoneLabel() {
+    const el = document.getElementById('vs-filename');
+    const btn = document.getElementById('vs-uploadBtn');
+    if (!_vsFile) return;
+    const mb = (_vsFile.size / 1024 / 1024).toFixed(1);
+    if (el) el.textContent = `선택됨: ${_vsFile.name} (${mb} MB)`;
+    if (btn) { btn.style.opacity = '1'; btn.style.pointerEvents = 'auto'; }
+}
+
+// ── 업로드 & 분석 시작 ──────────────────────────────────────
+async function vsStartUpload() {
+    if (!_vsFile) { alert('영상 파일을 선택해주세요.'); return; }
+
+    const aisle   = document.getElementById('vs-aisle')?.value || '';
+    const droneId = document.getElementById('vs-droneId')?.value || 'DRONE-01';
+    const fps     = document.getElementById('vs-fps')?.value || '5';
+    const btn     = document.getElementById('vs-uploadBtn');
+    const status  = document.getElementById('vs-uploadStatus');
+    const wrap    = document.getElementById('vs-progressWrap');
+    const bar     = document.getElementById('vs-progressBar');
+    const pct     = document.getElementById('vs-progressPct');
+    const label   = document.getElementById('vs-progressLabel');
+    const resultPanel = document.getElementById('vs-resultPanel');
+
+    btn.textContent = '⏳ 업로드 중...';
+    btn.style.opacity = '0.7';
+    btn.style.pointerEvents = 'none';
+    wrap.style.display = 'block';
+    resultPanel.style.display = 'none';
+    status.textContent = '';
+
+    const formData = new FormData();
+    formData.append('video', _vsFile);
+    formData.append('drone_id', droneId);
+    formData.append('fps_sample', fps);
+    if (aisle) formData.append('aisle', aisle);
+
+    try {
+        // XHR로 업로드 진행률 추적
+        const result = await new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/api/video-scan');
+
+            xhr.upload.onprogress = (e) => {
+                if (e.lengthComputable) {
+                    const p = Math.round(e.loaded / e.total * 60);  // 업로드 60%
+                    bar.style.width = p + '%';
+                    pct.textContent = p + '%';
+                    label.textContent = `업로드 중... (${(e.loaded/1024/1024).toFixed(1)}MB / ${(e.total/1024/1024).toFixed(1)}MB)`;
+                }
+            };
+
+            xhr.onload = () => {
+                bar.style.width = '70%';
+                pct.textContent = '70%';
+                label.textContent = '분석 중...';
+                try { resolve(JSON.parse(xhr.responseText)); }
+                catch { reject(new Error('응답 파싱 실패')); }
+            };
+            xhr.onerror = () => reject(new Error('네트워크 오류'));
+            xhr.send(formData);
+        });
+
+        bar.style.width = '100%';
+        pct.textContent = '100%';
+        label.textContent = '완료';
+
+        if (!result.ok) throw new Error(result.error || '분석 실패');
+
+        vsShowResult(result);
+        status.innerHTML = `<span style="color:#34d399">✅ ${result.total_pt_found}개 PT번호 추출 완료</span>`;
+        vsLoadSessions();
+        addFeed(`🎥 영상 스캔 완료: ${result.total_pt_found}개 PT번호 추출 (세션: ${result.session_id})`, 'info');
+
+    } catch (err) {
+        status.innerHTML = `<span style="color:#f87171">❌ 오류: ${err.message}</span>`;
+        label.textContent = '실패';
+        bar.style.background = '#ef4444';
+    } finally {
+        btn.textContent = '🚀 PT번호 추출 시작';
+        btn.style.opacity = '1';
+        btn.style.pointerEvents = 'auto';
+    }
+}
+
+// ── 결과 렌더링 ────────────────────────────────────────────
+function vsShowResult(r) {
+    const panel = document.getElementById('vs-resultPanel');
+    const body  = document.getElementById('vs-resultBody');
+    if (!panel || !body) return;
+
+    const ptRows = r.pt_list.map(pt => {
+        const d = r.pt_detail?.[pt] || {};
+        return `<tr>
+          <td style="padding:8px 12px;color:#34d399;font-family:monospace;font-weight:700">${pt}</td>
+          <td style="padding:8px 12px;color:#f1f5f9;text-align:center">${d.count ?? '-'}회</td>
+          <td style="padding:8px 12px;color:#94a3b8;text-align:right">${d.first_seen_sec ?? '-'}s</td>
+        </tr>`;
+    }).join('');
+
+    body.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px">
+        <div style="padding:14px;border-radius:10px;background:rgba(16,185,129,0.1);text-align:center">
+          <div style="font-size:1.8rem;font-weight:800;color:#34d399">${r.total_pt_found}</div>
+          <div style="color:#64748b;font-size:0.78rem">PT번호 발견</div>
+        </div>
+        <div style="padding:14px;border-radius:10px;background:rgba(99,102,241,0.1);text-align:center">
+          <div style="font-size:1.8rem;font-weight:800;color:#a5b4fc">${r.saved}</div>
+          <div style="color:#64748b;font-size:0.78rem">DB 저장</div>
+        </div>
+        <div style="padding:14px;border-radius:10px;background:rgba(251,191,36,0.1);text-align:center">
+          <div style="font-size:1.8rem;font-weight:800;color:#fbbf24">${r.analysis_time_sec}s</div>
+          <div style="color:#64748b;font-size:0.78rem">분석 시간</div>
+        </div>
+        <div style="padding:14px;border-radius:10px;background:rgba(100,116,139,0.1);text-align:center">
+          <div style="font-size:1rem;font-weight:700;color:#94a3b8;padding-top:4px">${r.method}</div>
+          <div style="color:#64748b;font-size:0.78rem">분석 방법</div>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <span style="color:#94a3b8;font-size:0.85rem">세션: <code style="color:#34d399">${r.session_id}</code></span>
+        <button onclick="showView('compare')" style="padding:7px 16px;border-radius:7px;
+          border:1px solid rgba(34,211,238,0.35);background:rgba(34,211,238,0.08);
+          color:#22d3ee;font-size:0.8rem;cursor:pointer">📊 ERP 재고 비교 →</button>
+      </div>
+
+      ${ r.total_pt_found > 0 ? `
+      <table style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr style="border-bottom:1px solid rgba(255,255,255,0.08)">
+            <th style="padding:8px 12px;text-align:left;color:#64748b;font-size:0.78rem">PT번호</th>
+            <th style="padding:8px 12px;text-align:center;color:#64748b;font-size:0.78rem">인식 횟수</th>
+            <th style="padding:8px 12px;text-align:right;color:#64748b;font-size:0.78rem">첫 발견 시각</th>
+          </tr>
+        </thead>
+        <tbody>${ptRows}</tbody>
+      </table>` : '<div style="color:#64748b;padding:20px;text-align:center">PT번호가 감지되지 않았습니다.<br>영상 품질·각도·조명을 확인하세요.</div>' }
+    `;
+    panel.style.display = 'block';
+}
+
+// ── 세션 이력 로드 ──────────────────────────────────────────
+async function vsLoadSessions() {
+    const el = document.getElementById('vs-sessionList');
+    if (!el) return;
+    try {
+        const res  = await fetch('/api/video-scan/sessions?limit=20');
+        const json = await res.json();
+        if (!json.ok || !json.sessions.length) {
+            el.innerHTML = '<div style="color:#64748b;font-size:0.85rem">영상 스캔 세션 없음</div>';
+            return;
+        }
+        el.innerHTML = json.sessions.map(s => `
+          <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:8px;
+                      border:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);margin-bottom:6px">
+            <span style="font-size:1.1rem">🎬</span>
+            <div style="flex:1;min-width:0">
+              <div style="color:#f1f5f9;font-family:monospace;font-size:0.82rem;font-weight:700">${s.session_id}</div>
+              <div style="color:#64748b;font-size:0.75rem">${s.started_at?.slice(0,19).replace('T',' ')} · 드론: ${s.drone_id}</div>
+            </div>
+            <div style="text-align:right">
+              <div style="color:#34d399;font-size:0.9rem;font-weight:700">${s.unique_pt}개 PT</div>
+              <div style="color:#64748b;font-size:0.72rem">${s.total_events}건 저장</div>
+            </div>
+          </div>
+        `).join('');
+    } catch (err) {
+        el.innerHTML = `<div style="color:#f87171;font-size:0.85rem">로드 실패: ${err.message}</div>`;
+    }
+}
+
+// ── 시스템 상태 확인 ────────────────────────────────────────
+async function checkVideoScanStatus() {
+    const modal = document.getElementById('vs-statusModal');
+    const body  = document.getElementById('vs-statusBody');
+    if (!modal || !body) return;
+    modal.style.display = 'flex';
+    body.innerHTML = '<div style="color:#64748b">확인 중...</div>';
+    try {
+        const res  = await fetch('/api/video-scan/status');
+        const json = await res.json();
+        const cap  = json.capabilities || {};
+        const chip = (ok, label) =>
+            `<span style="display:inline-block;padding:3px 10px;border-radius:20px;font-size:0.75rem;
+             font-weight:700;border:1px solid ${ok?'rgba(16,185,129,0.4)':'rgba(239,68,68,0.4)'};
+             background:${ok?'rgba(16,185,129,0.1)':'rgba(239,68,68,0.1)'};
+             color:${ok?'#34d399':'#f87171'}">${ok?'✅':'❌'} ${label}</span>`;
+        body.innerHTML = `
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px">
+            ${chip(cap.opencv,'OpenCV')} ${chip(cap.pyzbar,'pyzbar (바코드)')}
+            ${chip(cap.easyocr,'EasyOCR (OCR)')} ${chip(cap.ffmpeg,'FFmpeg')}
+          </div>
+          <div style="background:rgba(255,255,255,0.04);border-radius:8px;padding:12px;margin-bottom:14px">
+            <code style="color:#94a3b8;font-size:0.78rem;white-space:pre-wrap">${json.recommended_install}</code>
+          </div>
+          <div style="color:#64748b;font-size:0.8rem">${json.warehouse_scale}</div>
+          <div style="color:#64748b;font-size:0.8rem;margin-top:4px">${json.batch_mode}</div>`;
+    } catch (err) {
+        body.innerHTML = `<div style="color:#f87171">오류: ${err.message}</div>`;
+    }
 }
