@@ -58,11 +58,9 @@ for (let i = 0; i < 15; i++) {
     });
 }
 
-// 3개 Dock 위치 정의
+// Dock 위치 — 왼쪽 상단 (창고 입구 기준)
 WAREHOUSE.docks = [
-    { id: 1, name: 'First Dock',  x: 20,  y: 280, w: 35, h: 60, color: '#22d3ee', aisles: [1,2,3,4,5] },
-    { id: 2, name: 'Second Dock', x: 20,  y: 360, w: 35, h: 60, color: '#34d399', aisles: [6,7,8,9,10] },
-    { id: 3, name: 'Third Dock',  x: 20,  y: 440, w: 35, h: 60, color: '#a78bfa', aisles: [11,12,13,14,15] },
+    { id: 1, name: 'Dock A',  x: 20, y: 18,  w: 35, h: 55, color: '#f87171', aisles: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15] },
 ];
 
 const DRONE = { size: 12, speed: 2.0, scanRadius: 40, batteryDrainRate: 0.037 };  // 27분에 100% 소모
@@ -436,12 +434,12 @@ function renderPatrolView(content) {
                     <rect width="${svgW}" height="${svgH}" fill="url(#grid)"/>
                     <rect x="10" y="10" width="${svgW-20}" height="${svgH-20}"
                           fill="none" stroke="rgba(99,102,241,0.25)" stroke-width="1.5" rx="4"/>
-                    <!-- 도킹 스테이션 -->
-                    <rect x="12" y="215" width="32" height="55" rx="4"
-                          fill="rgba(34,211,238,0.08)" stroke="rgba(34,211,238,0.4)" stroke-width="1"/>
-                    <text x="28" y="236" fill="#22d3ee" font-size="7" text-anchor="middle" font-family="monospace">DOCK</text>
-                    <text x="28" y="248" fill="#22d3ee" font-size="6" text-anchor="middle" font-family="monospace">⚡</text>
-                    <text x="28" y="260" fill="#22d3ee" font-size="5.5" text-anchor="middle" font-family="monospace">5-Layer</text>
+                    <!-- 도킹 스테이션 — 왼쪽 상단 (창고 입구) -->
+                    <rect x="12" y="14" width="32" height="50" rx="4"
+                          fill="rgba(248,113,113,0.15)" stroke="rgba(248,113,113,0.7)" stroke-width="1.5"/>
+                    <text x="28" y="32" fill="#f87171" font-size="7" text-anchor="middle" font-family="monospace" font-weight="bold">DOCK</text>
+                    <text x="28" y="44" fill="#f87171" font-size="6" text-anchor="middle" font-family="monospace">⚡Wi-Fi</text>
+                    <text x="28" y="56" fill="#f87171" font-size="5.5" text-anchor="middle" font-family="monospace">전송</text>
                     <g id="shelvesGroup"></g>
                     <g id="pathGroup"></g>
                     <g id="scanBeamGroup"></g>
@@ -772,8 +770,8 @@ function buildPatrolPath() {
         });
     }
 
-    // 도킹 귀환
-    path.push({ type: 'dock', x: 27, y: 240, aisle: null });
+    // 도킹 귀환 (왼쪽 상단)
+    path.push({ type: 'dock', x: 27, y: 38, aisle: null });
     return path;
 }
 
@@ -1804,7 +1802,7 @@ function launchRescan(shelfIds) {
                 shelf: shelf
             });
         });
-        path.push({ type: 'rescan_dock', x: 27, y: 240 });
+        path.push({ type: 'rescan_dock', x: 27, y: 38 });
 
         state.drone.x = 27;
         state.drone.y = 240;
@@ -3674,24 +3672,24 @@ async function renderAgentMissionView(container) {
             </div>`).join('')}
         </div>
 
-        <!-- 비행 패턴 설명 -->
+        <!-- Batch 카메라 스윕 비행 패턴 -->
         <div style="margin-top:16px;padding:14px 16px;background:rgba(0,0,0,0.25);
                     border-radius:10px;border:1px solid rgba(255,255,255,0.06)">
           <div style="font-size:0.75rem;color:#94a3b8;font-weight:700;margin-bottom:10px">
-            🏭 실제 비행 패턴 — 창고 구조 엄격 적용
+            🎥 Batch 카메라 스윕 비행 — 4K 연속 촬영 후 서버 분석
           </div>
 
-          <!-- 금지/허용 규칙 -->
-          <div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:10px">
+          <!-- 핵심 개념 -->
+          <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px">
             <div style="font-size:0.72rem;line-height:2">
+              <span style="color:#34d399;font-weight:700">✓ 드론</span>
+              <span style="color:#cbd5e1"> — 빠르게 날며 4K 영상만 촬영 (분석 안 함)</span><br>
+              <span style="color:#34d399;font-weight:700">✓ 서버</span>
+              <span style="color:#cbd5e1"> — Dock 귀환 후 Wi-Fi 전송 → 서버가 PT번호 추출</span><br>
               <span style="color:#f87171;font-weight:700">✗ 금지</span>
-              <span style="color:#64748b"> — 끝에서 옆 통로로 직접 이동 (천장·끝 통과 불가)</span><br>
-              <span style="color:#f87171;font-weight:700">✗ 금지</span>
-              <span style="color:#64748b"> — 통로 안에서 레벨 전환</span><br>
-              <span style="color:#34d399;font-weight:700">✓ 필수</span>
-              <span style="color:#cbd5e1"> — 반드시 들어온 입구로 완전히 복귀 후 다음 동작</span><br>
-              <span style="color:#34d399;font-weight:700">✓ 필수</span>
-              <span style="color:#cbd5e1"> — 레벨 전환은 입구(통로 바깥)에서만</span>
+              <span style="color:#64748b"> — 끝에서 옆 통로 직접 이동 (천장 통과 불가)</span><br>
+              <span style="color:#fbbf24;font-weight:700">★ Pass</span>
+              <span style="color:#cbd5e1"> — 4K FOV로 1 Pass에 절반 레벨 커버, 2 Pass로 전체 완료</span>
             </div>
           </div>
 
@@ -3699,27 +3697,24 @@ async function renderAgentMissionView(container) {
           <div style="background:rgba(0,0,0,0.3);border-radius:8px;padding:10px 14px;
                       margin-bottom:10px;font-family:monospace;font-size:0.68rem;
                       color:#94a3b8;line-height:1.9">
-            <span style="color:#a78bfa">Dock</span><br>
+            <span style="color:#f87171;font-weight:bold">Dock</span> <span style="color:#64748b">(왼쪽 상단)</span><br>
             &nbsp;│<br>
             &nbsp;├─► <span style="color:#22d3ee">Aisle-1 입구</span><br>
-            &nbsp;│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↓ <span style="color:#fbbf24">L1</span> 높이 → <span style="color:#34d399">직진(24m)</span> → <span style="color:#f87171">역방향 복귀(24m)</span> → 입구<br>
-            &nbsp;│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↓ <span style="color:#fbbf24">L2</span> 높이 → <span style="color:#34d399">직진(24m)</span> → <span style="color:#f87171">역방향 복귀(24m)</span> → 입구<br>
-            &nbsp;│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↓ … (L3 ~ L15 반복, 레벨 전환은 항상 입구에서)<br>
-            &nbsp;│&nbsp;&nbsp;&nbsp;(Aisle-1 완전 완료)<br>
+            &nbsp;│&nbsp;&nbsp;&nbsp;<span style="color:#fbbf24">[Pass1]</span> <span style="color:#34d399">→→→(24m)→ 끝</span> <span style="color:#f87171">←←←(24m)← 입구</span> <span style="color:#64748b">← 4K: L1~L8 동시 촬영</span><br>
+            &nbsp;│&nbsp;&nbsp;&nbsp;<span style="color:#fbbf24">[Pass2]</span> <span style="color:#34d399">→→→(24m)→ 끝</span> <span style="color:#f87171">←←←(24m)← 입구</span> <span style="color:#64748b">← 4K: L8~L15 동시 촬영</span><br>
             &nbsp;│<br>
-            &nbsp;├─► <span style="color:#22d3ee">Aisle-2 입구</span> (통로 바깥 경로로 이동)<br>
-            &nbsp;│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(같은 방식 반복)<br>
-            &nbsp;│&nbsp;&nbsp;&nbsp;…<br>
-            &nbsp;└─► <span style="color:#22d3ee">Aisle-15</span> 완료 → <span style="color:#a78bfa">Dock 귀환</span> → Wi-Fi 자동 전송
+            &nbsp;├─► <span style="color:#22d3ee">Aisle-2 ~ Aisle-15</span> (같은 방식)<br>
+            &nbsp;│<br>
+            &nbsp;└─► <span style="color:#f87171">Dock 귀환</span> → <span style="color:#34d399">Wi-Fi 자동 전송</span> → <span style="color:#a78bfa">서버 분석 (PT번호 추출)</span>
           </div>
 
           <!-- 거리/시간 계산 -->
           <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:0.72rem">
-            <span>📏 1회 왕복: <strong style="color:#e2e8f0">48m</strong> (24m×2)</span>
-            <span>🔢 통로당: <strong style="color:#e2e8f0">15레벨 × 48m ≈ 727m</strong></span>
-            <span>📐 15통로 총 거리: <strong style="color:#e2e8f0">~11km</strong></span>
-            <span>⏱ 예상 비행: <strong style="color:#fbbf24">~122분 → 배터리 4개</strong> (통로 3~4개씩 분할)</span>
-            <span>🔁 추출률 &lt;95%: <strong style="color:#f87171">해당 통로만 재촬영</strong> (최대 2회)</span>
+            <span>📏 통로 왕복: <strong style="color:#e2e8f0">48m</strong> × 2 Pass</span>
+            <span>🔢 15통로 총: <strong style="color:#e2e8f0">~1,538m</strong></span>
+            <span>⚡ 속도: <strong style="color:#34d399">2.5m/s</strong></span>
+            <span>⏱ 예상 비행: <strong style="color:#fbbf24">~10분</strong> (배터리 1개 충분)</span>
+            <span>🔁 추출률 &lt;95%: <strong style="color:#f87171">해당 통로 재촬영</strong> (최대 2회)</span>
           </div>
         </div>
       </div>
