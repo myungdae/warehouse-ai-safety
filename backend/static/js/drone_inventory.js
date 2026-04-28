@@ -1218,16 +1218,93 @@ function finishPatrol() {
         }
     });
 
-    // Day2 완료 시 자동 비교 + Agentic AI 실행
-    if (!isDay1) {
+    // 순찰 완료 후 자동 후처리 파이프라인 시각화
+    setTimeout(() => runPostFlightPipeline(isDay1), 800);
+}
+
+// ── 비행 완료 후 자동 처리 파이프라인 시각화 ──────────────────
+// 드론 귀환 → Wi-Fi 영상 전송 → 서버 분석 → ERP 비교 → 보고서
+function runPostFlightPipeline(isDay1) {
+    // 라이브 피드 패널에 파이프라인 진행 상황 순차 표시
+    const steps = [
+        { icon: '📡', label: 'Wi-Fi 영상 자동 전송',      delay:    0, color: '#22d3ee' },
+        { icon: '🎬', label: '영상 프레임 추출 (5fps)',    delay:  900, color: '#a78bfa' },
+        { icon: '📦', label: 'OpenCV 바코드 인식',         delay: 1800, color: '#34d399' },
+        { icon: '🔤', label: 'EasyOCR PT번호 추출',        delay: 2700, color: '#fbbf24' },
+        { icon: '💾', label: 'scan_events DB 저장',        delay: 3600, color: '#6366f1' },
+        { icon: '🔄', label: 'ERP 비교 분석',              delay: 4500, color: '#f87171' },
+        { icon: '📊', label: isDay1 ? '스캔 완료 보고서 생성' : 'Agentic AI 판단 시작', delay: 5400, color: '#fb923c' },
+    ];
+
+    addFeed(
+        `<div style="padding:6px 0;border-top:1px solid rgba(255,255,255,0.07);margin-top:4px">
+         <b style="color:#22d3ee">⚡ 자동 후처리 파이프라인 시작</b>
+         <div id="pipeline-steps" style="margin-top:6px;display:flex;flex-direction:column;gap:4px"></div>
+         </div>`,
+        'agent-action'
+    );
+
+    steps.forEach(step => {
         setTimeout(() => {
-            addFeed('🤖 Agentic AI: 재고 비교 분석 시작...', 'agent-action');
-            runInventoryComparison();
-            setTimeout(() => runAgenticAI(), 800);
-        }, 600);
-    } else {
-        addFeed('📅 Day 2로 전환하여 다음날 순찰을 시작하세요.', '');
-    }
+            const container = document.getElementById('pipeline-steps');
+            if (!container) return;
+            const div = document.createElement('div');
+            div.style.cssText = `display:flex;align-items:center;gap:6px;font-size:0.76rem;
+                animation:fadeIn 0.3s ease`;
+            div.innerHTML = `
+                <span style="font-size:0.9rem">${step.icon}</span>
+                <span style="color:${step.color};font-weight:600">${step.label}</span>
+                <span style="color:#34d399;margin-left:auto;font-size:0.7rem">✅ 완료</span>`;
+            container.appendChild(div);
+
+            // 각 단계별 피드도 개별 출력
+            addFeed(`${step.icon} <b style="color:${step.color}">${step.label}</b> — 완료`, 'scan-item');
+        }, step.delay);
+    });
+
+    // 전체 파이프라인 완료 후 처리
+    const totalDelay = 5400 + 800;
+    setTimeout(() => {
+        const ptCount = state.scannedShelves.size;
+        const extractRate = (92 + Math.random() * 6).toFixed(1);
+
+        addFeed(
+            `<div style="background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);
+             border-radius:8px;padding:10px;margin-top:4px">
+             <div style="color:#34d399;font-weight:700;margin-bottom:6px">
+               🎉 전체 파이프라인 완료
+             </div>
+             <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:0.75rem">
+               <span style="color:#64748b">📦 PT번호 추출</span>
+               <span style="color:#e2e8f0;font-weight:600">${ptCount.toLocaleString()}개</span>
+               <span style="color:#64748b">🎯 추출률</span>
+               <span style="color:${parseFloat(extractRate)>=95?'#34d399':'#fbbf24'};font-weight:700">
+                 ${extractRate}% ${parseFloat(extractRate)>=95?'✅':'⚠️ 재촬영 검토'}
+               </span>
+               <span style="color:#64748b">💾 DB 저장</span>
+               <span style="color:#e2e8f0;font-weight:600">scan_events 완료</span>
+               <span style="color:#64748b">🔄 ERP 비교</span>
+               <span style="color:#e2e8f0;font-weight:600">자동 완료</span>
+             </div>
+             </div>`,
+            'agent-action'
+        );
+
+        // Day2면 Agentic AI 자동 실행
+        if (!isDay1) {
+            setTimeout(() => {
+                addFeed('🤖 Agentic AI: 재고 비교 분석 시작...', 'agent-action');
+                runInventoryComparison();
+                setTimeout(() => runAgenticAI(), 800);
+            }, 600);
+        } else {
+            addFeed(
+                `<span style="color:#fbbf24">📅 Day 2로 전환하여 다음날 순찰을 시작하세요.</span><br>
+                 <span style="font-size:0.72rem;color:#64748b">또는 영상 스캔 메뉴에서 실제 드론 영상을 업로드하세요.</span>`,
+                ''
+            );
+        }
+    }, totalDelay);
 }
 
 // ============================================================
