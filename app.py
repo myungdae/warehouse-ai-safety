@@ -40,6 +40,9 @@ app = Flask(__name__,
 if CORS_AVAILABLE:
     CORS(app)
 
+# 영상 업로드 최대 크기: 4 GB (4K 10분 기준)
+app.config['MAX_CONTENT_LENGTH'] = 4 * 1024 * 1024 * 1024
+
 # ── Report Archive DB (SQLite — persistent across restarts) ───
 REPORT_ARCHIVE_DIR = os.path.join(os.path.dirname(__file__), 'backend', 'data')
 REPORT_DB_FILE     = os.path.join(REPORT_ARCHIVE_DIR, 'reports.db')
