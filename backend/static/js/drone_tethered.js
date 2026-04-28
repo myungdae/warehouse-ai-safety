@@ -45,38 +45,36 @@ const LAYERS = [
 // In production this would be LAYERS (all 15)
 const DEMO_LAYERS = LAYERS.slice(0, 2);
 
+// RED_LINE_Y: 각 Aisle의 상단 입구를 연결하는 수평 통로
+const RED_LINE_Y = 44;  // 빨간선 Y 좌표
+const AISLE_TOP_Y = 55; // Aisle 진입 Y 좌표 (RED_LINE 바로 아래)
+
 const WAREHOUSE = {
     width: 1400,
     height: 620,
     aisles: [],
     shelves: [],
     docks: [
+        // 단일 Dock — Aisle 1 좌측 상단 (빨간색)
         { 
             id: 'A', 
-            name: 'Dock A (Top-Left)', 
-            x: 65, y: 10, w: 50, h: 30,
-            color: '#22d3ee',
-            aisles: ['1','2','3','4','5','6','7']
-        },
-        { 
-            id: 'B', 
-            name: 'Dock B (Top-Right)', 
-            x: 1285, y: 10, w: 50, h: 30,
-            color: '#a78bfa',
-            aisles: ['8','9','10','11','12','13','14','15']
+            name: 'DOCK (Aisle-1 입구)',
+            x: 65, y: 5, w: 55, h: 32,
+            color: '#f87171',
+            aisles: ['1','2','3','4','5','6','7','8','9','10','11','12','13','14','15']
         },
     ]
 };
 
-// Generate Aisles (15 aisles, vertical layout)
+// Generate Aisles (15 aisles, 가로 배치, 세로 통로)
 for (let i = 0; i < 15; i++) {
     WAREHOUSE.aisles.push({
         id: String(i + 1),
-        label: `Aisle ${i + 1}`,
+        label: `A${i + 1}`,
         x: 90 + i * 85,
-        y: 50,
+        y: AISLE_TOP_Y,      // RED_LINE 바로 아래에서 시작
         w: 60,
-        h: 520
+        h: 530               // 아래로 길게 (세로 통로)
     });
 }
 
@@ -122,9 +120,9 @@ WAREHOUSE.aisles.forEach(aisle => {
 
 const DRONE_CONFIG = {
     size: 12,
-    speed: 5.0,  // 적당한 이동 속도 (애니메이션 안정적)
+    speed: 6.0,   // 4K 연속 sweep 속도 (빠르게)
     scanRadius: 40,
-    scanDelay: 200,  // 스캔 딜레이 — 약 3분 순찰 완료
+    scanDelay: 0, // sweep 중 정지 없음
 };
 
 // ══════════════════════════════════════════════════════════════
@@ -234,8 +232,8 @@ const state = {
     sessionId: null,          // ← 순찰 세션 ID (Edge DB 기록용)
     erpCompareResult: null,   // ← ERP 비교 결과 캐시
     drones: {
-        A: { id: 'A', dockId: 'A', x: 90, y: 25, angle: 0, status: 'standby', currentAisle: null, currentLevel: null, path: [], pathIndex: 0, scannedCount: 0, isScanning: false },
-        B: { id: 'B', dockId: 'B', x: 1310, y: 25, angle: 0, status: 'standby', currentAisle: null, currentLevel: null, path: [], pathIndex: 0, scannedCount: 0, isScanning: false },
+        // 단일 드론 A (Tethered, 전 Aisle 담당)
+        A: { id: 'A', dockId: 'A', x: 92, y: 21, angle: 0, status: 'standby', currentAisle: null, currentLevel: null, path: [], pathIndex: 0, scannedCount: 0, isScanning: false },
     },
     scannedShelves: new Set(),
     scanEvents: [],
@@ -250,109 +248,101 @@ const state = {
 };
 
 // ══════════════════════════════════════════════════════════════
-// TASK BUILDER — Level-Pass Strategy (CORRECT)
+// TASK BUILDER — 4K Batch Sweep (CORRECT)
 //
-// Real tethered drone operation:
-//   PASS L1: Dock → Aisle1(Rack1~20,L1) → Aisle2 → ... → AisleN → Dock
-//   PASS L2: Dock → Aisle1(Rack1~20,L2) → Aisle2 → ... → AisleN → Dock
-//   ...
-//   PASS L15: Dock → all aisles (L15) → Dock  ← complete
+// \uc2e4\uc81c \ube44\ud589 \ud328\ud134:
+//   Dock → RED_LINE \uc218\ud3c9 \uc774\ub3d9 → A1 \uc0c1\ub2e8 \uc9c4\uc785 → \uc544\ub798\ub85c sweep →
+//   \ud558\ub2e8 U\ud134 → \uc704\ub85c sweep → RED_LINE \ubcf5\uadc0 → A2 \uc774\ub3d9 → ... → Dock
 //
-// Each PASS = one full sweep of all assigned aisles at ONE level only.
-// The drone returns to dock between passes (cable management).
+// ※ \uc7a1\uc544\uc8fc\uae30:
+//   - \uac01 Aisle\ub294 2\uac1c waypoint\ub9cc (top\u2192bottom): NO per-rack stops
+//   - \uc774\ub3d9 \uc911 \uc5f0\uc18d \uc2a4\uce94 (droneLoop\uc5d0\uc11c proximity check\ub85c \uc790\ub3d9 \ucc98\ub9ac)
+//   - \ubcf4\ub77c\uc77c \uc5c6\uc774 \ubbf8\ub044\ub7ec\uc9c0\ub4ef\uc774 \uc774\ub3d9
 // ══════════════════════════════════════════════════════════════
 
 function buildTaskQueue(dockId) {
     const dock = WAREHOUSE.docks.find(d => d.id === dockId);
     const tasks = [];
+    const dockCx = dock.x + dock.w / 2;
+    const dockCy = dock.y + dock.h / 2;
 
-    // Iterate over each level PASS first (outer loop)
+    // PASS 1 (L1~L8) + PASS 2 (L9~L15) — \uac01 Pass\ub294 \uc804\uccb4 aisle\uc744 \ud55c \ubc88 sweep
     DEMO_LAYERS.forEach((layer, levelIdx) => {
 
-        // ── PASS START: Dock → first aisle entry (horizontal move at dock Y)
+        // ── PASS \uc2dc\uc791: Dock\uc5d0\uc11c \uce68\ub2f9\ubd80\ud130 \uc218\ud3c9\uc73c\ub85c RED_LINE \uc774\ub3d9
         tasks.push({
             type: 'level_pass_start',
-            desc: `▶ Level Pass ${layer.id} (${layer.label}) — all aisles`,
+            desc: `▶ Pass ${layer.id} (${layer.label}) \uc2dc\uc791 — \ub4dc\ub860 \uc2dc\ub3d9`,
             layerId: layer.id,
             levelIdx: levelIdx,
-            x: dock.x + dock.w / 2,
-            y: dock.y + dock.h / 2,
+            x: dockCx, y: dockCy,
         });
 
-        // ── Scan every assigned aisle at this level
-        dock.aisles.forEach((aisleId, idx) => {
-            const aisle = WAREHOUSE.aisles.find(a => a.id === aisleId);
-            const aisleCenter = aisle.x + aisle.w / 2;
-            const aisleTop    = aisle.y + 10;
-
-            // 1. Move horizontally to aisle column (at dock height)
-            tasks.push({
-                type: 'move',
-                desc: `[${layer.id}] Navigate to Aisle ${aisleId}`,
-                x: aisleCenter,
-                y: dock.y + dock.h / 2,
-                straightLineOnly: true
-            });
-
-            // 2. Descend into aisle top
-            tasks.push({
-                type: 'move',
-                desc: `[${layer.id}] Enter Aisle ${aisleId}`,
-                x: aisleCenter,
-                y: aisleTop,
-                straightLineOnly: true
-            });
-
-            // 3. Scan Rack 1 → 20 at THIS LEVEL ONLY
-            for (let rack = 1; rack <= 20; rack++) {
-                const shelvesLeft = WAREHOUSE.shelves.filter(s =>
-                    s.aisle === aisleId && s.side === 'L' &&
-                    s.rack === rack && s.layerIdx === levelIdx
-                );
-                const shelvesRight = WAREHOUSE.shelves.filter(s =>
-                    s.aisle === aisleId && s.side === 'R' &&
-                    s.rack === rack && s.layerIdx === levelIdx
-                );
-                tasks.push({
-                    type: 'scan',
-                    aisleId: aisleId,
-                    rack: rack,
-                    layerId: layer.id,
-                    levelIdx: levelIdx,
-                    shelvesLeft:  shelvesLeft,
-                    shelvesRight: shelvesRight,
-                    x: aisleCenter,
-                    y: aisle.y + 10 + (rack - 1) * 25 + 10,
-                });
-            }
-
-            // 4. Return to aisle top after rack scan
-            tasks.push({
-                type: 'move',
-                desc: `[${layer.id}] Exit Aisle ${aisleId}`,
-                x: aisleCenter,
-                y: aisleTop,
-                straightLineOnly: true
-            });
-        });
-
-        // ── PASS END: return to dock (horizontal at dock Y)
-        // Move to dock column
+        // RED_LINE \ub192\uc774\ub85c \uc124\uc815 (Aisle \uc758 \ubc14\ub85c \uc704)
         tasks.push({
             type: 'move',
-            desc: `[${layer.id}] Return to dock column`,
-            x: dock.x + dock.w / 2,
-            y: dock.y + dock.h / 2 + 5,  // slight offset for visibility
-            straightLineOnly: true
+            desc: `[${layer.id}] RED LINE\uc73c\ub85c \uc774\ub3d9`,
+            x: dockCx, y: RED_LINE_Y,
+            straightLineOnly: true,
         });
-        // Dock
+
+        // ── \uac01 Aisle\uc744 \uc21c\uc11c\ub300\ub85c sweep (\uc815\uc9c0 \uc5c6\uc774 \uc5f0\uc18d \uc774\ub3d9)
+        dock.aisles.forEach((aisleId) => {
+            const aisle = WAREHOUSE.aisles.find(a => a.id === aisleId);
+            const cx = aisle.x + aisle.w / 2;
+            const topY  = aisle.y;             // Aisle \uc0c1\ub2e8 \uc785\uad6c
+            const botY  = aisle.y + aisle.h;   // Aisle \ud558\ub2e8 \ub05d
+
+            // 1) RED_LINE\uc5d0\uc11c \uc218\ud3c9\uc73c\ub85c Aisle \uc785\uad6c\ub85c \uc774\ub3d9
+            tasks.push({
+                type: 'move',
+                desc: `[${layer.id}] Aisle ${aisleId} \uc785\uad6c\ub85c \uc774\ub3d9`,
+                x: cx, y: RED_LINE_Y,
+                straightLineOnly: true,
+            });
+
+            // 2) Aisle \uc9c4\uc785: \uc0c1\ub2e8 → \ud558\ub2e8 sweep (\uc5f0\uc18d \uc2a4\uce94)
+            tasks.push({
+                type: 'sweep_down',
+                aisleId: aisleId,
+                layerId: layer.id,
+                levelIdx: levelIdx,
+                x: cx, y: botY,
+                desc: `[${layer.id}] Aisle ${aisleId} \uc544\ub798\ub85c sweep`,
+            });
+
+            // 3) U\ud134: \ud558\ub2e8\uc5d0\uc11c \ub2e4\uc2dc \uc0c1\ub2e8\uc73c\ub85c
+            tasks.push({
+                type: 'sweep_up',
+                aisleId: aisleId,
+                layerId: layer.id,
+                levelIdx: levelIdx,
+                x: cx, y: topY,
+                desc: `[${layer.id}] Aisle ${aisleId} \uc704\ub85c U\ud134 \ubcf5\uad00`,
+            });
+
+            // 4) RED_LINE\uc73c\ub85c \ube60\uc838\ub098\uc624\uae30
+            tasks.push({
+                type: 'move',
+                desc: `[${layer.id}] Aisle ${aisleId} \uc5d0\uc11c \uc774\ud0c8`,
+                x: cx, y: RED_LINE_Y,
+                straightLineOnly: true,
+            });
+        });
+
+        // ── PASS \uc644\ub8cc: Dock\ub85c \ubcf5\uadc0
+        tasks.push({
+            type: 'move',
+            desc: `[${layer.id}] Dock \uc218\ud3c9 \uc774\ub3d9`,
+            x: dockCx, y: RED_LINE_Y,
+            straightLineOnly: true,
+        });
         tasks.push({
             type: 'level_pass_end',
-            desc: `✅ ${layer.id} Pass complete — returning to ${dock.name}`,
+            desc: `✅ ${layer.id} Pass \uc644\ub8cc — Dock \ubcf5\uadc0`,
             layerId: layer.id,
             levelIdx: levelIdx,
-            x: dock.x + dock.w / 2,
-            y: dock.y + dock.h / 2,
+            x: dockCx, y: dockCy,
         });
     });
 
@@ -377,20 +367,16 @@ function startPatrol() {
     state.sessionId = `SES-${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}-${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}-${Math.random().toString(36).substr(2,6).toUpperCase()}`;
     addFeed(`🔑 세션 시작: ${state.sessionId}`, 'system');
     
-    // Build tasks for each dock
-    ['A', 'B'].forEach(dockId => {
-        const drone = state.drones[dockId];
-        drone.path = buildTaskQueue(dockId);
-        drone.pathIndex = 0;
-        drone.status = 'working';
-        
-        console.log(`Drone ${dockId}: ${drone.path.length} tasks`);
-        
-        // Start animation
-        state.animFrames[dockId] = requestAnimationFrame(() => droneLoop(dockId));
-    });
+    // 단일 드론 A 시동
+    const droneA = state.drones['A'];
+    droneA.path = buildTaskQueue('A');
+    droneA.pathIndex = 0;
+    droneA.status = 'working';
+    droneA.scannedCount = 0;
+    console.log(`Drone A: ${droneA.path.length} tasks (smooth sweep)`);
+    state.animFrames['A'] = requestAnimationFrame(() => droneLoop('A'));
     
-    addFeed('🔌 Tethered Drone Patrol Started — 2 drones (wired power)', 'system');
+    addFeed('📹 4K Batch Sweep 시작 — Dock→RED LINE→A1단노드스칌→…→A15→Dock', 'system');
     
     // Update button
     const btn = document.getElementById('patrolBtn');
@@ -399,11 +385,9 @@ function startPatrol() {
 
 function stopPatrol() {
     state.patrolActive = false;
-    ['A', 'B'].forEach(dockId => {
-        if (state.animFrames[dockId]) {
-            cancelAnimationFrame(state.animFrames[dockId]);
-        }
-    });
+    if (state.animFrames['A']) {
+        cancelAnimationFrame(state.animFrames['A']);
+    }
     
     const btn = document.getElementById('patrolBtn');
     if (btn) btn.textContent = '▶ Resume';
@@ -429,18 +413,17 @@ function resetPatrol() {
     const erpCardHint = document.getElementById('erpCardHint');
     if (erpCardHint) erpCardHint.textContent = '순찰 후 자동 비교';
     
-    ['A', 'B'].forEach(dockId => {
-        const drone = state.drones[dockId];
-        const dock = WAREHOUSE.docks.find(d => d.id === dockId);
-        drone.x = dock.x + dock.w / 2;
-        drone.y = dock.y + dock.h / 2;
-        drone.status = 'standby';
-        drone.currentAisle = null;
-        drone.currentLevel = null;
-        drone.path = [];
-        drone.pathIndex = 0;
-        drone.scannedCount = 0;
-    });
+    // Drone A 리셋
+    const dockA = WAREHOUSE.docks[0];
+    const droneAReset = state.drones['A'];
+    droneAReset.x = dockA.x + dockA.w / 2;
+    droneAReset.y = dockA.y + dockA.h / 2;
+    droneAReset.status = 'standby';
+    droneAReset.currentAisle = null;
+    droneAReset.currentLevel = null;
+    droneAReset.path = [];
+    droneAReset.pathIndex = 0;
+    droneAReset.scannedCount = 0;
     
     const btn = document.getElementById('patrolBtn');
     if (btn) btn.textContent = '▶ Start Patrol';
@@ -458,109 +441,193 @@ function togglePatrol() {
 
 function droneLoop(droneId) {
     const drone = state.drones[droneId];
-    
+
     if (!state.patrolActive || drone.status !== 'working') return;
-    
-    // If currently scanning, don't move
-    if (drone.isScanning) {
-        state.animFrames[droneId] = requestAnimationFrame(() => droneLoop(droneId));
-        return;
-    }
-    
+
+    // isScanning \uc911\uc5d0\ub3c4 \uc774\ub3d9 \uc9c0\uc18d (sweep_down/up \uc911 \uc5f0\uc18d \uc2a4\uce94)
+    // — sweep type\uc774\uba74 \uc774\ub3d9 \uc911 scanShelvesInRange() \ud638\ucd9c
+
     if (drone.path.length > 0 && drone.pathIndex < drone.path.length) {
         const target = drone.path[drone.pathIndex];
-        
-        // For straight-line movement, move to targetX/targetY in two phases
+
+        // ── \uc9c1\uc120 \uc774\ub3d9 (RED_LINE \uc218\ud3c9 \uc774\ub3d9 / Dock \ubcf5\uac70)
         if (target.straightLineOnly) {
-            // Phase 1: Move horizontally if X doesn't match
             if (Math.abs(drone.x - target.x) > 2) {
                 drone.x += (target.x > drone.x ? 1 : -1) * DRONE_CONFIG.speed;
-                drone.angle = target.x > drone.x ? 0 : 180;
-            }
-            // Phase 2: Move vertically if Y doesn't match
-            else if (Math.abs(drone.y - target.y) > 2) {
+            } else if (Math.abs(drone.y - target.y) > 2) {
                 drone.y += (target.y > drone.y ? 1 : -1) * DRONE_CONFIG.speed;
-                drone.angle = target.y > drone.y ? 90 : -90;
-            }
-            // Reached target
-            else {
+            } else {
                 drone.x = target.x;
                 drone.y = target.y;
-                if (target.desc) {
-                    addFeed(`Drone ${droneId}: ${target.desc}`, 'system');
-                }
                 drone.pathIndex++;
             }
-        } else {
-            // Regular movement (for scan targets)
-            const dx = target.x - drone.x;
+        }
+        // ── Aisle sweep (\uc544\ub798 or \uc704\ub85c) — \uc5f0\uc18d \uc774\ub3d9 + \uc2e4\uc2dc\uac04 \uc2a4\uce94
+        else if (target.type === 'sweep_down' || target.type === 'sweep_up') {
             const dy = target.y - drone.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            
-            if (dist < 2) {
-                // Reached target
-                if (target.type === 'scan') {
-                    // Start scanning (async)
-                    drone.isScanning = true;
-                    processScanWithDelay(droneId, target, () => {
-                        drone.isScanning = false;
-                        drone.pathIndex++;
-                    });
-                } else if (target.type === 'move') {
-                    if (target.desc) {
-                        addFeed(`Drone ${droneId}: ${target.desc}`, 'system');
-                    }
-                    drone.pathIndex++;
-                } else if (target.type === 'level_pass_start') {
-                    drone.x = target.x;
-                    drone.y = target.y;
-                    drone.currentLevel = target.layerId;
-                    updatePassBarStatus(target.layerId, 'active', 0);
-                    addFeed(`Drone ${droneId}: ${target.desc}`, 'system');
-                    drone.pathIndex++;
-                } else if (target.type === 'level_pass_end') {
-                    drone.x = target.x;
-                    drone.y = target.y;
-                    drone.currentLevel = null;
-                    updatePassBarStatus(target.layerId, 'done', 100);
-                    addFeed(`Drone ${droneId}: ${target.desc}`, 'success');
-                    drone.pathIndex++;
-                } else {
-                    // Unknown task type — skip
-                    drone.pathIndex++;
-                }
+            if (Math.abs(dy) > 2) {
+                // \uc138\ub85c \uc774\ub3d9 (X\ub294 \uace0\uc815)
+                drone.y += (dy > 0 ? 1 : -1) * DRONE_CONFIG.speed;
+                drone.currentAisle = target.aisleId;
+                drone.currentLevel = target.layerId;
+
+                // \uc774\ub3d9 \uc911 \uc8fc\ubcc0 \uc120\ubc18 \uc2a4\uce94 (\uc815\uc9c0 \uc5c6\uc774 \uc5f0\uc18d)
+                scanShelvesInRange(droneId, target.aisleId, drone.y, target.levelIdx);
             } else {
-                // Move towards target
-                drone.x += (dx / dist) * DRONE_CONFIG.speed;
-                drone.y += (dy / dist) * DRONE_CONFIG.speed;
-                drone.angle = Math.atan2(dy, dx) * 180 / Math.PI;
+                // Aisle sweep \uc644\ub8cc
+                drone.y = target.y;
+                if (target.type === 'sweep_down') {
+                    addFeed(`🔽 Aisle ${target.aisleId} \uc544\ub798\ub85c sweep \uc644\ub8cc`, 'scan');
+                } else {
+                    addFeed(`🔼 Aisle ${target.aisleId} U\ud134 \ubcf5\uad00 \uc644\ub8cc`, 'scan');
+                }
+                updatePassBarProgress(target.layerId);
+                drone.pathIndex++;
             }
         }
-        
-        // Check if all tasks completed
+        // ── level_pass_start
+        else if (target.type === 'level_pass_start') {
+            const dx = target.x - drone.x;
+            const dy = target.y - drone.y;
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            if (dist < 2) {
+                drone.currentLevel = target.layerId;
+                updatePassBarStatus(target.layerId, 'active', 0);
+                addFeed(`▶ Pass ${target.layerId} \uc2dc\uc791 — \uc804\uccb4 15 Aisle 4K \uc2a4\uc717`, 'system');
+                drone.pathIndex++;
+            } else {
+                drone.x += (dx / dist) * DRONE_CONFIG.speed;
+                drone.y += (dy / dist) * DRONE_CONFIG.speed;
+            }
+        }
+        // ── level_pass_end
+        else if (target.type === 'level_pass_end') {
+            const dx = target.x - drone.x;
+            const dy = target.y - drone.y;
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            if (dist < 2) {
+                drone.x = target.x;
+                drone.y = target.y;
+                drone.currentLevel = null;
+                updatePassBarStatus(target.layerId, 'done', 100);
+                addFeed(`✅ Pass ${target.layerId} \uc644\ub8cc — Dock \ubcf5\uac70`, 'success');
+                drone.pathIndex++;
+            } else {
+                drone.x += (dx / dist) * DRONE_CONFIG.speed;
+                drone.y += (dy / dist) * DRONE_CONFIG.speed;
+            }
+        }
+        // ── \uae30\ud0c0 move
+        else {
+            const dx = target.x - drone.x;
+            const dy = target.y - drone.y;
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            if (dist < 2) {
+                drone.x = target.x;
+                drone.y = target.y;
+                drone.pathIndex++;
+            } else {
+                drone.x += (dx / dist) * DRONE_CONFIG.speed;
+                drone.y += (dy / dist) * DRONE_CONFIG.speed;
+            }
+        }
+
+        // \uc804\uccb4 task \uc644\ub8cc \uccb4\ud06c
         if (drone.pathIndex >= drone.path.length) {
             drone.status = 'standby';
-            addFeed(`✅ Drone ${droneId} patrol complete — ${drone.scannedCount} items scanned`, 'success');
+            addFeed(`✅ Drone ${droneId} \ubbf8\uc158 \uc644\ub8cc — ${drone.scannedCount}\uac1c PT\ubc88\ud638 \uc2a4\uce94`, 'success');
             updateDroneElement(droneId);
-            // Check if ALL drones are now standby → trigger auto-report (한 번만 실행 보장)
             const allDone = Object.values(state.drones).every(d => d.status === 'standby');
             if (allDone && state.patrolActive && !state._reportFired) {
-                state._reportFired = true;   // ← 중복 실행 방지 플래그
+                state._reportFired = true;
                 state.patrolActive = false;
                 const btn = document.getElementById('patrolBtn');
                 if (btn) btn.textContent = '▶ Start Patrol';
-                // Auto-save report and notify MCP
                 setTimeout(() => onPatrolComplete(), 800);
             }
             return;
         }
     }
-    
+
     updateDroneElement(droneId);
     updateGlobalStats();
-    
-    // Continue loop
     state.animFrames[droneId] = requestAnimationFrame(() => droneLoop(droneId));
+}
+
+// ── \uc5f0\uc18d sweep \uc911 \uc8fc\ubcc0 \uc120\ubc18 \uc790\ub3d9 \uc2a4\uce94 ──────────────────────────────────
+function scanShelvesInRange(droneId, aisleId, currentY, levelIdx) {
+    const drone = state.drones[droneId];
+    const inv = getCurrentInventory();
+    const scanTime = new Date().toLocaleTimeString('ko-KR');
+    const SCAN_RADIUS_Y = 20; // \ub4dc\ub860 \uc704\uc544\ub798 ±20px \uc120\ubc18 \uc2a4\uce94
+
+    WAREHOUSE.shelves.forEach(shelf => {
+        if (shelf.aisle !== aisleId) return;
+        if (shelf.layerIdx !== levelIdx) return;
+        if (state.scannedShelves.has(shelf.id)) return;
+
+        // \ub4dc\ub860 Y\uc88c\ud45c\uc640 \uc120\ubc18 Y\uc88c\ud45c\uc758 \uac70\ub9ac\uac00 \uc2a4\uce94 \ubc18\uacbd \uc774\ub0b4
+        const shelfCenterY = shelf.y + shelf.h / 2;
+        if (Math.abs(currentY - shelfCenterY) > SCAN_RADIUS_Y) return;
+
+        // \uc2a4\uce94 \uc2e4\ud589
+        state.scannedShelves.add(shelf.id);
+        const item = inv[shelf.id];
+        const ptNumber = item?.sku || null;
+        const qty = item?.qty || 0;
+
+        const event = {
+            id: `SE-${Date.now()}-${shelf.id}`,
+            timestamp: scanTime,
+            droneId,
+            shelfId: shelf.id,
+            aisle: shelf.aisle,
+            rack: shelf.rack,
+            side: shelf.side,
+            layer: shelf.layer,
+            sku: ptNumber,
+            qty,
+        };
+        if (state.currentDay === 1) state.scanEvents.push(event);
+        else state.scanEventsDay2.push(event);
+
+        drone.scannedCount++;
+
+        // Edge DB \uc800\uc7a5
+        if (state.sessionId) {
+            fetch('/api/scan/event', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    session_id: state.sessionId,
+                    drone_id:   droneId,
+                    aisle:      shelf.aisle,
+                    rack:       shelf.rack,
+                    side:       shelf.side,
+                    layer:      shelf.layer,
+                    shelf_id:   shelf.id,
+                    pt_number:  ptNumber,
+                    qty,
+                }),
+            }).catch(e => console.warn(`[scan/event] ${e.message}`));
+        }
+
+        // SVG \uc120\ubc18 \uc0c9\uc0c1 \uc5c5\ub370\uc774\ud2b8
+        const shelfEl = document.getElementById(`shelf-${shelf.id}`);
+        if (shelfEl) {
+            shelfEl.setAttribute('fill', qty > 0 ? 'rgba(34,211,238,0.3)' : 'rgba(248,113,113,0.2)');
+            shelfEl.setAttribute('stroke', qty > 0 ? '#22d3ee' : '#f87171');
+            shelfEl.setAttribute('stroke-width', '2');
+        }
+
+        // \uc2a4\uce94 \ud53c\ub4dc (\uc9c4\ud589 \uc0c1\ud669\ub9cc \uac04\ub9b5\ud788 \uc720\uc9c0)
+        if (drone.scannedCount % 30 === 0) {
+            const scanMsg = qty > 0
+                ? `\ubb34\uc911\ub2e8 PT: <b style="color:#22d3ee">${ptNumber}</b>`
+                : `\ube48 \uc120\ubc18`;
+            addFeed(`📡 Aisle ${aisleId} \uc2a4\uce94 \uc9c4\ud589 \uc911 — ${scanMsg} (${drone.scannedCount}\uac1c)`, 'scan');
+        }
+    });
 }
 
 async function processScanWithDelay(droneId, task, onComplete) {
@@ -735,18 +802,16 @@ function renderPatrolView(content) {
                             </div>`).join('')}
                         </div>
                     </div>
-                    ${WAREHOUSE.docks.map(dock => `
-                    <div class="dock-card" style="border-left:3px solid ${dock.color};padding:8px;background:rgba(15,23,42,0.5);border-radius:4px">
-                        <div style="font-weight:700;color:${dock.color};font-size:0.8rem">${dock.name}</div>
+                    <!-- \ub4dc\ub860 A \uc0c1\ud0dc \ud328\ub110 -->
+                    <div style="border-left:3px solid #f87171;padding:8px;background:rgba(15,23,42,0.5);border-radius:4px">
+                        <div style="font-weight:700;color:#f87171;font-size:0.8rem">📹 Drone A (4K)</div>
                         <div style="font-size:0.65rem;color:#64748b;margin-top:4px">
-                            <div>Drone: <span style="color:${dock.color}">${dock.id}</span></div>
-                            <div>Aisles: ${dock.aisles.join(', ')}</div>
-                            <div id="drone${dock.id}-aisle" style="color:#94a3b8">Current: -</div>
-                            <div id="drone${dock.id}-level" style="color:#fbbf24;font-weight:600">Pass: -</div>
-                            <div id="drone${dock.id}-status">Status: Standby</div>
+                            <div>\ub2f4\ub2f9: <span style="color:#f87171">Aisle 1-15 \uc804\uccb4</span></div>
+                            <div id="droneA-aisle" style="color:#94a3b8">Current: -</div>
+                            <div id="droneA-level" style="color:#fbbf24;font-weight:600">Pass: -</div>
+                            <div id="droneA-status">Status: Standby</div>
                         </div>
                     </div>
-                    `).join('')}
                 </div>
                 
                 <!-- Warehouse Map -->
@@ -773,37 +838,81 @@ function renderWarehouseElements() {
     const shelvesG = document.getElementById('shelvesGroup');
     const dronesG = document.getElementById('dronesGroup');
     
-    // Render docks
-    WAREHOUSE.docks.forEach(dock => {
-        const rect = createSVG('rect', {
-            x: dock.x, y: dock.y, width: dock.w, height: dock.h,
-            fill: `rgba(${dock.color === '#22d3ee' ? '34,211,238' : '167,139,250'},0.15)`,
-            stroke: dock.color, 'stroke-width': '2', rx: '4'
-        });
-        docksG.appendChild(rect);
-        
-        const label = createSVG('text', {
-            x: dock.x + dock.w / 2, y: dock.y - 5,
-            fill: dock.color, 'font-size': '9', 'text-anchor': 'middle', 'font-weight': '700'
-        });
-        label.textContent = dock.name;
-        docksG.appendChild(label);
+    // Dock 렌더링 (단일, 빨간색)
+    const dock = WAREHOUSE.docks[0];
+    const dockRect = createSVG('rect', {
+        x: dock.x, y: dock.y, width: dock.w, height: dock.h,
+        fill: 'rgba(248,113,113,0.2)', stroke: '#f87171', 'stroke-width': '2.5', rx: '5'
     });
+    docksG.appendChild(dockRect);
+    const dockLbl = createSVG('text', {
+        x: dock.x + dock.w / 2, y: dock.y + 12,
+        fill: '#f87171', 'font-size': '8', 'text-anchor': 'middle', 'font-weight': '700'
+    });
+    dockLbl.textContent = 'DOCK';
+    docksG.appendChild(dockLbl);
+    const dockLbl2 = createSVG('text', {
+        x: dock.x + dock.w / 2, y: dock.y + 23,
+        fill: '#f87171', 'font-size': '6.5', 'text-anchor': 'middle'
+    });
+    dockLbl2.textContent = '⚡Wi-Fi';
+    docksG.appendChild(dockLbl2);
+
+    // RED LINE — 모든 Aisle 상단 입구를 연결하는 수평선
+    const lastAisle = WAREHOUSE.aisles[WAREHOUSE.aisles.length - 1];
+    const redLine = createSVG('line', {
+        x1: dock.x, y1: RED_LINE_Y,
+        x2: lastAisle.x + lastAisle.w, y2: RED_LINE_Y,
+        stroke: '#f87171', 'stroke-width': '2.5',
+        'stroke-dasharray': '8,4',
+        opacity: '0.85'
+    });
+    docksG.appendChild(redLine);
+    const redLbl = createSVG('text', {
+        x: lastAisle.x + lastAisle.w + 8, y: RED_LINE_Y + 4,
+        fill: '#f87171', 'font-size': '7.5', 'font-weight': '700'
+    });
+    redLbl.textContent = 'RED LINE';
+    docksG.appendChild(redLbl);
     
-    // Render aisles — 전 구역 동일 색상 (PT번호 기준)
-    WAREHOUSE.aisles.forEach(aisle => {
+    // Aisle 렌더링 — 각 aisle은 세로 통로, 양측에 rack이 있는 형태
+    WAREHOUSE.aisles.forEach((aisle, i) => {
+        // 통로 배경
         const rect = createSVG('rect', {
             x: aisle.x, y: aisle.y, width: aisle.w, height: aisle.h,
-            fill: 'rgba(34,211,238,0.03)', stroke: 'rgba(34,211,238,0.2)', 'stroke-width': '1', rx: '2'
+            fill: 'rgba(34,211,238,0.03)',
+            stroke: 'rgba(34,211,238,0.15)', 'stroke-width': '1', rx: '2'
         });
         aislesG.appendChild(rect);
 
+        // Aisle 레이블 (위쪽)
         const label = createSVG('text', {
-            x: aisle.x + aisle.w / 2, y: aisle.y - 5,
-            fill: '#64748b', 'font-size': '8', 'text-anchor': 'middle'
+            x: aisle.x + aisle.w / 2,
+            y: aisle.y - 7,
+            fill: '#4b5563', 'font-size': '8', 'text-anchor': 'middle',
+            'font-family': 'monospace'
         });
         label.textContent = aisle.label;
         aislesG.appendChild(label);
+
+        // 락 표현 (Aisle 양쪽 뜩은 막대기 패널)
+        const rackColorL = 'rgba(52,211,153,0.25)';
+        const rackColorR = 'rgba(99,102,241,0.25)';
+        const rackW = 22;
+        // 좌측 rack 패널 (Side A)
+        const rackL = createSVG('rect', {
+            x: aisle.x - rackW - 2, y: aisle.y,
+            width: rackW, height: aisle.h,
+            fill: rackColorL, stroke: 'rgba(52,211,153,0.4)', 'stroke-width': '0.8', rx: '2'
+        });
+        aislesG.appendChild(rackL);
+        // 우측 rack 패널 (Side B)
+        const rackR = createSVG('rect', {
+            x: aisle.x + aisle.w + 2, y: aisle.y,
+            width: rackW, height: aisle.h,
+            fill: rackColorR, stroke: 'rgba(99,102,241,0.4)', 'stroke-width': '0.8', rx: '2'
+        });
+        aislesG.appendChild(rackR);
     });
     
     // Render shelves (L1, L2 only)
@@ -830,65 +939,74 @@ function renderWarehouseElements() {
         shelvesG.appendChild(rect);
     });
     
-    // Render drones
-    ['A', 'B'].forEach(droneId => {
-        const drone = state.drones[droneId];
-        const g = createSVG('g', { id: `drone-${droneId}` });
-        
-        const circle = createSVG('circle', {
-            cx: drone.x, cy: drone.y, r: DRONE_CONFIG.size,
-            fill: WAREHOUSE.docks.find(d => d.id === droneId).color,
-            opacity: '0.8', stroke: '#fff', 'stroke-width': '1.5'
+    // \ub2e8\uc77c \ub4dc\ub860 A \ub80c\ub354\ub9c1
+    const droneA = state.drones['A'];
+    const gA = createSVG('g', { id: 'drone-A' });
+    // \ub4dc\ub860 \ubcf8\uccb4 (\ube68\uac04\uc0c9 = Dock \uc0c9\uc0c1)
+    const propPositions = [[-8,-8],[8,-8],[-8,8],[8,8]];
+    propPositions.forEach(([dx,dy]) => {
+        const prop = createSVG('ellipse', {
+            cx: droneA.x + dx, cy: droneA.y + dy,
+            rx: '5', ry: '2',
+            fill: 'rgba(248,113,113,0.5)', stroke: '#f87171', 'stroke-width': '0.8'
         });
-        g.appendChild(circle);
-        
-        const text = createSVG('text', {
-            x: drone.x, y: drone.y + 4,
-            fill: '#fff', 'font-size': '8', 'text-anchor': 'middle', 'font-weight': '700'
-        });
-        text.textContent = droneId;
-        g.appendChild(text);
-        
-        dronesG.appendChild(g);
+        gA.appendChild(prop);
     });
+    const bodyCircle = createSVG('circle', {
+        cx: droneA.x, cy: droneA.y, r: String(DRONE_CONFIG.size),
+        fill: '#f87171', opacity: '0.9', stroke: '#fff', 'stroke-width': '1.5'
+    });
+    gA.appendChild(bodyCircle);
+    const bodyText = createSVG('text', {
+        x: droneA.x, y: String(droneA.y + 4),
+        fill: '#fff', 'font-size': '7', 'text-anchor': 'middle', 'font-weight': '700'
+    });
+    bodyText.textContent = '4K';
+    gA.appendChild(bodyText);
+    dronesG.appendChild(gA);
 }
 
 function updateDroneElement(droneId) {
     const drone = state.drones[droneId];
     const g = document.getElementById(`drone-${droneId}`);
     if (!g) return;
-    
+
+    // \ubcf8\uccb4 + \ud504\ub86c\ud398\ub7ec \uc5c5\ub370\uc774\ud2b8 (\ubaa8\ub4e0 SVG \uc758 cx/cy)
+    g.querySelectorAll('ellipse').forEach((el, i) => {
+        const offsets = [[-8,-8],[8,-8],[-8,8],[8,8]];
+        const [dx, dy] = offsets[i] || [0,0];
+        el.setAttribute('cx', drone.x + dx);
+        el.setAttribute('cy', drone.y + dy);
+    });
     const circle = g.querySelector('circle');
-    const text = g.querySelector('text');
-    
-    circle.setAttribute('cx', drone.x);
-    circle.setAttribute('cy', drone.y);
-    text.setAttribute('x', drone.x);
-    text.setAttribute('y', drone.y + 4);
-    
-    // Update dock status
-    const statusEl = document.getElementById(`drone${droneId}-status`);
-    if (statusEl) {
-        statusEl.textContent = `Status: ${drone.status === 'working' ? 'Working' : 'Standby'}`;
+    const text   = g.querySelector('text');
+    if (circle) {
+        circle.setAttribute('cx', drone.x);
+        circle.setAttribute('cy', drone.y);
+    }
+    if (text) {
+        text.setAttribute('x', drone.x);
+        text.setAttribute('y', drone.y + 4);
     }
     
-    // Update current aisle
-    const aisleEl = document.getElementById(`drone${droneId}-aisle`);
+    // \uc0c1\ud0dc \ud328\ub110 \uc5c5\ub370\uc774\ud2b8 (droneA- prefix)
+    const statusEl = document.getElementById('droneA-status');
+    if (statusEl) {
+        statusEl.textContent = `Status: ${drone.status === 'working' ? '🟢 Sweeping' : '⚪ Standby'}`;
+    }
+    const aisleEl = document.getElementById('droneA-aisle');
     if (aisleEl) {
         aisleEl.innerHTML = drone.currentAisle
-            ? `Current: Aisle ${drone.currentAisle} <span style="color:#22d3ee">🔵PT</span>`
+            ? `\ud604\uc7ac: Aisle <b style="color:#f87171">${drone.currentAisle}</b> 🎥`
             : 'Current: -';
     }
-    
-    // Update current level with color (use layer's defined color)
-    const levelEl = document.getElementById(`drone${droneId}-level`);
+    const levelEl = document.getElementById('droneA-level');
     if (levelEl) {
         if (drone.currentLevel) {
             const layerDef = LAYERS.find(l => l.id === drone.currentLevel);
             const levelColor = layerDef ? layerDef.color : '#fbbf24';
             levelEl.style.color = levelColor;
-            const layerLabel = layerDef ? layerDef.label : drone.currentLevel;
-            levelEl.textContent = `Pass: ${drone.currentLevel} (${layerLabel})`;
+            levelEl.textContent = `Pass: ${drone.currentLevel}`;
         } else {
             levelEl.style.color = '#64748b';
             levelEl.textContent = 'Pass: -';
@@ -1000,16 +1118,10 @@ function dispatchRescan(shelfId) {
 
     const { aisleId, rack } = parsed;
 
-    // Pick the best drone: the one whose dock covers this aisle, preferably standby
-    const dockForAisle = WAREHOUSE.docks.find(d => d.aisles.includes(aisleId));
-    if (!dockForAisle) {
-        addFeed(`⛔ No dock covers Aisle ${aisleId}`, 'alert');
-        return;
-    }
-
-    // Choose drone from that dock (there's only 1 per dock in this system)
-    const droneId = dockForAisle.id;
+    // \ub2e8\uc77c \ub4dc\ub860 A \uc0ac\uc6a9
+    const droneId = 'A';
     const drone = state.drones[droneId];
+    const dockForAisle = WAREHOUSE.docks[0];
 
     if (!drone) {
         addFeed(`⛔ Drone ${droneId} not found`, 'alert');
@@ -1473,7 +1585,7 @@ function showDailyReportModal() {
                 <div style="font-size:0.7rem;color:#64748b;margin-bottom:4px">보고서 ID</div>
                 <div style="font-family:monospace;color:#a78bfa;font-size:0.95rem;font-weight:700">${reportId}</div>
                 <div style="font-size:0.7rem;color:#64748b;margin-top:8px">드론 편대</div>
-                <div style="color:#22d3ee;font-size:0.85rem">Drone A · Drone B</div>
+                <div style="color:#f87171;font-size:0.85rem">📹 Drone A (4K Batch Sweep)</div>
             </div>
         </div>
         <!-- KPI Row -->
