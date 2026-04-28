@@ -48,9 +48,14 @@ _DEFAULT_AGENT_CONFIG = {
     # 드론
     "drone_host":            "192.168.10.50",  # 드론 컨트롤러 IP
     "drone_port":            8765,
-    "flight_speed_ms":       1.5,          # m/s — 바코드 인식 최적 (1~2m/s)
-    # 비행 패턴: 레벨별 완전 왕복 (입구 진입→끝→입구 복귀, 레벨 전환은 입구에서만)
-    # 천장/끝 통과 절대 불가 — S자 금지
+    "flight_speed_ms":       2.5,          # m/s — 4K 카메라 스윕 촬영 최적 속도
+    # ── Batch 카메라 스윕 방식 ──────────────────────────────────
+    # 드론이 aisle을 빠르게 날며 4K 카메라로 연속 촬영
+    # 카메라 FOV(수직 60°+틸트)로 한 번 왕복에 여러 레벨 동시 커버
+    # 높이별 2~3 Pass → 전체 15레벨 커버
+    # 분석은 Dock 귀환 후 서버가 담당 (Batch 방식)
+    # 천장/끝 통과 불가 → 각 aisle 입구로 왕복
+    "flight_passes":         2,            # 높이 Pass 수 (낮은/높은 위치 각 1회)
     "warehouse_aisles":      15,
     "warehouse_racks":       20,
     "warehouse_levels":      15,
@@ -168,52 +173,45 @@ class MCPTools:
     def drone_control(mission_id: str, cfg: dict,
                       rescan_aisles: list = None) -> dict:
         """
-        실제 창고 구조 기반 비행 패턴 (엄격한 규칙):
-        ───────────────────────────────────────────────
-        ★ 규칙 1: 천장/끝 통과 절대 불가 (물리적 구조)
-        ★ 규칙 2: 반드시 들어온 입구로 완전히 복귀 후 다음 동작
-        ★ 규칙 3: 레벨 전환은 반드시 입구(aisle 바깥)에서만
+        ★ Batch 카메라 스윕 방식 (핵심 설계)
+        ══════════════════════════════════════
+        드론이 각 aisle을 빠르게 날며 4K 카메라로 연속 촬영.
+        분석(PT번호 추출)은 Dock 귀환 후 서버가 담당.
 
-        비행 순서 (Aisle 1 예시, 전체 반복):
-          Dock
-           │
-           ├─► Aisle-1 입구 도착
-           │     ↓ L1 높이로 진입 → rack 끝까지 직진 → 역방향 복귀 → 입구
-           │     ↓ L2 높이로 진입 → rack 끝까지 직진 → 역방향 복귀 → 입구
-           │     ↓ L3 높이로 진입 → ...
-           │     ↓ L15 높이로 진입 → ... → 입구 복귀
-           │   (Aisle-1 완전 완료)
-           │
-           ├─► Aisle-2 입구로 이동 (통로 바깥 경로)
-           │     (같은 방식 반복)
-           ...
-           └─► Aisle-15 완료 → Dock 귀환 → Wi-Fi 자동 전송
+        비행 패턴:
+          - 카메라 넓은 FOV(수직 60°+틸트)로 1 Pass에 여러 레벨 동시 커버
+          - 높이를 달리하여 2 Pass → 전체 15레벨 커버
+          - 각 aisle: 입구 진입 → 끝까지 직진 촬영 → 입구로 복귀
+          - 높이/Pass 전환은 반드시 입구(aisle 바깥)에서만
+          - 끝에서 옆 aisle로 직접 이동 금지 (천장 통과 불가)
+          - 연속 녹화 (중단 없음) → Dock 귀환 → Wi-Fi 자동 전송
 
-        핵심: 끝에서 옆 통로로 바로 넘어가는 것 절대 금지
-              레벨 전환도 반드시 입구에서만 수행
+        비행 순서:
+          Dock → A1입구 [Pass1 왕복] [Pass2 왕복] → A2입구 [...] → Dock
+          총 ~10~15분 (2 Pass @ 2.5m/s), 배터리 1개로 완주
         """
         aisles = cfg.get('warehouse_aisles', 15)
         racks  = cfg.get('warehouse_racks',  20)
         levels = cfg.get('warehouse_levels', 15)
-        speed  = cfg.get('flight_speed_ms',  1.5)
+        speed  = cfg.get('flight_speed_ms',  2.5)   # 4K 스윕 최적 속도
+        passes = cfg.get('flight_passes',    2)      # 높이별 Pass 수
 
-        # ── 비행 거리 계산 (레벨별 완전 왕복 구조) ─────────────
-        rack_len_m      = racks * 1.2    # 랙 1개 = 1.2m → 20랙 = 24m
-        roundtrip_m     = rack_len_m * 2 # 1회 왕복 = 48m (입구→끝→입구)
-        level_gap_m     = 0.5            # 입구에서 높이 조정 이동 (수직 0.5m)
-        aisle_gap_m     = 3.5            # 통로 간 수평 이동
+        # ── 비행 거리 계산 (Batch 카메라 스윕) ─────────────────
+        # 각 aisle: 입구→끝→입구 왕복 × passes
+        # 높이 전환: 입구에서만 (짧은 상승/하강)
+        rack_len_m    = racks * 1.2           # 20랙 × 1.2m = 24m
+        roundtrip_m   = rack_len_m * 2        # 왕복 48m
+        aisle_gap_m   = 3.5                   # 통로 간 이동
+        height_adj_m  = (levels * 0.5) / passes  # Pass간 높이 이동 (입구에서)
 
-        # 재촬영 모드: 지정 통로만
         target_aisles = rescan_aisles if rescan_aisles else list(range(1, aisles + 1))
         n_aisles = len(target_aisles)
 
-        # 총 거리:
-        #   각 aisle = (레벨 수 × 왕복) + (레벨 전환 × level_gap)
-        #   aisle 간 이동 = (aisle 수 - 1) × aisle_gap
-        per_aisle_m  = levels * roundtrip_m + (levels - 1) * level_gap_m
-        inter_aisle_m = aisle_gap_m * (n_aisles - 1)
-        total_dist_m = per_aisle_m * n_aisles + inter_aisle_m
+        # 총 거리 = (통로 왕복 × passes + 높이조정) × 통로수 + 통로간 이동
+        per_aisle_m  = roundtrip_m * passes + height_adj_m * (passes - 1)
+        total_dist_m = per_aisle_m * n_aisles + aisle_gap_m * (n_aisles - 1)
         flight_sec   = total_dist_m / speed
+        flight_min   = flight_sec / 60
 
         mode_label = f"재촬영({n_aisles}개 통로)" if rescan_aisles else f"전체({aisles}개 통로)"
 
@@ -222,44 +220,54 @@ class MCPTools:
             'status': 'planning',
             'message': (
                 f"📐 비행 계획 [{mode_label}] — "
-                f"입구 왕복 × {levels}레벨 × {n_aisles}통로 = "
-                f"총 {total_dist_m:.0f}m / 예상 {flight_sec/60:.1f}분"
+                f"4K 카메라 스윕 × {passes} Pass × {n_aisles}통로 = "
+                f"총 {total_dist_m:.0f}m / 예상 {flight_min:.0f}분 @ {speed}m/s"
             ),
             'detail': {
-                'pattern': 'per-level roundtrip from entrance (no end-crossing)',
-                'rule': '입구로만 출입, 레벨 전환은 입구(aisle 바깥)에서만',
+                'pattern': 'batch-camera-sweep (4K continuous recording)',
+                'rule': '입구 왕복, Pass 전환은 입구에서만, 끝 통과 금지',
                 'aisles': n_aisles, 'racks': racks, 'levels': levels,
-                'roundtrip_per_level_m': roundtrip_m,
+                'passes': passes, 'speed_ms': speed,
+                'roundtrip_m': roundtrip_m,
                 'per_aisle_m': round(per_aisle_m),
                 'total_dist_m': round(total_dist_m),
-                'estimated_flight_min': round(flight_sec / 60, 1),
+                'estimated_flight_min': round(flight_min, 1),
                 'target_aisles': target_aisles,
                 'rescan_mode': bool(rescan_aisles),
+                'note': (
+                    f"4K FOV로 1 Pass에 ~{levels//passes}레벨 동시 커버, "
+                    f"배터리 1개로 완주 가능"
+                ),
             }
         })
 
         # ── 실제 드론 SDK 연결 포인트 ──────────────────────────
-        # TODO: 실제 환경에서 아래 주석을 해제하고 드론 IP/SDK 설정
-        #
         # import requests
         # drone_url = f"http://{cfg['drone_host']}:{cfg['drone_port']}"
-        # requests.post(f"{drone_url}/takeoff", json={'altitude': 0.5})
         #
-        # # 웨이포인트 생성: 레벨별 완전 왕복, 입구에서만 레벨 전환
-        # waypoints = _build_per_level_waypoints(
-        #     target_aisles, rack_len_m, aisle_gap_m, level_gap_m, levels, speed
-        # )
-        # # 각 레벨 왕복 구조:
+        # # 이륙 (Dock 위치 기준)
+        # requests.post(f"{drone_url}/takeoff", json={'altitude': 1.0})
+        #
+        # # 웨이포인트: Batch 스윕 패턴
+        # # for pass_i in range(passes):
+        # #   fly_height = rack_height * (pass_i + 0.5) / passes  # 높이 분할
         # #   for aisle in target_aisles:
-        # #     for level in range(1, levels+1):
-        # #       ENTRANCE → fly in at level_height(level) → END → fly back → ENTRANCE
-        # #       (높이 조정은 ENTRANCE에서만)
+        # #     ENTRANCE(aisle) → set_height(fly_height) → fly_forward(rack_len_m)
+        # #     → fly_backward(rack_len_m) → ENTRANCE(aisle)
+        # #     # 끝에서 옆으로 절대 이동 금지
+        # #   next aisle via external path
+        # waypoints = _build_batch_sweep_waypoints(
+        #     target_aisles, rack_len_m, aisle_gap_m, passes, levels, speed
+        # )
         # requests.post(f"{drone_url}/mission/upload",
-        #               json={'waypoints': waypoints, 'continuous_record': True})
+        #               json={'waypoints': waypoints,
+        #                     'continuous_record': True,
+        #                     'camera': '4K', 'fps': 30})
         # requests.post(f"{drone_url}/mission/start")
         # while True:
         #     if requests.get(f"{drone_url}/status").json()['state'] == 'landed': break
         #     time.sleep(5)
+        # # Dock 귀환 후 Wi-Fi 자동 전송
         # requests.post(f"{drone_url}/transfer", json={'dest': _UPLOAD_DIR})
         # video_path = requests.get(f"{drone_url}/last_video").json()['path']
 
@@ -283,7 +291,7 @@ class MCPTools:
             'status': 'completed',
             'message': (
                 f"✅ 비행 완료 — {total_dist_m:.0f}m "
-                f"(레벨별 완전 왕복, 입구 전환) | "
+                f"(4K 스윕 × {passes} Pass, {flight_min:.0f}분) | "
                 f"Dock 귀환 → Wi-Fi 전송 완료 | "
                 f"영상: {os.path.basename(video_path) if video_path else '시뮬레이션 모드'}"
             ),
@@ -293,15 +301,15 @@ class MCPTools:
             'ok': True,
             'video_path': video_path,
             'flight_dist_m': round(total_dist_m),
-            'flight_min': round(flight_sec / 60, 1),
-            'levels': levels,
+            'flight_min': round(flight_min, 1),
+            'passes': passes,
             'per_aisle_m': round(per_aisle_m),
             'target_aisles': target_aisles,
             'rescan_mode': bool(rescan_aisles),
             'sim_mode': video_path is None,
             'message': (
                 f"비행 완료 ({total_dist_m:.0f}m, "
-                f"레벨별 완전 왕복 × {levels}레벨 × {n_aisles}통로)"
+                f"4K 스윕 × {passes} Pass × {n_aisles}통로, {flight_min:.0f}분)"
             )
         }
 
