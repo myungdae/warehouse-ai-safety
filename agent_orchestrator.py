@@ -164,11 +164,16 @@ class MCPTools:
 
     # ── Tool 1: drone_control ──────────────────────────────────
     @staticmethod
-    def drone_control(mission_id: str, cfg: dict) -> dict:
+    def drone_control(mission_id: str, cfg: dict,
+                      rescan_aisles: list = None) -> dict:
         """
-        드론 이륙 → S자 경로 비행 → 영상 녹화 → 착륙 → 영상 전송
-        실제 환경: DJI SDK / MAVLink / 드론 컨트롤러 API 호출
-        현재: 시뮬레이션 (실제 드론 SDK 연결 포인트 표시)
+        실제 창고 구조 기반 비행 패턴:
+          - 천장 통과 불가 → 각 통로는 반드시 입구로 되돌아옴 (U턴 왕복)
+          - 패턴: Dock 출발 → Aisle-1 진입 → 끝까지 직진 → 역방향 복귀
+                 → Aisle-2 진입 → ... → Aisle-15 → Dock 귀환
+          - 카메라 틸트로 여러 단(level)을 커버 (1 Pass당 4~5단)
+          - 연속 녹화 (중단 없음) → Dock 귀환 후 Wi-Fi 자동 전송
+          - rescan_aisles 지정 시 해당 통로만 재촬영
         """
         aisles  = cfg.get('warehouse_aisles', 15)
         racks   = cfg.get('warehouse_racks', 20)
@@ -176,21 +181,47 @@ class MCPTools:
         speed   = cfg.get('flight_speed_ms', 1.5)
         lpp     = cfg.get('flight_levels_per_pass', 4)
 
-        # 비행 경로 계산
-        passes       = -(-levels // lpp)        # ceiling division
-        aisle_len_m  = racks * 1.2              # rack 1.2m
-        total_dist_m = aisle_len_m * aisles * passes + (aisles - 1) * 4 * passes
-        flight_sec   = total_dist_m / speed
+        # ── 실제 창고 구조 기반 비행 거리 계산 ─────────────────
+        # 각 통로: 입구 → 끝(rack_len) → 입구 복귀 = 2 × rack_len
+        # S자 불가 (천장 통과 불가) → 왕복(U턴) 구조
+        rack_len_m    = racks * 1.2          # 랙 1개 = 1.2m, 20랙 = 24m
+        aisle_roundtrip = rack_len_m * 2    # 왕복: 24m × 2 = 48m
+        aisle_gap_m   = 3.5                 # 통로 간 이동 거리 (측면)
 
+        # 높이 Pass 수: 카메라 틸트로 1 Pass당 lpp단 커버
+        passes = -(-levels // lpp)           # ceil(15/4) = 4 Pass
+
+        # 재촬영 모드: 지정 통로만
+        target_aisles = rescan_aisles if rescan_aisles else list(range(1, aisles + 1))
+        n_aisles = len(target_aisles)
+
+        # 총 거리 = (통로 왕복 × 통로 수 + 통로 간 이동 × (통로수-1)) × Pass 수
+        total_dist_m = (
+            aisle_roundtrip * n_aisles +
+            aisle_gap_m * (n_aisles - 1)
+        ) * passes
+        flight_sec = total_dist_m / speed
+
+        # 비행 계획 로그
+        mode_label = f"재촬영({n_aisles}개 통로)" if rescan_aisles else f"전체({aisles}개 통로)"
         _log_step(mission_id, {
             'tool': 'drone_control',
             'status': 'planning',
-            'message': (f"비행 계획: {aisles}통로 × {passes} Pass "
-                        f"= 총 {total_dist_m:.0f}m / 예상 {flight_sec/60:.1f}분"),
+            'message': (
+                f"📐 비행 계획 [{mode_label}] — "
+                f"U턴 왕복 × {passes} Pass = 총 {total_dist_m:.0f}m / "
+                f"예상 {flight_sec/60:.1f}분"
+            ),
             'detail': {
-                'aisles': aisles, 'racks': racks, 'levels': levels,
-                'passes': passes, 'total_dist_m': round(total_dist_m),
-                'estimated_flight_min': round(flight_sec / 60, 1)
+                'pattern': 'U-turn roundtrip (no ceiling crossing)',
+                'aisles': n_aisles, 'racks': racks, 'levels': levels,
+                'passes': passes,
+                'rack_len_m': rack_len_m,
+                'aisle_roundtrip_m': aisle_roundtrip,
+                'total_dist_m': round(total_dist_m),
+                'estimated_flight_min': round(flight_sec / 60, 1),
+                'target_aisles': target_aisles,
+                'rescan_mode': bool(rescan_aisles),
             }
         })
 
@@ -203,30 +234,33 @@ class MCPTools:
         # # 이륙
         # requests.post(f"{drone_url}/takeoff", json={'altitude': 1.5})
         #
-        # # 경로 업로드 및 실행
-        # waypoints = _build_waypoints(aisles, racks, passes, lpp)
-        # requests.post(f"{drone_url}/mission/upload", json={'waypoints': waypoints})
-        # requests.post(f"{drone_url}/mission/start", json={'speed': speed, 'record': True})
+        # # 경로 생성: U턴 왕복 패턴
+        # waypoints = _build_uturn_waypoints(
+        #     target_aisles, rack_len_m, aisle_gap_m, passes, lpp, speed
+        # )
+        # requests.post(f"{drone_url}/mission/upload",
+        #               json={'waypoints': waypoints, 'continuous_record': True})
+        # requests.post(f"{drone_url}/mission/start")
         #
-        # # 완료 대기
+        # # 완료 대기 (드론이 Dock 귀환 후 landed 상태)
         # while True:
         #     status = requests.get(f"{drone_url}/status").json()
         #     if status['state'] == 'landed': break
         #     time.sleep(5)
         #
-        # # 영상 파일 경로 수신
-        # video_info = requests.get(f"{drone_url}/last_recording").json()
-        # video_path = video_info['local_path']  # 또는 Wi-Fi 전송 후 로컬 경로
+        # # Wi-Fi 자동 전송 완료 대기
+        # requests.post(f"{drone_url}/transfer", json={'dest': _UPLOAD_DIR})
+        # video_path = requests.get(f"{drone_url}/last_video").json()['path']
 
-        # 시뮬레이션: 비행 시간 대기 (실제 환경에서는 위 SDK 코드로 대체)
-        sim_wait = min(flight_sec * 0.01, 3)   # 시뮬레이션은 최대 3초
+        # 시뮬레이션 대기
+        sim_wait = min(flight_sec * 0.01, 3)
         time.sleep(sim_wait)
 
-        # 영상 파일 경로 (실제: 드론 Wi-Fi 전송 후 로컬 경로)
-        # 시뮬레이션: 기존 업로드 파일이 있으면 사용, 없으면 None
+        # 영상 파일 (실제: Wi-Fi 전송 후 로컬 경로)
         video_path = None
         uploads = sorted(
-            [f for f in os.listdir(_UPLOAD_DIR) if f.endswith(('.mp4','.avi','.mov','.mkv'))],
+            [f for f in os.listdir(_UPLOAD_DIR)
+             if f.endswith(('.mp4', '.avi', '.mov', '.mkv'))],
             key=lambda x: os.path.getmtime(os.path.join(_UPLOAD_DIR, x)),
             reverse=True
         )
@@ -236,9 +270,11 @@ class MCPTools:
         _log_step(mission_id, {
             'tool': 'drone_control',
             'status': 'completed',
-            'message': (f"✅ 비행 완료 — {total_dist_m:.0f}m 비행, "
-                        f"영상: {os.path.basename(video_path) if video_path else '시뮬레이션 모드'}"),
-            'video_path': video_path,
+            'message': (
+                f"✅ 비행 완료 — {total_dist_m:.0f}m (U턴 왕복 × {passes} Pass) | "
+                f"Dock 귀환 → Wi-Fi 전송 완료 | "
+                f"영상: {os.path.basename(video_path) if video_path else '시뮬레이션 모드'}"
+            ),
         })
 
         return {
@@ -247,8 +283,10 @@ class MCPTools:
             'flight_dist_m': round(total_dist_m),
             'flight_min': round(flight_sec / 60, 1),
             'passes': passes,
+            'target_aisles': target_aisles,
+            'rescan_mode': bool(rescan_aisles),
             'sim_mode': video_path is None,
-            'message': f"비행 완료 ({total_dist_m:.0f}m)"
+            'message': f"비행 완료 ({total_dist_m:.0f}m, U턴 왕복)"
         }
 
     # ── Tool 2: video_scan ─────────────────────────────────────
@@ -787,24 +825,35 @@ class AgentOrchestrator:
             })
             return 'continue'   # 비치명적 오류는 계속 진행
 
-        # video_scan: 추출률 체크
+        # video_scan: 추출률 95% 기준 재촬영 판단
         if context == 'video_scan':
-            found = step_result.get('total_pt_found', 0)
-            aisles = self.cfg.get('warehouse_aisles', 15)
-            racks  = self.cfg.get('warehouse_racks', 20)
-            expected_min = int(aisles * racks * 0.5)  # 최소 50% 위치
-            if found < expected_min:
+            found    = step_result.get('total_pt_found', 0)
+            scanned  = step_result.get('total_scanned', 0)
+            aisles   = self.cfg.get('warehouse_aisles', 15)
+            racks    = self.cfg.get('warehouse_racks', 20)
+            # 예상 PT 수: 통로 × 랙 × 양면(L/R) × 2단(L1/L2) × 재고 있을 확률 85%
+            expected = int(aisles * racks * 2 * 2 * 0.85)
+            extr_pct = round(found / expected * 100, 1) if expected > 0 else 0
+            threshold = self.cfg.get('rescan_threshold_pct', 95.0)
+
+            if extr_pct < threshold:
                 _log_step(mission_id, {
                     'tool': 'agent_brain',
                     'status': 'decision',
-                    'message': (f"⚠️ PT 추출 부족 ({found}종 < 예상 {expected_min}종) "
-                                f"→ 시뮬레이션 모드로 계속 진행"),
+                    'message': (
+                        f"⚠️ PT 추출률 {extr_pct}% < 기준 {threshold}% "
+                        f"({found}종 / 예상 {expected}종) → 재촬영 판단"
+                    ),
                 })
+                return 'rescan'   # 호출부에서 재촬영 루프 처리
             else:
                 _log_step(mission_id, {
                     'tool': 'agent_brain',
                     'status': 'decision',
-                    'message': f"✅ PT 추출 충분 ({found}종) → 다음 단계 진행",
+                    'message': (
+                        f"✅ PT 추출률 {extr_pct}% ≥ 기준 {threshold}% "
+                        f"({found}종 / 예상 {expected}종) → 다음 단계 진행"
+                    ),
                 })
 
         # erp_compare: 정확도 체크
@@ -846,17 +895,70 @@ class AgentOrchestrator:
 
         summary = {}
         try:
-            # ── Step 1: 드론 제어 ──────────────────────────────
-            r1 = MCPTools.drone_control(mission_id, self.cfg)
-            self._decide(r1, mission_id, 'drone_control')
-            summary['drone'] = r1
-            vid = video_path or r1.get('video_path')
-            sim  = r1.get('sim_mode', True) if not video_path else False
+            # ── Step 1 & 2: 촬영 → 분석 → 재촬영 루프 ─────────
+            # 실제 구조: U턴 왕복 비행 (S자 불가, 천장 통과 불가)
+            # 연속 녹화 → Dock 귀환 → Wi-Fi 전송 → 분석
+            # 추출률 < 95% → Agent가 해당 통로만 재촬영 지시 (최대 2회)
+            MAX_RESCAN = 2
+            rescan_aisles = None      # None = 전체 통로
+            rescan_count  = 0
+            r1 = r2 = None
 
-            # ── Step 2: 영상 분석 ──────────────────────────────
-            r2 = MCPTools.video_scan(mission_id, self.cfg, vid, session_id, sim_mode=sim)
-            self._decide(r2, mission_id, 'video_scan')
+            while True:
+                # Step 1: 드론 비행 (전체 or 재촬영 통로만)
+                r1 = MCPTools.drone_control(mission_id, self.cfg,
+                                            rescan_aisles=rescan_aisles)
+                self._decide(r1, mission_id, 'drone_control')
+
+                vid = video_path or r1.get('video_path')
+                sim = r1.get('sim_mode', True) if not video_path else False
+
+                # Step 2: 영상 분석 (Dock 귀환 후 Wi-Fi 전송된 영상)
+                if rescan_count > 0:
+                    _log_step(mission_id, {
+                        'tool': 'orchestrator',
+                        'status': 'rescan',
+                        'message': (
+                            f"🔄 재촬영 #{rescan_count} — "
+                            f"통로 {rescan_aisles} 영상 재분석 시작"
+                        ),
+                    })
+
+                r2 = MCPTools.video_scan(mission_id, self.cfg, vid,
+                                         session_id, sim_mode=sim)
+                decision = self._decide(r2, mission_id, 'video_scan')
+
+                if decision == 'rescan' and rescan_count < MAX_RESCAN:
+                    # Agent가 추출률 부족 판정 → 저조한 통로 파악 후 재촬영
+                    rescan_count += 1
+                    # 실제 환경: 저조 통로를 분석해서 특정 aisle만 재촬영
+                    # 시뮬레이션: 전체 재촬영 (실제론 저조 aisle만)
+                    aisles = self.cfg.get('warehouse_aisles', 15)
+                    rescan_aisles = list(range(1, aisles + 1))  # TODO: 저조 통로만
+                    _log_step(mission_id, {
+                        'tool': 'agent_brain',
+                        'status': 'decision',
+                        'message': (
+                            f"🚁 재촬영 지시 #{rescan_count}/{MAX_RESCAN} → "
+                            f"드론 재이륙, 저조 통로 재촬영"
+                        ),
+                    })
+                    continue  # 다시 비행
+                else:
+                    if decision == 'rescan' and rescan_count >= MAX_RESCAN:
+                        _log_step(mission_id, {
+                            'tool': 'agent_brain',
+                            'status': 'decision',
+                            'message': (
+                                f"⚠️ 최대 재촬영 횟수({MAX_RESCAN}회) 도달 → "
+                                f"현재 추출 결과로 계속 진행"
+                            ),
+                        })
+                    break  # 추출률 OK 또는 재촬영 한도 도달 → 다음 단계
+
+            summary['drone'] = r1
             summary['video_scan'] = r2
+            summary['rescan_count'] = rescan_count
 
             # ── Step 3: ERP 비교 ───────────────────────────────
             r3 = MCPTools.erp_compare(mission_id, self.cfg, session_id)
@@ -882,10 +984,13 @@ class AgentOrchestrator:
             _log_step(mission_id, {
                 'tool': 'orchestrator',
                 'status': 'completed',
-                'message': (f"🎉 미션 완료 — "
-                            f"PT {r2.get('total_pt_found',0)}종 스캔, "
-                            f"ERP 정확도 {r3.get('accuracy',0)}%, "
-                            f"보고서 {r4.get('report_id','?')} 생성"),
+                'message': (
+                    f"🎉 미션 완료 — "
+                    f"PT {r2.get('total_pt_found',0)}종 스캔 "
+                    f"(재촬영 {rescan_count}회), "
+                    f"ERP 정확도 {r3.get('accuracy',0)}%, "
+                    f"보고서 {r4.get('report_id','?')} 생성"
+                ),
             })
 
             _finish_mission(mission_id, 'completed', summary)
