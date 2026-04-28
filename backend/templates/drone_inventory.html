@@ -51,33 +51,56 @@
                 </div>
                 <div class="menu-content expanded" id="droneStatusMenu">
                     <div class="drone-status-card" id="sidebarDroneStatus">
-                        <div class="drone-status-row">
-                            <span class="ds-label">드론 ID</span>
-                            <span class="ds-value" id="sb-droneId" style="color:#34d399">DRONE-01</span>
+                        <!-- DRONE-01 상태 (청록색) -->
+                        <div style="font-size:0.65rem;font-weight:700;color:#22d3ee;letter-spacing:0.08em;margin-bottom:4px;padding-bottom:3px;border-bottom:1px solid rgba(34,211,238,0.2)">
+                            🚁 DRONE-01 (A1~A8)
                         </div>
                         <div class="drone-status-row">
-                            <span class="ds-label">배터리 번호</span>
-                            <span class="ds-value" id="sb-batteryNum" style="color:#fbbf24">Battery 1/2</span>
+                            <span class="ds-label">드론 ID</span>
+                            <span class="ds-value" id="sb-droneId" style="color:#22d3ee">DRONE-01</span>
                         </div>
                         <div class="drone-status-row">
                             <span class="ds-label">상태</span>
                             <span class="ds-value status-standby" id="sb-droneState">대기 중</span>
                         </div>
                         <div class="drone-status-row">
-                            <span class="ds-label">배터리 잔량</span>
+                            <span class="ds-label">배터리</span>
                             <span class="ds-value" id="sb-battery">100%</span>
                         </div>
                         <div class="drone-status-row">
                             <span class="ds-label">현재 통로</span>
                             <span class="ds-value" id="sb-aisle">—</span>
                         </div>
+                        <!-- DRONE-02 상태 (오렌지색) -->
+                        <div style="font-size:0.65rem;font-weight:700;color:#f97316;letter-spacing:0.08em;margin:8px 0 4px;padding-bottom:3px;border-bottom:1px solid rgba(249,115,22,0.2)">
+                            🚁 DRONE-02 (A9~A15)
+                        </div>
                         <div class="drone-status-row">
-                            <span class="ds-label">스캔 수</span>
+                            <span class="ds-label">상태</span>
+                            <span class="ds-value" id="sb-drone2State" style="color:#f97316">대기 중</span>
+                        </div>
+                        <div class="drone-status-row">
+                            <span class="ds-label">배터리</span>
+                            <span class="ds-value" id="sb-battery2">100%</span>
+                        </div>
+                        <div class="drone-status-row">
+                            <span class="ds-label">현재 통로</span>
+                            <span class="ds-value" id="sb-aisle2">—</span>
+                        </div>
+                        <!-- 공통 -->
+                        <div style="border-top:1px solid rgba(255,255,255,0.06);margin-top:6px;padding-top:6px">
+                        <div class="drone-status-row">
+                            <span class="ds-label">배터리 번호</span>
+                            <span class="ds-value" id="sb-batteryNum" style="color:#fbbf24">Battery 1/2</span>
+                        </div>
+                        <div class="drone-status-row">
+                            <span class="ds-label">스캔 완료</span>
                             <span class="ds-value" id="sb-scanCount">0</span>
                         </div>
                         <div class="drone-status-row">
                             <span class="ds-label">현재 Layer</span>
                             <span class="ds-value" id="sb-layer" style="font-family:monospace">L1</span>
+                        </div>
                         </div>
                     </div>
                 </div>
