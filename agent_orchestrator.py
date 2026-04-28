@@ -19,6 +19,7 @@ Warehouse Agentic AI Orchestrator — 완전 자동화 재고 파이프라인
 
 import os
 import json
+import math
 import time
 import uuid
 import threading
@@ -48,14 +49,21 @@ _DEFAULT_AGENT_CONFIG = {
     # 드론
     "drone_host":            "192.168.10.50",  # 드론 컨트롤러 IP
     "drone_port":            8765,
-    "flight_speed_ms":       2.5,          # m/s — 4K 카메라 스윕 촬영 최적 속도
+    "flight_speed_ms":       2.0,          # m/s — 4K 촬영 품질 보장 속도 (느릴수록 선명)
     # ── Batch 카메라 스윕 방식 ──────────────────────────────────
-    # 드론이 aisle을 빠르게 날며 4K 카메라로 연속 촬영
+    # 드론이 aisle을 날며 4K 카메라로 연속 촬영
     # 카메라 FOV(수직 60°+틸트)로 한 번 왕복에 여러 레벨 동시 커버
-    # 높이별 2~3 Pass → 전체 15레벨 커버
+    # 높이별 2 Pass → 전체 15레벨 커버
     # 분석은 Dock 귀환 후 서버가 담당 (Batch 방식)
     # 천장/끝 통과 불가 → 각 aisle 입구로 왕복
     "flight_passes":         2,            # 높이 Pass 수 (낮은/높은 위치 각 1회)
+    # ── 배터리 교대 설정 ─────────────────────────────────────────
+    # 45,000박스 (15×20×15×2면×5박스) 전체 촬영 시
+    # DJI M30 배터리: 최대 41분, 실제 비행 가능: 30~35분 (안전 마진 포함)
+    # 1배터리당 약 7~8개 Aisle 커버 → 2배터리로 전체 15개 Aisle 완주
+    "battery_swap_enabled":  True,         # 배터리 교대 활성화
+    "battery_safe_min":      30,           # 배터리 1개당 안전 비행 시간 (분)
+    "battery_aisles_per_charge": 8,        # 배터리 1개당 커버 Aisle 수 (1~8, 9~15)
     "warehouse_aisles":      15,
     "warehouse_racks":       20,
     "warehouse_levels":      15,
@@ -215,13 +223,43 @@ class MCPTools:
 
         mode_label = f"재촬영({n_aisles}개 통로)" if rescan_aisles else f"전체({aisles}개 통로)"
 
+        # ── 배터리 교대 계획 ──────────────────────────────────────
+        battery_swap  = cfg.get('battery_swap_enabled', True)
+        safe_min      = cfg.get('battery_safe_min', 30)          # 배터리당 안전 비행 분
+        aisles_per_bat= cfg.get('battery_aisles_per_charge', 8)  # 배터리당 Aisle 수
+        n_batteries   = math.ceil(n_aisles / aisles_per_bat) if battery_swap else 1
+
+        # 배터리별 담당 Aisle 분할
+        battery_plan = []
+        for b in range(n_batteries):
+            start_a = b * aisles_per_bat
+            end_a   = min(start_a + aisles_per_bat, n_aisles)
+            bat_aisles = target_aisles[start_a:end_a]
+            bat_dist   = per_aisle_m * len(bat_aisles) + aisle_gap_m * (len(bat_aisles) - 1)
+            bat_min    = bat_dist / speed / 60
+            battery_plan.append({
+                'battery': b + 1,
+                'aisles': bat_aisles,
+                'dist_m': round(bat_dist),
+                'min': round(bat_min, 1),
+            })
+
+        if n_batteries > 1:
+            bat_parts = '→'.join(
+                [f"B{p['battery']}(A{p['aisles'][0]}~A{p['aisles'][-1]})" for p in battery_plan]
+            )
+            swap_note = f"배터리 {n_batteries}개 교대 ({bat_parts})"
+        else:
+            swap_note = "배터리 1개로 완주"
+
         _log_step(mission_id, {
             'tool': 'drone_control',
             'status': 'planning',
             'message': (
                 f"📐 비행 계획 [{mode_label}] — "
                 f"4K 카메라 스윕 × {passes} Pass × {n_aisles}통로 = "
-                f"총 {total_dist_m:.0f}m / 예상 {flight_min:.0f}분 @ {speed}m/s"
+                f"총 {total_dist_m:.0f}m / 예상 {flight_min:.0f}분 @ {speed}m/s | "
+                f"{swap_note}"
             ),
             'detail': {
                 'pattern': 'batch-camera-sweep (4K continuous recording)',
@@ -234,12 +272,28 @@ class MCPTools:
                 'estimated_flight_min': round(flight_min, 1),
                 'target_aisles': target_aisles,
                 'rescan_mode': bool(rescan_aisles),
+                'battery_plan': battery_plan,
+                'n_batteries': n_batteries,
                 'note': (
-                    f"4K FOV로 1 Pass에 ~{levels//passes}레벨 동시 커버, "
-                    f"배터리 1개로 완주 가능"
+                    f"4K FOV로 1 Pass에 ~{levels//passes}레벨 동시 커버 | "
+                    f"{swap_note} | "
+                    f"DJI M30 배터리 최대 41분 → 안전 비행 {safe_min}분 기준"
                 ),
             }
         })
+
+        # 배터리별 교대 로그
+        for bp in battery_plan:
+            _log_step(mission_id, {
+                'tool': 'drone_control',
+                'status': 'in_progress',
+                'message': (
+                    f"🔋 배터리 {bp['battery']}번 — "
+                    f"A{bp['aisles'][0]}~A{bp['aisles'][-1]} ({len(bp['aisles'])}개 통로) | "
+                    f"{bp['dist_m']}m / 약 {bp['min']}분"
+                    + (f" → 배터리 교체 후 계속" if bp['battery'] < n_batteries else " → Dock 귀환 완료")
+                ),
+            })
 
         # ── 실제 드론 SDK 연결 포인트 ──────────────────────────
         # import requests
@@ -290,8 +344,8 @@ class MCPTools:
             'tool': 'drone_control',
             'status': 'completed',
             'message': (
-                f"✅ 비행 완료 — {total_dist_m:.0f}m "
-                f"(4K 스윕 × {passes} Pass, {flight_min:.0f}분) | "
+                f"✅ 전체 비행 완료 — {total_dist_m:.0f}m / {flight_min:.0f}분 | "
+                f"배터리 {n_batteries}개 사용 | "
                 f"Dock 귀환 → Wi-Fi 전송 완료 | "
                 f"영상: {os.path.basename(video_path) if video_path else '시뮬레이션 모드'}"
             ),
@@ -306,6 +360,8 @@ class MCPTools:
             'per_aisle_m': round(per_aisle_m),
             'target_aisles': target_aisles,
             'rescan_mode': bool(rescan_aisles),
+            'n_batteries': n_batteries,
+            'battery_plan': battery_plan,
             'sim_mode': video_path is None,
             'message': (
                 f"비행 완료 ({total_dist_m:.0f}m, "
