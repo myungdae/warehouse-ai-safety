@@ -436,13 +436,14 @@ function renderPatrolView(content) {
                     <rect width="${svgW}" height="${svgH}" fill="url(#grid)"/>
                     <rect x="10" y="10" width="${svgW-20}" height="${svgH-20}"
                           fill="none" stroke="rgba(99,102,241,0.25)" stroke-width="1.5" rx="4"/>
-                    <!-- 도킹 스테이션 — Aisle-1 입구 상단 (빨간선 위) -->
-                    <rect x="77" y="8" width="36" height="22" rx="4"
-                          fill="rgba(248,113,113,0.20)" stroke="#f87171" stroke-width="2"/>
-                    <text x="95" y="19" fill="#f87171" font-size="7" text-anchor="middle" font-family="monospace" font-weight="bold">DOCK</text>
-                    <text x="95" y="28" fill="#f87171" font-size="5.5" text-anchor="middle" font-family="monospace">⚡Wi-Fi</text>
-                    <!-- 빨간 경계선 (Aisle 상단 입구) -->
-                    <line x1="60" y1="46" x2="1380" y2="46" stroke="#f87171" stroke-width="1.5" stroke-dasharray="6,3" opacity="0.6"/>
+                    <!-- 도킹 스테이션 — Aisle-1 입구 상단 빨간선 위 (DOCK_X=95 중앙) -->
+                    <rect x="77" y="5" width="36" height="38" rx="5"
+                          fill="rgba(248,113,113,0.22)" stroke="#f87171" stroke-width="2.5"/>
+                    <text x="95" y="18" fill="#f87171" font-size="7.5" text-anchor="middle" font-family="monospace" font-weight="bold">🟥 DOCK</text>
+                    <text x="95" y="29" fill="#f87171" font-size="5.5" text-anchor="middle" font-family="monospace">⚡ 충전/Wi-Fi</text>
+                    <text x="95" y="39" fill="rgba(248,113,113,0.7)" font-size="5" text-anchor="middle" font-family="monospace">A1 입구</text>
+                    <!-- 빨간 경계선 (Aisle 상단 입구 — 드론은 이 선 위에서 출발) -->
+                    <line x1="60" y1="46" x2="1380" y2="46" stroke="#f87171" stroke-width="2" stroke-dasharray="6,3" opacity="0.8"/>
                     <g id="shelvesGroup"></g>
                     <g id="pathGroup"></g>
                     <g id="scanBeamGroup"></g>
@@ -883,15 +884,16 @@ function droneLoop() {
 
         state.pathIndex++;
     } else {
-        // 연속 smooth 이동 — 멈추지 않음
+        // 연속 smooth 이동 — 절대 멈추지 않음
         state.drone.x += (dx / dist) * DRONE.speed;
         state.drone.y += (dy / dist) * DRONE.speed;
         state.drone.angle = Math.atan2(dy, dx) * 180 / Math.PI;
         state.drone.battery = Math.max(0, state.drone.battery - DRONE.batteryDrainRate);
 
-        // 이동 중 실시간 스캔 빔 표시
-        if (target.type === 'sweep_down' || target.type === 'sweep_up') {
-            if (state.scanBeamEl) state.scanBeamEl.setAttribute('opacity', '0.6');
+        // sweep 이동 중: 드론 Y 위치 기준으로 지나친 선반 실시간 초록색 전환
+        if ((target.type === 'sweep_down' || target.type === 'sweep_up') && target.aisle) {
+            if (state.scanBeamEl) state.scanBeamEl.setAttribute('opacity', '0.55');
+            colorShelvesNearDrone(target.aisle, state.drone.y, 28);
         } else {
             if (state.scanBeamEl) state.scanBeamEl.setAttribute('opacity', '0');
         }
@@ -902,7 +904,29 @@ function droneLoop() {
     state.animFrame = requestAnimationFrame(droneLoop);
 }
 
-// ── Batch Sweep 중 Aisle 전체 선반 일괄 스캔 ────────────────
+// ── Sweep 중 드론 위치 근처 선반 실시간 색상 전환 (smooth 효과) ──
+function colorShelvesNearDrone(aisleId, droneY, radius) {
+    WAREHOUSE.shelves.forEach(shelf => {
+        if (shelf.aisle !== aisleId) return;
+        if (state.scannedShelves.has(shelf.id)) return;
+        const shelfCY = shelf.y + shelf.h / 2;
+        if (Math.abs(shelfCY - droneY) <= radius) {
+            state.scannedShelves.add(shelf.id);
+            const shelfEl = document.getElementById(`shelf-${shelf.id}`);
+            if (shelfEl) {
+                const inv = getCurrentInventory();
+                const item = inv[shelf.id];
+                shelfEl.setAttribute('fill', item?.sku
+                    ? 'rgba(52,211,153,0.30)' : 'rgba(248,113,113,0.12)');
+                shelfEl.setAttribute('stroke', item?.sku
+                    ? 'rgba(52,211,153,0.8)' : 'rgba(248,113,113,0.5)');
+                shelfEl.setAttribute('opacity', '1');
+            }
+        }
+    });
+}
+
+// ── Batch Sweep 중 Aisle 전체 선반 일괄 스캔 (도달 시 DB 이벤트) ──
 function processSweepAisle(aisleId, direction) {
     const inv = getCurrentInventory();
     const scanTime = new Date().toLocaleTimeString('ko-KR');
@@ -1852,10 +1876,10 @@ function launchRescan(shelfIds) {
                 shelf: shelf
             });
         });
-        path.push({ type: 'rescan_dock', x: 27, y: 38 });
+        path.push({ type: 'rescan_dock', x: DOCK_X, y: DOCK_Y + 24 });
 
-        state.drone.x = 27;
-        state.drone.y = 240;
+        state.drone.x = DOCK_X;
+        state.drone.y = DOCK_Y + 24;
 
         // 드론 엘리먼트가 없으면 재생성
         if (!state.droneEl) renderWarehouseElements();
