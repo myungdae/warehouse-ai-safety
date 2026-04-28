@@ -3675,25 +3675,51 @@ async function renderAgentMissionView(container) {
         </div>
 
         <!-- 비행 패턴 설명 -->
-        <div style="margin-top:16px;padding:12px 16px;background:rgba(0,0,0,0.25);
+        <div style="margin-top:16px;padding:14px 16px;background:rgba(0,0,0,0.25);
                     border-radius:10px;border:1px solid rgba(255,255,255,0.06)">
-          <div style="font-size:0.75rem;color:#94a3b8;font-weight:700;margin-bottom:8px">
-            🏭 실제 비행 패턴 (창고 구조 기반)
+          <div style="font-size:0.75rem;color:#94a3b8;font-weight:700;margin-bottom:10px">
+            🏭 실제 비행 패턴 — 창고 구조 엄격 적용
           </div>
-          <div style="display:flex;gap:20px;flex-wrap:wrap">
-            <div style="font-size:0.72rem;color:#cbd5e1;line-height:1.8">
-              <span style="color:#f87171;font-weight:700">✗ S자 불가</span> — 천장 통과 불가능<br>
-              <span style="color:#34d399;font-weight:700">✓ U턴 왕복</span> — 입구 진입 → 끝 직진 → 입구 복귀
-            </div>
-            <div style="font-size:0.72rem;color:#cbd5e1;line-height:1.8">
-              <code style="color:#a78bfa">Dock → [A1: →→→ ←←←] → [A2: →→→ ←←←] → … → [A15] → Dock</code>
+
+          <!-- 금지/허용 규칙 -->
+          <div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:10px">
+            <div style="font-size:0.72rem;line-height:2">
+              <span style="color:#f87171;font-weight:700">✗ 금지</span>
+              <span style="color:#64748b"> — 끝에서 옆 통로로 직접 이동 (천장·끝 통과 불가)</span><br>
+              <span style="color:#f87171;font-weight:700">✗ 금지</span>
+              <span style="color:#64748b"> — 통로 안에서 레벨 전환</span><br>
+              <span style="color:#34d399;font-weight:700">✓ 필수</span>
+              <span style="color:#cbd5e1"> — 반드시 들어온 입구로 완전히 복귀 후 다음 동작</span><br>
+              <span style="color:#34d399;font-weight:700">✓ 필수</span>
+              <span style="color:#cbd5e1"> — 레벨 전환은 입구(통로 바깥)에서만</span>
             </div>
           </div>
-          <div style="margin-top:8px;display:flex;gap:16px;flex-wrap:wrap;font-size:0.72rem">
-            <span>📏 통로당 왕복: <strong style="color:#e2e8f0">48m</strong> (24m × 2)</span>
-            <span>🔢 15통로 × 4 Pass = 총 <strong style="color:#e2e8f0">~2,940m</strong></span>
-            <span>⏱ 예상 비행: <strong style="color:#fbbf24">~33분</strong> @ 1.5m/s</span>
-            <span>🔁 95% 미만 시: <strong style="color:#f87171">저조 통로만 재촬영</strong> (최대 2회)</span>
+
+          <!-- 비행 순서 다이어그램 -->
+          <div style="background:rgba(0,0,0,0.3);border-radius:8px;padding:10px 14px;
+                      margin-bottom:10px;font-family:monospace;font-size:0.68rem;
+                      color:#94a3b8;line-height:1.9">
+            <span style="color:#a78bfa">Dock</span><br>
+            &nbsp;│<br>
+            &nbsp;├─► <span style="color:#22d3ee">Aisle-1 입구</span><br>
+            &nbsp;│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↓ <span style="color:#fbbf24">L1</span> 높이 → <span style="color:#34d399">직진(24m)</span> → <span style="color:#f87171">역방향 복귀(24m)</span> → 입구<br>
+            &nbsp;│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↓ <span style="color:#fbbf24">L2</span> 높이 → <span style="color:#34d399">직진(24m)</span> → <span style="color:#f87171">역방향 복귀(24m)</span> → 입구<br>
+            &nbsp;│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↓ … (L3 ~ L15 반복, 레벨 전환은 항상 입구에서)<br>
+            &nbsp;│&nbsp;&nbsp;&nbsp;(Aisle-1 완전 완료)<br>
+            &nbsp;│<br>
+            &nbsp;├─► <span style="color:#22d3ee">Aisle-2 입구</span> (통로 바깥 경로로 이동)<br>
+            &nbsp;│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(같은 방식 반복)<br>
+            &nbsp;│&nbsp;&nbsp;&nbsp;…<br>
+            &nbsp;└─► <span style="color:#22d3ee">Aisle-15</span> 완료 → <span style="color:#a78bfa">Dock 귀환</span> → Wi-Fi 자동 전송
+          </div>
+
+          <!-- 거리/시간 계산 -->
+          <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:0.72rem">
+            <span>📏 1회 왕복: <strong style="color:#e2e8f0">48m</strong> (24m×2)</span>
+            <span>🔢 통로당: <strong style="color:#e2e8f0">15레벨 × 48m ≈ 727m</strong></span>
+            <span>📐 15통로 총 거리: <strong style="color:#e2e8f0">~11km</strong></span>
+            <span>⏱ 예상 비행: <strong style="color:#fbbf24">~122분 → 배터리 4개</strong> (통로 3~4개씩 분할)</span>
+            <span>🔁 추출률 &lt;95%: <strong style="color:#f87171">해당 통로만 재촬영</strong> (최대 2회)</span>
           </div>
         </div>
       </div>
