@@ -23,16 +23,19 @@ module.exports = {
 
     // ─────────────────────────────────────────────
     // 2. WAREHOUSE (flask, port 5002 → warehouse.exko.kr)
+    // venv: /home/ubuntu/warehouse-ai-safety/venv
+    // 설치: python3 -m venv venv && venv/bin/pip install -r requirements.txt
     // ─────────────────────────────────────────────
     {
       name: 'warehouse-app',
-      script: 'app.py',
-      interpreter: 'python3',
+      script: 'venv/bin/python',
+      args: 'app.py',
+      interpreter: 'none',
       cwd: '/home/ubuntu/warehouse-ai-safety',
       instances: 1,
       autorestart: true,
       watch: false,
-      max_memory_restart: '512M',
+      max_memory_restart: '1G',
       error_file: '/home/ubuntu/.pm2/logs/warehouse-app-error.log',
       out_file: '/home/ubuntu/.pm2/logs/warehouse-app-out.log',
       time: true
