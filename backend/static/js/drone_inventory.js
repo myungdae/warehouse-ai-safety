@@ -3652,8 +3652,9 @@ async function renderAgentMissionView(container) {
         </div>
         <div style="display:flex;align-items:center;gap:0;flex-wrap:wrap;row-gap:10px">
           ${[
-            ['🚁','드론 제어','drone_control','이륙·비행·착륙'],
+            ['🚁','드론 제어','drone_control','U턴 왕복 비행'],
             ['🎥','영상 분석','video_scan','PT번호 추출'],
+            ['🔁','재촬영 판단','agent_brain','추출률 ≥95%?'],
             ['📊','ERP 비교','erp_compare','재고 대조'],
             ['📋','보고서','report_gen','자동 생성'],
             ['🔔','경보 발송','alert_send','이메일·프린터'],
@@ -3661,15 +3662,39 @@ async function renderAgentMissionView(container) {
           ].map(([icon, label, tool, sub], i, arr) => `
             <div style="display:flex;align-items:center;gap:0">
               <div style="text-align:center;padding:10px 14px;border-radius:10px;
-                          background:rgba(0,0,0,0.3);border:1px solid rgba(168,85,247,0.2);
+                          background:${tool==='agent_brain'?'rgba(251,191,36,0.12)':'rgba(0,0,0,0.3)'};
+                          border:1px solid ${tool==='agent_brain'?'rgba(251,191,36,0.35)':'rgba(168,85,247,0.2)'};
                           min-width:80px">
                 <div style="font-size:1.4rem">${icon}</div>
-                <div style="font-size:0.72rem;color:#e2e8f0;font-weight:700;margin-top:3px">${label}</div>
+                <div style="font-size:0.72rem;color:${tool==='agent_brain'?'#fbbf24':'#e2e8f0'};font-weight:700;margin-top:3px">${label}</div>
                 <div style="font-size:0.62rem;color:#64748b;margin-top:1px">${sub}</div>
               </div>
               ${i < arr.length-1 ? `
-              <div style="padding:0 6px;color:#6366f1;font-size:1.1rem;font-weight:700">→</div>` : ''}
+              <div style="padding:0 6px;color:${arr[i+1][2]==='agent_brain'?'#fbbf24':'#6366f1'};font-size:1.1rem;font-weight:700">→</div>` : ''}
             </div>`).join('')}
+        </div>
+
+        <!-- 비행 패턴 설명 -->
+        <div style="margin-top:16px;padding:12px 16px;background:rgba(0,0,0,0.25);
+                    border-radius:10px;border:1px solid rgba(255,255,255,0.06)">
+          <div style="font-size:0.75rem;color:#94a3b8;font-weight:700;margin-bottom:8px">
+            🏭 실제 비행 패턴 (창고 구조 기반)
+          </div>
+          <div style="display:flex;gap:20px;flex-wrap:wrap">
+            <div style="font-size:0.72rem;color:#cbd5e1;line-height:1.8">
+              <span style="color:#f87171;font-weight:700">✗ S자 불가</span> — 천장 통과 불가능<br>
+              <span style="color:#34d399;font-weight:700">✓ U턴 왕복</span> — 입구 진입 → 끝 직진 → 입구 복귀
+            </div>
+            <div style="font-size:0.72rem;color:#cbd5e1;line-height:1.8">
+              <code style="color:#a78bfa">Dock → [A1: →→→ ←←←] → [A2: →→→ ←←←] → … → [A15] → Dock</code>
+            </div>
+          </div>
+          <div style="margin-top:8px;display:flex;gap:16px;flex-wrap:wrap;font-size:0.72rem">
+            <span>📏 통로당 왕복: <strong style="color:#e2e8f0">48m</strong> (24m × 2)</span>
+            <span>🔢 15통로 × 4 Pass = 총 <strong style="color:#e2e8f0">~2,940m</strong></span>
+            <span>⏱ 예상 비행: <strong style="color:#fbbf24">~33분</strong> @ 1.5m/s</span>
+            <span>🔁 95% 미만 시: <strong style="color:#f87171">저조 통로만 재촬영</strong> (최대 2회)</span>
+          </div>
         </div>
       </div>
 
@@ -4015,18 +4040,22 @@ function amRenderLog(steps) {
         start: '🚀', planning: '📐', analyzing: '🔍', comparing: '📊',
         completed: '✅', skipped: '⏭', queued: '📥', decision: '🧠',
         warning: '⚠️', error: '❌', 'in_progress': '⚡',
+        rescan: '🔁',   // 재촬영 이벤트
     };
     panel.innerHTML = [...steps].reverse().map(s => {
         const col  = toolColor[s.tool]  || '#94a3b8';
         const icon = statusIcon[s.status] || '▸';
         const ts   = (s.ts || '').slice(11, 19);
+        // 재촬영 이벤트는 노란 배경으로 강조
+        const isRescan = s.status === 'rescan' || (s.message || '').includes('재촬영');
+        const rowBg = isRescan ? 'rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.2);border-radius:6px;padding:4px 6px;' : '';
         return `
-          <div style="display:flex;gap:8px;margin-bottom:7px;align-items:flex-start">
+          <div style="display:flex;gap:8px;margin-bottom:7px;align-items:flex-start;${rowBg}">
             <span style="color:#475569;flex-shrink:0;font-size:0.68rem;margin-top:1px">${ts}</span>
             <span style="padding:1px 7px;border-radius:4px;font-size:0.68rem;font-weight:700;
                          background:${col}22;color:${col};border:1px solid ${col}44;
                          flex-shrink:0;white-space:nowrap">${s.tool}</span>
-            <span style="color:#94a3b8;font-size:0.72rem;line-height:1.5">
+            <span style="color:${isRescan ? '#fbbf24' : '#94a3b8'};font-size:0.72rem;line-height:1.5">
               ${icon} ${s.message || ''}
             </span>
           </div>`;
