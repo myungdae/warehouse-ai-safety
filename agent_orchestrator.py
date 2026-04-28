@@ -48,8 +48,9 @@ _DEFAULT_AGENT_CONFIG = {
     # 드론
     "drone_host":            "192.168.10.50",  # 드론 컨트롤러 IP
     "drone_port":            8765,
-    "flight_speed_ms":       1.5,          # m/s — 바코드 인식 최적
-    "flight_levels_per_pass":4,            # 1 Pass당 커버 단수
+    "flight_speed_ms":       1.5,          # m/s — 바코드 인식 최적 (1~2m/s)
+    # 비행 패턴: 레벨별 완전 왕복 (입구 진입→끝→입구 복귀, 레벨 전환은 입구에서만)
+    # 천장/끝 통과 절대 불가 — S자 금지
     "warehouse_aisles":      15,
     "warehouse_racks":       20,
     "warehouse_levels":      15,
@@ -167,57 +168,69 @@ class MCPTools:
     def drone_control(mission_id: str, cfg: dict,
                       rescan_aisles: list = None) -> dict:
         """
-        실제 창고 구조 기반 비행 패턴:
-          - 천장 통과 불가 → 각 통로는 반드시 입구로 되돌아옴 (U턴 왕복)
-          - 패턴: Dock 출발 → Aisle-1 진입 → 끝까지 직진 → 역방향 복귀
-                 → Aisle-2 진입 → ... → Aisle-15 → Dock 귀환
-          - 카메라 틸트로 여러 단(level)을 커버 (1 Pass당 4~5단)
-          - 연속 녹화 (중단 없음) → Dock 귀환 후 Wi-Fi 자동 전송
-          - rescan_aisles 지정 시 해당 통로만 재촬영
+        실제 창고 구조 기반 비행 패턴 (엄격한 규칙):
+        ───────────────────────────────────────────────
+        ★ 규칙 1: 천장/끝 통과 절대 불가 (물리적 구조)
+        ★ 규칙 2: 반드시 들어온 입구로 완전히 복귀 후 다음 동작
+        ★ 규칙 3: 레벨 전환은 반드시 입구(aisle 바깥)에서만
+
+        비행 순서 (Aisle 1 예시, 전체 반복):
+          Dock
+           │
+           ├─► Aisle-1 입구 도착
+           │     ↓ L1 높이로 진입 → rack 끝까지 직진 → 역방향 복귀 → 입구
+           │     ↓ L2 높이로 진입 → rack 끝까지 직진 → 역방향 복귀 → 입구
+           │     ↓ L3 높이로 진입 → ...
+           │     ↓ L15 높이로 진입 → ... → 입구 복귀
+           │   (Aisle-1 완전 완료)
+           │
+           ├─► Aisle-2 입구로 이동 (통로 바깥 경로)
+           │     (같은 방식 반복)
+           ...
+           └─► Aisle-15 완료 → Dock 귀환 → Wi-Fi 자동 전송
+
+        핵심: 끝에서 옆 통로로 바로 넘어가는 것 절대 금지
+              레벨 전환도 반드시 입구에서만 수행
         """
-        aisles  = cfg.get('warehouse_aisles', 15)
-        racks   = cfg.get('warehouse_racks', 20)
-        levels  = cfg.get('warehouse_levels', 15)
-        speed   = cfg.get('flight_speed_ms', 1.5)
-        lpp     = cfg.get('flight_levels_per_pass', 4)
+        aisles = cfg.get('warehouse_aisles', 15)
+        racks  = cfg.get('warehouse_racks',  20)
+        levels = cfg.get('warehouse_levels', 15)
+        speed  = cfg.get('flight_speed_ms',  1.5)
 
-        # ── 실제 창고 구조 기반 비행 거리 계산 ─────────────────
-        # 각 통로: 입구 → 끝(rack_len) → 입구 복귀 = 2 × rack_len
-        # S자 불가 (천장 통과 불가) → 왕복(U턴) 구조
-        rack_len_m    = racks * 1.2          # 랙 1개 = 1.2m, 20랙 = 24m
-        aisle_roundtrip = rack_len_m * 2    # 왕복: 24m × 2 = 48m
-        aisle_gap_m   = 3.5                 # 통로 간 이동 거리 (측면)
-
-        # 높이 Pass 수: 카메라 틸트로 1 Pass당 lpp단 커버
-        passes = -(-levels // lpp)           # ceil(15/4) = 4 Pass
+        # ── 비행 거리 계산 (레벨별 완전 왕복 구조) ─────────────
+        rack_len_m      = racks * 1.2    # 랙 1개 = 1.2m → 20랙 = 24m
+        roundtrip_m     = rack_len_m * 2 # 1회 왕복 = 48m (입구→끝→입구)
+        level_gap_m     = 0.5            # 입구에서 높이 조정 이동 (수직 0.5m)
+        aisle_gap_m     = 3.5            # 통로 간 수평 이동
 
         # 재촬영 모드: 지정 통로만
         target_aisles = rescan_aisles if rescan_aisles else list(range(1, aisles + 1))
         n_aisles = len(target_aisles)
 
-        # 총 거리 = (통로 왕복 × 통로 수 + 통로 간 이동 × (통로수-1)) × Pass 수
-        total_dist_m = (
-            aisle_roundtrip * n_aisles +
-            aisle_gap_m * (n_aisles - 1)
-        ) * passes
-        flight_sec = total_dist_m / speed
+        # 총 거리:
+        #   각 aisle = (레벨 수 × 왕복) + (레벨 전환 × level_gap)
+        #   aisle 간 이동 = (aisle 수 - 1) × aisle_gap
+        per_aisle_m  = levels * roundtrip_m + (levels - 1) * level_gap_m
+        inter_aisle_m = aisle_gap_m * (n_aisles - 1)
+        total_dist_m = per_aisle_m * n_aisles + inter_aisle_m
+        flight_sec   = total_dist_m / speed
 
-        # 비행 계획 로그
         mode_label = f"재촬영({n_aisles}개 통로)" if rescan_aisles else f"전체({aisles}개 통로)"
+
         _log_step(mission_id, {
             'tool': 'drone_control',
             'status': 'planning',
             'message': (
                 f"📐 비행 계획 [{mode_label}] — "
-                f"U턴 왕복 × {passes} Pass = 총 {total_dist_m:.0f}m / "
-                f"예상 {flight_sec/60:.1f}분"
+                f"입구 왕복 × {levels}레벨 × {n_aisles}통로 = "
+                f"총 {total_dist_m:.0f}m / 예상 {flight_sec/60:.1f}분"
             ),
             'detail': {
-                'pattern': 'U-turn roundtrip (no ceiling crossing)',
+                'pattern': 'per-level roundtrip from entrance (no end-crossing)',
+                'rule': '입구로만 출입, 레벨 전환은 입구(aisle 바깥)에서만',
                 'aisles': n_aisles, 'racks': racks, 'levels': levels,
-                'passes': passes,
-                'rack_len_m': rack_len_m,
-                'aisle_roundtrip_m': aisle_roundtrip,
+                'roundtrip_per_level_m': roundtrip_m,
+                'per_aisle_m': round(per_aisle_m),
                 'total_dist_m': round(total_dist_m),
                 'estimated_flight_min': round(flight_sec / 60, 1),
                 'target_aisles': target_aisles,
@@ -230,25 +243,23 @@ class MCPTools:
         #
         # import requests
         # drone_url = f"http://{cfg['drone_host']}:{cfg['drone_port']}"
+        # requests.post(f"{drone_url}/takeoff", json={'altitude': 0.5})
         #
-        # # 이륙
-        # requests.post(f"{drone_url}/takeoff", json={'altitude': 1.5})
-        #
-        # # 경로 생성: U턴 왕복 패턴
-        # waypoints = _build_uturn_waypoints(
-        #     target_aisles, rack_len_m, aisle_gap_m, passes, lpp, speed
+        # # 웨이포인트 생성: 레벨별 완전 왕복, 입구에서만 레벨 전환
+        # waypoints = _build_per_level_waypoints(
+        #     target_aisles, rack_len_m, aisle_gap_m, level_gap_m, levels, speed
         # )
+        # # 각 레벨 왕복 구조:
+        # #   for aisle in target_aisles:
+        # #     for level in range(1, levels+1):
+        # #       ENTRANCE → fly in at level_height(level) → END → fly back → ENTRANCE
+        # #       (높이 조정은 ENTRANCE에서만)
         # requests.post(f"{drone_url}/mission/upload",
         #               json={'waypoints': waypoints, 'continuous_record': True})
         # requests.post(f"{drone_url}/mission/start")
-        #
-        # # 완료 대기 (드론이 Dock 귀환 후 landed 상태)
         # while True:
-        #     status = requests.get(f"{drone_url}/status").json()
-        #     if status['state'] == 'landed': break
+        #     if requests.get(f"{drone_url}/status").json()['state'] == 'landed': break
         #     time.sleep(5)
-        #
-        # # Wi-Fi 자동 전송 완료 대기
         # requests.post(f"{drone_url}/transfer", json={'dest': _UPLOAD_DIR})
         # video_path = requests.get(f"{drone_url}/last_video").json()['path']
 
@@ -256,7 +267,7 @@ class MCPTools:
         sim_wait = min(flight_sec * 0.01, 3)
         time.sleep(sim_wait)
 
-        # 영상 파일 (실제: Wi-Fi 전송 후 로컬 경로)
+        # 영상 파일 (실제: Dock 귀환 후 Wi-Fi 자동 전송)
         video_path = None
         uploads = sorted(
             [f for f in os.listdir(_UPLOAD_DIR)
@@ -271,7 +282,8 @@ class MCPTools:
             'tool': 'drone_control',
             'status': 'completed',
             'message': (
-                f"✅ 비행 완료 — {total_dist_m:.0f}m (U턴 왕복 × {passes} Pass) | "
+                f"✅ 비행 완료 — {total_dist_m:.0f}m "
+                f"(레벨별 완전 왕복, 입구 전환) | "
                 f"Dock 귀환 → Wi-Fi 전송 완료 | "
                 f"영상: {os.path.basename(video_path) if video_path else '시뮬레이션 모드'}"
             ),
@@ -282,11 +294,15 @@ class MCPTools:
             'video_path': video_path,
             'flight_dist_m': round(total_dist_m),
             'flight_min': round(flight_sec / 60, 1),
-            'passes': passes,
+            'levels': levels,
+            'per_aisle_m': round(per_aisle_m),
             'target_aisles': target_aisles,
             'rescan_mode': bool(rescan_aisles),
             'sim_mode': video_path is None,
-            'message': f"비행 완료 ({total_dist_m:.0f}m, U턴 왕복)"
+            'message': (
+                f"비행 완료 ({total_dist_m:.0f}m, "
+                f"레벨별 완전 왕복 × {levels}레벨 × {n_aisles}통로)"
+            )
         }
 
     # ── Tool 2: video_scan ─────────────────────────────────────
