@@ -1103,6 +1103,7 @@ function drone02Loop() {
 
         if (target.type === 'sweep_down') {
             processSweepAisle(target.aisle, 'down');
+            updateSidebarAisle2(target.aisle);
             addFeed(
                 `📹 <b style="color:#f97316">[DRONE-02]</b> ` +
                 `<b>Aisle-${target.aisle}</b> 촬영 완료 — 20랙 × 15단`,
@@ -1110,7 +1111,10 @@ function drone02Loop() {
             );
         } else if (target.type === 'sweep_up') {
             addFeed(`↩ <b style="color:#f97316">D-02</b> A${target.aisle} U턴 → 다음 통로`, 'scan-item');
+        } else if (target.type === 'move') {
+            updateSidebarAisle2(target.aisle);
         } else if (target.type === 'return_to_dock') {
+            updateSidebarAisle2(null);
             addFeed(
                 `🏠 <b style="color:#f97316">[DRONE-02]</b> A${BATTERY_SWAP_AISLE+1}~A15 완료 → Dock 귀환`,
                 'scan-item'
