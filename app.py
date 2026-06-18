@@ -229,7 +229,12 @@ def index():
 
 @app.route('/drone')
 def drone_inventory():
-    """Tethered drone system (wired power, 2 docks)"""
+    """Smart Factory Patrol — AI 무인 보안 순찰 시스템"""
+    return render_template('drone.html')
+
+@app.route('/drone/tethered')
+def drone_tethered():
+    """Tethered drone system (wired power, 2 docks) — legacy"""
     return render_template('drone_tethered.html')
 
 @app.route('/drone/multi')
