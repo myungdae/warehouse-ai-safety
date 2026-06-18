@@ -1,0 +1,1259 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Smart Factory Patrol — AI 무인 보안 순찰 시스템</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #080c18;
+      --panel: #0c1220;
+      --card: #0f1829;
+      --border: #1a2d50;
+      --border2: #1e3360;
+      --accent: #00d4ff;
+      --green: #00ff88;
+      --yellow: #ffe033;
+      --orange: #ff9f2e;
+      --red: #ff2244;
+      --purple: #a855f7;
+      --teal: #00f0d0;
+      --text: #e8f4ff;
+      --muted: #7a9cc0;
+      --dim: #3d5a80;
+      --font: 'Segoe UI', 'Noto Sans KR', sans-serif;
+      --mono: 'Courier New', monospace;
+    }
+
+    html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font); font-size: 13px; overflow-x: hidden; }
+
+    /* 격자 배경 */
+    body::before {
+      content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+      background-image: linear-gradient(rgba(0,212,255,.025) 1px, transparent 1px), linear-gradient(90deg, rgba(0,212,255,.025) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+
+    .wrap { position: relative; z-index: 1; display: grid; grid-template-rows: 56px 1fr 34px; height: 100vh; overflow: hidden; }
+
+    /* ── HEADER ── */
+    header {
+      background: rgba(8,12,24,.95); border-bottom: 1px solid rgba(0,212,255,.2);
+      display: flex; align-items: center; gap: 16px; padding: 0 24px;
+      box-shadow: 0 2px 30px rgba(0,0,0,.5); z-index: 100;
+    }
+    .hdr-logo { display: flex; align-items: center; gap: 10px; }
+    .hdr-icon { font-size: 22px; }
+    .hdr-title { font-size: 15px; font-weight: 700; color: var(--accent); letter-spacing: 1px; }
+    .hdr-sub   { font-size: 10px; color: var(--muted); letter-spacing: 1px; margin-top: 1px; }
+    .hdr-badge { font-size: 9px; font-weight: 700; padding: 3px 10px; border-radius: 12px; border: 1px solid var(--purple); color: var(--purple); background: rgba(168,85,247,.1); letter-spacing: 1px; margin-left: 6px; }
+    .hdr-nav   { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+    .nav-btn   { padding: 5px 14px; border-radius: 4px; font-size: 11px; font-weight: 700; text-decoration: none; border: 1px solid; transition: all .15s; letter-spacing: 1px; cursor: pointer; background: transparent; color: var(--muted); border-color: var(--border2); }
+    .nav-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .nav-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(0,212,255,.08); }
+    .sys-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); animation: blink 2s infinite; }
+    .sys-dot.alert { background: var(--red); box-shadow: 0 0 8px var(--red); animation: blink .5s infinite; }
+    .sys-dot.warn  { background: var(--yellow); box-shadow: 0 0 8px var(--yellow); animation: blink .8s infinite; }
+    .sys-label { font-size: 11px; font-weight: 700; color: var(--green); letter-spacing: 1px; }
+    .sys-label.alert { color: var(--red); }
+    .sys-label.warn  { color: var(--yellow); }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.25} }
+
+    /* ── MAIN GRID ── */
+    main {
+      display: grid;
+      grid-template-columns: 280px 1fr 320px;
+      gap: 6px; padding: 6px;
+      overflow: hidden; min-height: 0;
+    }
+
+    /* ── PANEL 공통 ── */
+    .panel {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 8px; overflow: hidden;
+      display: flex; flex-direction: column;
+    }
+    .panel-hdr {
+      padding: 9px 14px; background: rgba(0,212,255,.04);
+      border-bottom: 1px solid var(--border);
+      font-size: 11px; font-weight: 700; color: var(--accent);
+      letter-spacing: 1.5px; text-transform: uppercase;
+      display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+    }
+    .ph-badge {
+      margin-left: auto; background: var(--accent); color: var(--bg);
+      font-size: 10px; font-weight: 900; padding: 1px 8px;
+      border-radius: 10px; min-width: 22px; text-align: center;
+    }
+    .ph-badge.zero { background: var(--dim); }
+    .ph-badge.red  { background: var(--red); }
+    .panel-body { flex: 1; overflow-y: auto; padding: 10px; }
+    .panel-body::-webkit-scrollbar { width: 3px; }
+    .panel-body::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+    /* ── LEFT: 공장 평면도 + 센서 상태 ── */
+    #left-col { display: flex; flex-direction: column; gap: 6px; }
+
+    /* 공장 맵 (Canvas) */
+    #factory-map-panel { height: 300px; flex-shrink: 0; }
+    #factory-canvas { width: 100%; height: 100%; display: block; }
+
+    /* 센서 상태 */
+    .sensor-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+    .sensor-item {
+      background: var(--card); border: 1px solid var(--border2);
+      border-radius: 5px; padding: 8px 10px;
+      display: flex; align-items: center; gap: 7px;
+      font-size: 10px; transition: border-color .3s;
+    }
+    .sensor-item.triggered { border-color: var(--red); background: rgba(255,34,68,.05); animation: sensorPulse .6s ease; }
+    @keyframes sensorPulse { 0%{box-shadow:0 0 0 rgba(255,34,68,0)} 50%{box-shadow:0 0 12px rgba(255,34,68,.4)} 100%{box-shadow:0 0 0 rgba(255,34,68,0)} }
+    .sensor-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .sensor-name { color: var(--muted); flex: 1; }
+    .sensor-status { font-size: 9px; font-weight: 700; }
+
+    /* 드론 상태 카드 */
+    .drone-status-card {
+      background: var(--card); border: 1px solid var(--border2);
+      border-radius: 6px; padding: 12px; margin-bottom: 8px;
+    }
+    .dsc-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+    .dsc-icon { font-size: 24px; }
+    .dsc-id   { font-size: 14px; font-weight: 900; color: var(--accent); }
+    .dsc-sub  { font-size: 10px; color: var(--muted); margin-top: 1px; }
+    .dsc-status-badge {
+      margin-left: auto; font-size: 10px; font-weight: 700; padding: 3px 10px;
+      border-radius: 10px; letter-spacing: 1px;
+    }
+    .dsc-status-badge.standby { background: rgba(122,156,192,.12); color: var(--muted); border: 1px solid var(--border2); }
+    .dsc-status-badge.patrol  { background: rgba(0,255,136,.12); color: var(--green); border: 1px solid rgba(0,255,136,.3); }
+    .dsc-status-badge.deploy  { background: rgba(255,224,51,.12); color: var(--yellow); border: 1px solid rgba(255,224,51,.3); animation: blink .8s infinite; }
+    .dsc-status-badge.alert   { background: rgba(255,34,68,.15); color: var(--red); border: 1px solid rgba(255,34,68,.4); animation: blink .5s infinite; }
+    .dsc-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-bottom: 8px; }
+    .dsc-field-lbl { font-size: 9px; color: var(--dim); margin-bottom: 2px; }
+    .dsc-field-val { font-size: 12px; font-weight: 700; color: var(--text); }
+    .dsc-bat-track { height: 4px; background: rgba(255,255,255,.07); border-radius: 2px; overflow: hidden; margin-top: 4px; }
+    .dsc-bat-fill  { height: 100%; border-radius: 2px; transition: width .5s; }
+
+    /* ── CENTER: 메인 이벤트 대시보드 ── */
+    #center-col { display: flex; flex-direction: column; gap: 6px; }
+
+    /* 상황 배너 */
+    #situation-bar {
+      flex-shrink: 0; border-radius: 6px; padding: 10px 18px;
+      display: flex; align-items: center; gap: 12px;
+      font-size: 13px; font-weight: 700; letter-spacing: 1px;
+      border: 1px solid; transition: all .4s;
+    }
+    .sb-normal   { background: rgba(0,255,136,.05); border-color: rgba(0,255,136,.2); color: var(--green); }
+    .sb-detect   { background: rgba(255,224,51,.06); border-color: rgba(255,224,51,.35); color: var(--yellow); }
+    .sb-dispatch { background: rgba(255,159,46,.08); border-color: rgba(255,159,46,.4); color: var(--orange); }
+    .sb-alert    { background: rgba(255,34,68,.1); border-color: rgba(255,34,68,.5); color: var(--red); animation: critPulse .8s infinite alternate; }
+    @keyframes critPulse { from{box-shadow:none} to{box-shadow:0 0 20px rgba(255,34,68,.4)} }
+    #sit-phase { margin-left: auto; font-size: 11px; opacity: .7; }
+    #sit-timer { font-family: var(--mono); font-size: 18px; font-weight: 900; }
+
+    /* 온톨로지 판단 패널 */
+    #ontology-panel {
+      flex-shrink: 0;
+      background: var(--card); border: 1px solid var(--border2);
+      border-radius: 6px; padding: 14px 16px;
+    }
+    .ont-title { font-size: 10px; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+    .ont-grid  { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    .ont-item  { background: rgba(255,255,255,.03); border: 1px solid var(--border2); border-radius: 5px; padding: 10px; text-align: center; transition: all .4s; }
+    .ont-item.triggered { border-color: var(--red); background: rgba(255,34,68,.08); }
+    .ont-item.ok        { border-color: rgba(0,255,136,.3); background: rgba(0,255,136,.05); }
+    .ont-item.warn      { border-color: rgba(255,224,51,.3); background: rgba(255,224,51,.05); }
+    .ont-lbl { font-size: 9px; color: var(--dim); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 6px; }
+    .ont-val  { font-size: 13px; font-weight: 700; }
+    .ont-val.red    { color: var(--red); }
+    .ont-val.green  { color: var(--green); }
+    .ont-val.yellow { color: var(--yellow); }
+    .ont-val.orange { color: var(--orange); }
+
+    /* 이벤트 타임라인 */
+    #timeline-panel { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
+    #timeline-list  { flex: 1; overflow-y: auto; padding: 8px 12px; }
+    #timeline-list::-webkit-scrollbar { width: 3px; }
+    #timeline-list::-webkit-scrollbar-thumb { background: var(--border2); }
+
+    .tl-item {
+      display: flex; gap: 12px; padding: 8px 0;
+      border-bottom: 1px solid rgba(255,255,255,.04); align-items: flex-start;
+    }
+    .tl-item:last-child { border-bottom: none; }
+    .tl-line { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; }
+    .tl-dot  { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; margin-top: 2px; }
+    .tl-vline { width: 1px; flex: 1; background: var(--border2); margin-top: 4px; min-height: 16px; }
+    .tl-time { font-size: 9px; color: var(--dim); flex-shrink: 0; width: 52px; padding-top: 1px; font-family: var(--mono); }
+    .tl-body { flex: 1; }
+    .tl-phase { font-size: 9px; font-weight: 700; letter-spacing: 1px; margin-bottom: 2px; }
+    .tl-msg   { font-size: 11px; color: var(--muted); line-height: 1.5; }
+    .tl-msg b { color: var(--text); }
+    .tl-item.cctv     .tl-dot { background: var(--accent); }
+    .tl-item.cctv     .tl-phase { color: var(--accent); }
+    .tl-item.ontology .tl-dot { background: var(--purple); }
+    .tl-item.ontology .tl-phase { color: var(--purple); }
+    .tl-item.dispatch .tl-dot { background: var(--yellow); }
+    .tl-item.dispatch .tl-phase { color: var(--yellow); }
+    .tl-item.drone    .tl-dot { background: var(--orange); }
+    .tl-item.drone    .tl-phase { color: var(--orange); }
+    .tl-item.broadcast .tl-dot { background: var(--red); box-shadow: 0 0 6px var(--red); }
+    .tl-item.broadcast .tl-phase { color: var(--red); }
+    .tl-item.resolved  .tl-dot { background: var(--green); box-shadow: 0 0 6px var(--green); }
+    .tl-item.resolved  .tl-phase { color: var(--green); }
+
+    /* CCTV 화면 (시뮬레이션) */
+    #cctv-panel { flex-shrink: 0; height: 200px; }
+    .cctv-grid  { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; height: 160px; }
+    .cctv-feed  {
+      background: #050810; border: 1px solid var(--border2); border-radius: 4px;
+      position: relative; overflow: hidden; cursor: pointer; transition: border-color .2s;
+    }
+    .cctv-feed:hover { border-color: var(--accent); }
+    .cctv-feed.active { border-color: var(--red); box-shadow: 0 0 10px rgba(255,34,68,.3); }
+    .cctv-canvas { width: 100%; height: 100%; display: block; }
+    .cctv-label {
+      position: absolute; bottom: 4px; left: 6px;
+      font-size: 9px; color: rgba(255,255,255,.5);
+      font-family: var(--mono); pointer-events: none;
+    }
+    .cctv-alert-tag {
+      position: absolute; top: 4px; right: 4px;
+      background: var(--red); color: #fff;
+      font-size: 8px; font-weight: 700; padding: 2px 6px;
+      border-radius: 3px; letter-spacing: 1px; display: none;
+    }
+    .cctv-feed.active .cctv-alert-tag { display: block; animation: blink .5s infinite; }
+
+    /* ── RIGHT: 대응 단계 + 통계 ── */
+    #right-col { display: flex; flex-direction: column; gap: 6px; }
+
+    /* 대응 단계 플로우 */
+    #flow-panel { flex-shrink: 0; }
+    .flow-step {
+      display: flex; gap: 10px; align-items: flex-start;
+      padding: 9px 0; border-bottom: 1px solid rgba(255,255,255,.04);
+      transition: all .3s;
+    }
+    .flow-step:last-child { border-bottom: none; }
+    .flow-step-num {
+      width: 24px; height: 24px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 900; flex-shrink: 0;
+      border: 1.5px solid var(--dim); color: var(--dim);
+      background: transparent; transition: all .3s;
+    }
+    .flow-step.active .flow-step-num { border-color: var(--yellow); color: var(--bg); background: var(--yellow); }
+    .flow-step.done   .flow-step-num { border-color: var(--green);  color: var(--bg); background: var(--green); }
+    .flow-step.alert-step .flow-step-num { border-color: var(--red); color: #fff; background: var(--red); animation: blink .5s infinite; }
+    .flow-step-body { flex: 1; }
+    .flow-step-title { font-size: 11px; font-weight: 700; color: var(--dim); transition: color .3s; }
+    .flow-step.active .flow-step-title { color: var(--yellow); }
+    .flow-step.done   .flow-step-title { color: var(--green); }
+    .flow-step.alert-step .flow-step-title { color: var(--red); }
+    .flow-step-desc { font-size: 10px; color: var(--dim); margin-top: 2px; line-height: 1.4; }
+    .flow-step.active .flow-step-desc,
+    .flow-step.done   .flow-step-desc { color: var(--muted); }
+    .flow-step-time { font-size: 9px; color: var(--dim); font-family: var(--mono); margin-top: 2px; }
+
+    /* 통계 카드 */
+    .stat-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px; }
+    .stat-box { background: var(--card); border: 1px solid var(--border2); border-radius: 5px; padding: 10px; text-align: center; }
+    .stat-val { font-size: 26px; font-weight: 900; line-height: 1; margin-bottom: 3px; }
+    .stat-lbl { font-size: 9px; color: var(--muted); letter-spacing: 1px; }
+    .stat-box.green-b  { border-color: rgba(0,255,136,.3); }
+    .stat-box.green-b  .stat-val { color: var(--green); }
+    .stat-box.accent-b { border-color: rgba(0,212,255,.3); }
+    .stat-box.accent-b .stat-val { color: var(--accent); }
+    .stat-box.yellow-b { border-color: rgba(255,224,51,.3); }
+    .stat-box.yellow-b .stat-val { color: var(--yellow); }
+    .stat-box.red-b    { border-color: rgba(255,34,68,.3); }
+    .stat-box.red-b    .stat-val { color: var(--red); }
+
+    /* 시나리오 컨트롤 */
+    .scenario-btn {
+      width: 100%; padding: 8px; border-radius: 5px; font-size: 11px; font-weight: 700;
+      cursor: pointer; border: 1px solid; transition: all .15s; background: transparent;
+      font-family: var(--font); letter-spacing: 1px; margin-bottom: 5px; text-align: left;
+    }
+    .scenario-btn.intrude { border-color: var(--red);    color: var(--red); }
+    .scenario-btn.intrude:hover { background: rgba(255,34,68,.1); }
+    .scenario-btn.fire    { border-color: var(--orange);  color: var(--orange); }
+    .scenario-btn.fire:hover { background: rgba(255,159,46,.1); }
+    .scenario-btn.patrol  { border-color: var(--green);   color: var(--green); }
+    .scenario-btn.patrol:hover { background: rgba(0,255,136,.1); }
+    .scenario-btn.reset   { border-color: var(--dim);     color: var(--dim); }
+    .scenario-btn.reset:hover { background: rgba(61,90,128,.2); color: var(--muted); }
+
+    /* 스피커 방송 표시 */
+    #broadcast-overlay {
+      display: none; position: fixed; inset: 0; z-index: 9999;
+      background: rgba(0,0,0,.7); backdrop-filter: blur(4px);
+      align-items: center; justify-content: center;
+    }
+    #broadcast-overlay.show { display: flex; }
+    .broadcast-box {
+      background: var(--panel); border: 2px solid var(--red);
+      border-radius: 12px; padding: 30px 40px; text-align: center;
+      max-width: 480px; animation: broadcastIn .3s ease;
+      box-shadow: 0 0 40px rgba(255,34,68,.4);
+    }
+    @keyframes broadcastIn { from{transform:scale(.8);opacity:0} to{transform:scale(1);opacity:1} }
+    .bc-icon { font-size: 48px; margin-bottom: 12px; }
+    .bc-title { font-size: 16px; font-weight: 900; color: var(--red); letter-spacing: 2px; margin-bottom: 14px; }
+    .bc-msg { font-size: 18px; font-weight: 700; color: var(--text); line-height: 1.6; margin-bottom: 20px; padding: 14px; background: rgba(255,34,68,.08); border-radius: 8px; border: 1px solid rgba(255,34,68,.2); }
+    .bc-sub { font-size: 11px; color: var(--muted); }
+    .bc-close { margin-top: 18px; padding: 8px 24px; border-radius: 5px; background: var(--red); border: none; color: #fff; font-size: 12px; font-weight: 700; cursor: pointer; font-family: var(--font); letter-spacing: 1px; }
+
+    /* ── FOOTER ── */
+    footer {
+      background: var(--panel); border-top: 1px solid var(--border);
+      display: flex; align-items: center; padding: 0 20px;
+      font-size: 10px; color: var(--dim); gap: 16px;
+    }
+    .ft-sep { color: var(--border2); }
+    #ft-time { color: var(--muted); font-family: var(--mono); }
+    #ft-events { color: var(--yellow); font-weight: 700; }
+  </style>
+</head>
+<body>
+
+<!-- 스피커 방송 오버레이 -->
+<div id="broadcast-overlay">
+  <div class="broadcast-box">
+    <div class="bc-icon">📢</div>
+    <div class="bc-title">🔴 AI 보안 방송</div>
+    <div class="bc-msg" id="bc-msg-text">여기는 AI 보안시스템입니다.<br>즉시 신원을 확인하십시오.</div>
+    <div class="bc-sub" id="bc-msg-sub">FPV 드론이 현장을 모니터링 중입니다. 관제센터에 실시간 영상이 전송되고 있습니다.</div>
+    <button class="bc-close" onclick="closeBroadcast()">확인 (ACK)</button>
+  </div>
+</div>
+
+<div class="wrap">
+<header>
+  <div class="hdr-logo">
+    <div class="hdr-icon">🏭</div>
+    <div>
+      <div class="hdr-title">Smart Factory Patrol</div>
+      <div class="hdr-sub">AI 무인 보안 순찰 시스템 · Ontology-Based Decision</div>
+    </div>
+  </div>
+  <div class="hdr-badge">AI SECURITY v2.0</div>
+  <div class="hdr-nav">
+    <div style="display:flex;align-items:center;gap:6px;">
+      <div class="sys-dot" id="sys-dot"></div>
+      <span class="sys-label" id="sys-label">NORMAL</span>
+    </div>
+    <a href="/" class="nav-btn">🏠 홈</a>
+    <a href="/gotham" class="nav-btn">🦇 Gotham</a>
+    <a href="/drone" class="nav-btn active">🏭 Factory Patrol</a>
+  </div>
+</header>
+
+<main>
+  <!-- ── LEFT ── -->
+  <div id="left-col">
+
+    <!-- 공장 평면도 -->
+    <div class="panel" id="factory-map-panel">
+      <div class="panel-hdr">🗺 공장 평면도
+        <span style="margin-left:auto;font-size:9px;color:var(--dim);font-weight:400;">클릭: 구역 선택</span>
+      </div>
+      <canvas id="factory-canvas"></canvas>
+    </div>
+
+    <!-- 드론 상태 -->
+    <div class="panel" style="flex:1;min-height:0;">
+      <div class="panel-hdr">🚁 드론 상태
+        <span class="ph-badge" id="drone-badge">1</span>
+      </div>
+      <div class="panel-body" style="padding:10px;">
+        <div class="drone-status-card">
+          <div class="dsc-header">
+            <div class="dsc-icon">🚁</div>
+            <div>
+              <div class="dsc-id">FPV-PATROL-01</div>
+              <div class="dsc-sub">Samsung Semiconductor Fab · 경비 드론</div>
+            </div>
+            <div class="dsc-status-badge standby" id="drone-status-badge">STANDBY</div>
+          </div>
+          <div class="dsc-grid">
+            <div>
+              <div class="dsc-field-lbl">고도</div>
+              <div class="dsc-field-val" id="d-alt">0m</div>
+            </div>
+            <div>
+              <div class="dsc-field-lbl">속도</div>
+              <div class="dsc-field-val" id="d-spd">0m/s</div>
+            </div>
+            <div>
+              <div class="dsc-field-lbl">구역</div>
+              <div class="dsc-field-val" id="d-zone">도크</div>
+            </div>
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--dim);margin-bottom:3px;">
+              배터리 <span id="d-bat-pct" style="color:var(--green);font-weight:700;">94%</span>
+            </div>
+            <div class="dsc-bat-track">
+              <div class="dsc-bat-fill" id="d-bat-bar" style="width:94%;background:var(--green);"></div>
+            </div>
+          </div>
+          <div style="margin-top:8px;font-size:10px;color:var(--dim);">
+            임무: <span id="d-mission" style="color:var(--muted);">대기 중</span>
+          </div>
+        </div>
+
+        <!-- 센서 상태 -->
+        <div style="font-size:10px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px;font-weight:700;">센서 현황</div>
+        <div class="sensor-grid" id="sensor-grid">
+          <div class="sensor-item" id="sens-cctv-a1">
+            <div class="sensor-dot" style="background:var(--green);box-shadow:0 0 5px var(--green);"></div>
+            <span class="sensor-name">CCTV-A1 입구</span>
+            <span class="sensor-status" style="color:var(--green);">정상</span>
+          </div>
+          <div class="sensor-item" id="sens-cctv-b2">
+            <div class="sensor-dot" style="background:var(--green);box-shadow:0 0 5px var(--green);"></div>
+            <span class="sensor-name">CCTV-B2 창고</span>
+            <span class="sensor-status" style="color:var(--green);">정상</span>
+          </div>
+          <div class="sensor-item" id="sens-pir-1">
+            <div class="sensor-dot" style="background:var(--green);box-shadow:0 0 5px var(--green);"></div>
+            <span class="sensor-name">PIR-1 동측</span>
+            <span class="sensor-status" style="color:var(--green);">정상</span>
+          </div>
+          <div class="sensor-item" id="sens-pir-2">
+            <div class="sensor-dot" style="background:var(--green);box-shadow:0 0 5px var(--green);"></div>
+            <span class="sensor-name">PIR-2 서측</span>
+            <span class="sensor-status" style="color:var(--green);">정상</span>
+          </div>
+          <div class="sensor-item" id="sens-door-1">
+            <div class="sensor-dot" style="background:var(--green);box-shadow:0 0 5px var(--green);"></div>
+            <span class="sensor-name">Door-1 메인</span>
+            <span class="sensor-status" style="color:var(--green);">닫힘</span>
+          </div>
+          <div class="sensor-item" id="sens-smoke-1">
+            <div class="sensor-dot" style="background:var(--green);box-shadow:0 0 5px var(--green);"></div>
+            <span class="sensor-name">Smoke-1 생산</span>
+            <span class="sensor-status" style="color:var(--green);">정상</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CENTER ── -->
+  <div id="center-col">
+
+    <!-- 상황 배너 -->
+    <div id="situation-bar" class="sb-normal">
+      <span id="sit-icon">🟢</span>
+      <span id="sit-text">야간 순찰 모드 · 이상 없음</span>
+      <span id="sit-phase" class="sit-phase">02:00 야간</span>
+      <span id="sit-timer" style="display:none;"></span>
+    </div>
+
+    <!-- CCTV 화면 -->
+    <div class="panel" id="cctv-panel">
+      <div class="panel-hdr">📹 CCTV 실시간 모니터
+        <span style="margin-left:auto;font-size:9px;color:var(--dim);font-weight:400;">야간 모드 · NVR 연동</span>
+      </div>
+      <div style="padding:8px;">
+        <div class="cctv-grid">
+          <div class="cctv-feed" id="cctv-a1">
+            <canvas class="cctv-canvas" id="cv-a1"></canvas>
+            <span class="cctv-label">CCTV-A1 | 출입구</span>
+            <span class="cctv-alert-tag">⚠ 침입감지</span>
+          </div>
+          <div class="cctv-feed" id="cctv-b2">
+            <canvas class="cctv-canvas" id="cv-b2"></canvas>
+            <span class="cctv-label">CCTV-B2 | 창고동</span>
+            <span class="cctv-alert-tag">⚠ 침입감지</span>
+          </div>
+          <div class="cctv-feed" id="cctv-c3">
+            <canvas class="cctv-canvas" id="cv-c3"></canvas>
+            <span class="cctv-label">CCTV-C3 | 생산라인</span>
+            <span class="cctv-alert-tag">⚠ 침입감지</span>
+          </div>
+          <div class="cctv-feed" id="cctv-drone">
+            <canvas class="cctv-canvas" id="cv-drone"></canvas>
+            <span class="cctv-label">드론 카메라 | FPV</span>
+            <span class="cctv-alert-tag">● LIVE</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 온톨로지 판단 -->
+    <div id="ontology-panel">
+      <div class="ont-title">
+        🧠 Operational Ontology 판단
+        <span style="font-size:9px;color:var(--dim);font-weight:400;letter-spacing:.5px;">실시간 의미론적 추론</span>
+      </div>
+      <div class="ont-grid">
+        <div class="ont-item" id="ont-time">
+          <div class="ont-lbl">작업 시간</div>
+          <div class="ont-val green" id="ont-time-val">정상</div>
+        </div>
+        <div class="ont-item" id="ont-auth">
+          <div class="ont-lbl">허가 여부</div>
+          <div class="ont-val green" id="ont-auth-val">확인</div>
+        </div>
+        <div class="ont-item" id="ont-intrude">
+          <div class="ont-lbl">침입 가능성</div>
+          <div class="ont-val green" id="ont-intrude-val">낮음</div>
+        </div>
+        <div class="ont-item" id="ont-action">
+          <div class="ont-lbl">자동 대응</div>
+          <div class="ont-val green" id="ont-action-val">대기</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 이벤트 타임라인 -->
+    <div class="panel" id="timeline-panel">
+      <div class="panel-hdr">📋 이벤트 타임라인
+        <span class="ph-badge zero" id="tl-count">0</span>
+      </div>
+      <div id="timeline-list">
+        <div style="text-align:center;padding:20px;color:var(--dim);font-size:11px;">
+          <div style="font-size:28px;margin-bottom:8px;">🟢</div>
+          야간 순찰 대기 중<br>
+          <span style="font-size:10px;">이벤트 발생 시 여기에 표시됩니다</span>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- #center-col -->
+
+  <!-- ── RIGHT ── -->
+  <div id="right-col">
+
+    <!-- 자동 대응 플로우 -->
+    <div class="panel" id="flow-panel">
+      <div class="panel-hdr">⚡ 자동 대응 프로세스</div>
+      <div class="panel-body" style="padding:10px 14px;">
+        <div class="flow-step" id="step-1">
+          <div class="flow-step-num">1</div>
+          <div class="flow-step-body">
+            <div class="flow-step-title">CCTV 이상 감지</div>
+            <div class="flow-step-desc">YOLOv8 객체 감지 — 야간 인체 탐지</div>
+            <div class="flow-step-time" id="step-1-time"></div>
+          </div>
+        </div>
+        <div class="flow-step" id="step-2">
+          <div class="flow-step-num">2</div>
+          <div class="flow-step-body">
+            <div class="flow-step-title">Ontology 상황 판단</div>
+            <div class="flow-step-desc">작업시간·허가·침입 가능성 추론</div>
+            <div class="flow-step-time" id="step-2-time"></div>
+          </div>
+        </div>
+        <div class="flow-step" id="step-3">
+          <div class="flow-step-num">3</div>
+          <div class="flow-step-body">
+            <div class="flow-step-title">FPV 드론 출동</div>
+            <div class="flow-step-desc">도킹스테이션 → 이상 감지 구역 이동</div>
+            <div class="flow-step-time" id="step-3-time"></div>
+          </div>
+        </div>
+        <div class="flow-step" id="step-4">
+          <div class="flow-step-num">4</div>
+          <div class="flow-step-body">
+            <div class="flow-step-title">현장 영상 확보</div>
+            <div class="flow-step-desc">FPV 카메라 → 관제센터 실시간 전송</div>
+            <div class="flow-step-time" id="step-4-time"></div>
+          </div>
+        </div>
+        <div class="flow-step" id="step-5">
+          <div class="flow-step-num">5</div>
+          <div class="flow-step-body">
+            <div class="flow-step-title">스피커 방송</div>
+            <div class="flow-step-desc">AI TTS — 신원 확인 요청 방송</div>
+            <div class="flow-step-time" id="step-5-time"></div>
+          </div>
+        </div>
+        <div class="flow-step" id="step-6">
+          <div class="flow-step-num">6</div>
+          <div class="flow-step-body">
+            <div class="flow-step-title">관제센터 보고</div>
+            <div class="flow-step-desc">영상·센서 데이터 + 경찰 연동</div>
+            <div class="flow-step-time" id="step-6-time"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 운영 통계 -->
+    <div class="panel" style="flex-shrink:0;">
+      <div class="panel-hdr">📊 운영 통계</div>
+      <div class="panel-body" style="padding:10px;">
+        <div class="stat-row">
+          <div class="stat-box green-b">
+            <div class="stat-val" id="stat-patrol">247</div>
+            <div class="stat-lbl">순찰 횟수</div>
+          </div>
+          <div class="stat-box accent-b">
+            <div class="stat-val" id="stat-detect">12</div>
+            <div class="stat-lbl">감지 이벤트</div>
+          </div>
+        </div>
+        <div class="stat-row">
+          <div class="stat-box yellow-b">
+            <div class="stat-val" id="stat-response">8s</div>
+            <div class="stat-lbl">평균 출동 시간</div>
+          </div>
+          <div class="stat-box red-b">
+            <div class="stat-val" id="stat-intrude">3</div>
+            <div class="stat-lbl">침입 차단</div>
+          </div>
+        </div>
+        <!-- 효과 비교 -->
+        <div style="background:var(--card);border:1px solid var(--border2);border-radius:5px;padding:12px;margin-top:4px;">
+          <div style="font-size:9px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px;font-weight:700;">💡 경비 효율화</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <span style="font-size:11px;color:var(--dim);">기존 경비원</span>
+            <span style="font-size:14px;font-weight:900;color:var(--red);">10명</span>
+          </div>
+          <div style="height:3px;background:var(--border2);border-radius:2px;margin-bottom:8px;">
+            <div style="width:100%;height:100%;background:var(--red);border-radius:2px;"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <span style="font-size:11px;color:var(--dim);">AI 드론 시스템</span>
+            <span style="font-size:14px;font-weight:900;color:var(--green);">1대</span>
+          </div>
+          <div style="height:3px;background:var(--border2);border-radius:2px;margin-bottom:10px;">
+            <div style="width:10%;height:100%;background:var(--green);border-radius:2px;"></div>
+          </div>
+          <div style="text-align:center;background:rgba(0,255,136,.08);border:1px solid rgba(0,255,136,.2);border-radius:4px;padding:7px;">
+            <span style="font-size:13px;font-weight:900;color:var(--green);">▼ 90% 비용 절감</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 시나리오 -->
+    <div class="panel" style="flex-shrink:0;">
+      <div class="panel-hdr">🎬 시나리오 시뮬레이션</div>
+      <div class="panel-body" style="padding:10px;">
+        <button class="scenario-btn intrude" onclick="runScenario('intrude')">🚨 야간 침입자 감지</button>
+        <button class="scenario-btn fire"    onclick="runScenario('fire')">🔥 화재 연기 감지</button>
+        <button class="scenario-btn patrol"  onclick="runScenario('patrol')">✅ 정기 순찰 실행</button>
+        <button class="scenario-btn reset"   onclick="resetScenario()">↺ 초기화</button>
+      </div>
+    </div>
+
+  </div><!-- #right-col -->
+</main>
+
+<footer>
+  <span>🏭 Smart Factory Patrol · AI Security System</span>
+  <span class="ft-sep">|</span>
+  <span>시각: <span id="ft-time">—</span></span>
+  <span class="ft-sep">|</span>
+  <span>오늘 이벤트: <span id="ft-events">0</span>건</span>
+  <span class="ft-sep" style="margin-left:auto">|</span>
+  <span>드론 1대 = 경비원 10명</span>
+  <span class="ft-sep">|</span>
+  <span>Ontology Decision Engine v2.0</span>
+</footer>
+</div><!-- .wrap -->
+
+<script>
+/* ═══════════════════════════════════════════
+   CCTV 캔버스 렌더링 (야간 영상 시뮬레이션)
+═══════════════════════════════════════════ */
+const CCTV_CANVASES = {};
+let _cctvTick = 0;
+let _intruderVisible = false;
+let _intruderPos = { x: 0.3, y: 0.5 };
+
+function initCCTVCanvases() {
+  ['a1','b2','c3','drone'].forEach(id => {
+    const cv = document.getElementById(`cv-${id}`);
+    const wrap = cv.parentElement;
+    cv.width  = wrap.clientWidth  || 200;
+    cv.height = wrap.clientHeight || 120;
+    CCTV_CANVASES[id] = cv.getContext('2d');
+  });
+}
+
+function renderCCTV(id, hasIntruder, isDrone) {
+  const ctx = CCTV_CANVASES[id];
+  if (!ctx) return;
+  const W = ctx.canvas.width, H = ctx.canvas.height;
+
+  // 야간 배경
+  ctx.fillStyle = isDrone ? '#060b14' : '#030508';
+  ctx.fillRect(0, 0, W, H);
+
+  // 노이즈 그레인
+  const noise = ctx.createImageData(W, H);
+  for (let i = 0; i < noise.data.length; i += 4) {
+    const n = Math.random() * 8;
+    noise.data[i] = noise.data[i+1] = noise.data[i+2] = n;
+    noise.data[i+3] = 255;
+  }
+  ctx.putImageData(noise, 0, 0);
+
+  // 공장 구조물 (초록 야간투시 느낌)
+  ctx.strokeStyle = `rgba(0,255,100,${0.12 + Math.random()*.03})`;
+  ctx.lineWidth = 1;
+  if (id === 'a1') {
+    // 출입구
+    ctx.strokeRect(W*.2, H*.1, W*.6, H*.8);
+    ctx.strokeRect(W*.38, H*.4, W*.24, H*.5);
+    ctx.beginPath(); ctx.moveTo(W*.5, H*.1); ctx.lineTo(W*.5, 0); ctx.stroke();
+  } else if (id === 'b2') {
+    // 창고 선반
+    for (let y = 0.2; y < 0.9; y += 0.15) {
+      ctx.beginPath(); ctx.moveTo(0, H*y); ctx.lineTo(W, H*y); ctx.stroke();
+    }
+    ctx.strokeRect(W*.05, H*.1, W*.9, H*.8);
+  } else if (id === 'c3') {
+    // 생산라인 기계
+    ctx.strokeRect(W*.05, H*.3, W*.25, H*.4);
+    ctx.strokeRect(W*.38, H*.2, W*.25, H*.5);
+    ctx.strokeRect(W*.7,  H*.3, W*.25, H*.4);
+  } else {
+    // 드론 FPV — 위에서 내려다보기
+    ctx.strokeStyle = `rgba(0,220,255,${0.15 + Math.random()*.04})`;
+    ctx.strokeRect(W*.1, H*.1, W*.8, H*.8);
+    // 십자선
+    ctx.beginPath(); ctx.moveTo(W*.5,0); ctx.lineTo(W*.5,H); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,H*.5); ctx.lineTo(W,H*.5); ctx.stroke();
+    // 중앙 원
+    ctx.beginPath(); ctx.arc(W/2, H/2, H*.2, 0, Math.PI*2); ctx.stroke();
+  }
+
+  // 침입자 실루엣
+  if (hasIntruder && _intruderVisible) {
+    const px = _intruderPos.x * W;
+    const py = _intruderPos.y * H;
+    const hw = 10, hh = 22;
+
+    // 열화상 느낌 (오렌지-레드)
+    const grad = ctx.createRadialGradient(px, py-hh/2, 2, px, py-hh/2, 20);
+    grad.addColorStop(0, 'rgba(255,160,30,.9)');
+    grad.addColorStop(1, 'rgba(255,50,20,.0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.arc(px, py-hh/2, 20, 0, Math.PI*2); ctx.fill();
+
+    // 몸통
+    ctx.fillStyle = 'rgba(255,120,20,.85)';
+    ctx.fillRect(px-hw/2, py-hh, hw, hh);
+    // 머리
+    ctx.beginPath(); ctx.arc(px, py-hh-7, 7, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(255,140,30,.9)'; ctx.fill();
+
+    // AI 탐지 박스
+    ctx.strokeStyle = '#ff2244';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4,3]);
+    ctx.strokeRect(px-hw-8, py-hh-16, hw*2+16, hh+20);
+    ctx.setLineDash([]);
+
+    // 라벨
+    ctx.fillStyle = '#ff2244';
+    ctx.fillRect(px-hw-8, py-hh-16-14, 80, 13);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 9px monospace';
+    ctx.fillText('HUMAN 97%', px-hw-5, py-hh-16-5);
+  }
+
+  // 타임스탬프
+  ctx.fillStyle = 'rgba(0,255,100,.5)';
+  ctx.font = '9px monospace';
+  const now = new Date();
+  const ts = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+  ctx.fillText(ts, 4, H-4);
+
+  // REC 표시
+  if (_intruderVisible && hasIntruder) {
+    ctx.fillStyle = `rgba(255,34,68,${_cctvTick%2 ? 1 : .3})`;
+    ctx.beginPath(); ctx.arc(W-12, 10, 4, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.font = '9px monospace';
+    ctx.fillText('REC', W-26, 14);
+  }
+}
+
+function renderAllCCTV() {
+  _cctvTick++;
+  const hasIntrude = _intruderVisible;
+  renderCCTV('a1',    hasIntrude && SCENE.activeCam === 'a1',    false);
+  renderCCTV('b2',    hasIntrude && SCENE.activeCam === 'b2',    false);
+  renderCCTV('c3',    false,                                      false);
+  renderCCTV('drone', hasIntrude && SCENE.step >= 3,             true);
+}
+
+/* ═══════════════════════════════════════════
+   공장 평면도 캔버스
+═══════════════════════════════════════════ */
+let _factoryCanvas, _factoryCtx;
+let _droneMapPos = { x: .85, y: .85 };
+let _droneTargetPos = { x: .85, y: .85 };
+
+function initFactoryMap() {
+  _factoryCanvas = document.getElementById('factory-canvas');
+  const panel = document.getElementById('factory-map-panel');
+  _factoryCanvas.width  = panel.clientWidth;
+  _factoryCanvas.height = panel.clientHeight - 36;
+  _factoryCtx = _factoryCanvas.getContext('2d');
+}
+
+function renderFactoryMap() {
+  const ctx = _factoryCtx;
+  const W = _factoryCanvas.width, H = _factoryCanvas.height;
+  if (!ctx || !W || !H) return;
+
+  ctx.fillStyle = '#050a15';
+  ctx.fillRect(0, 0, W, H);
+
+  // 격자
+  ctx.strokeStyle = 'rgba(0,212,255,.06)';
+  ctx.lineWidth = 1;
+  for (let x = 0; x < W; x += 30) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+  for (let y = 0; y < H; y += 30) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+
+  const rooms = [
+    { x:.05, y:.05, w:.4,  h:.35, label:'생산라인 A', col:'#00d4ff', active: SCENE.activeCam==='c3' },
+    { x:.55, y:.05, w:.4,  h:.35, label:'생산라인 B', col:'#00d4ff', active: false },
+    { x:.05, y:.5,  w:.25, h:.4,  label:'창고동',     col:'#a855f7', active: SCENE.activeCam==='b2' },
+    { x:.38, y:.5,  w:.25, h:.4,  label:'제어실',     col:'#ffe033', active: false },
+    { x:.7,  y:.5,  w:.25, h:.4,  label:'출입구',     col:'#ff4466', active: SCENE.activeCam==='a1' },
+  ];
+
+  rooms.forEach(r => {
+    const rx=r.x*W, ry=r.y*H, rw=r.w*W, rh=r.h*H;
+    // 구역 채우기
+    ctx.fillStyle = r.active
+      ? `${r.col}22`
+      : 'rgba(255,255,255,.02)';
+    ctx.fillRect(rx, ry, rw, rh);
+    // 테두리
+    ctx.strokeStyle = r.active ? r.col : `${r.col}55`;
+    ctx.lineWidth = r.active ? 2 : 1;
+    ctx.strokeRect(rx, ry, rw, rh);
+    // 라벨
+    ctx.fillStyle = r.active ? r.col : `${r.col}99`;
+    ctx.font = `${r.active ? 'bold ' : ''}10px sans-serif`;
+    ctx.fillText(r.label, rx+6, ry+14);
+  });
+
+  // CCTV 아이콘
+  const cams = [
+    { x:.25, y:.48, label:'A1' },
+    { x:.2,  y:.92, label:'B2' },
+    { x:.25, y:.25, label:'C3' },
+  ];
+  cams.forEach(c => {
+    ctx.fillStyle = SCENE.activeCam && SCENE.activeCam === c.label.toLowerCase()
+      ? 'var(--red)' : 'rgba(0,212,255,.6)';
+    ctx.beginPath();
+    ctx.arc(c.x*W, c.y*H, 5, 0, Math.PI*2);
+    ctx.fillStyle = SCENE.step >= 1 && SCENE.activeCam === c.label.toLowerCase()
+      ? '#ff2244' : '#00d4ff';
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.5)'; ctx.font = '8px monospace';
+    ctx.fillText(c.label, c.x*W+7, c.y*H+3);
+  });
+
+  // 도킹스테이션
+  const dock = {x:.85, y:.85};
+  ctx.fillStyle = 'rgba(0,255,136,.2)';
+  ctx.strokeStyle = 'rgba(0,255,136,.6)';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(dock.x*W-14, dock.y*H-10, 28, 20);
+  ctx.fillRect(dock.x*W-14, dock.y*H-10, 28, 20);
+  ctx.fillStyle = 'rgba(0,255,136,.8)'; ctx.font = 'bold 8px monospace';
+  ctx.fillText('DOCK', dock.x*W-12, dock.y*H+4);
+
+  // 드론 애니메이션
+  _droneMapPos.x += (_droneTargetPos.x - _droneMapPos.x) * .06;
+  _droneMapPos.y += (_droneTargetPos.y - _droneMapPos.y) * .06;
+
+  const dx = _droneMapPos.x * W, dy = _droneMapPos.y * H;
+
+  // 드론 헤일로
+  if (SCENE.step >= 3) {
+    const grd = ctx.createRadialGradient(dx, dy, 0, dx, dy, 20);
+    grd.addColorStop(0, 'rgba(255,224,51,.3)');
+    grd.addColorStop(1, 'rgba(255,224,51,.0)');
+    ctx.fillStyle = grd;
+    ctx.beginPath(); ctx.arc(dx, dy, 20, 0, Math.PI*2); ctx.fill();
+  }
+
+  // 드론 아이콘
+  ctx.fillStyle = SCENE.step >= 3 ? var_yellow : 'rgba(0,255,136,.9)';
+  ctx.font = '16px serif';
+  ctx.fillText('🚁', dx-8, dy+6);
+
+  // 침입자 위치
+  if (_intruderVisible) {
+    const ix = _intruderPos.x * W, iy = _intruderPos.y * H;
+    const grd2 = ctx.createRadialGradient(ix, iy, 0, ix, iy, 14);
+    grd2.addColorStop(0, 'rgba(255,50,20,.7)');
+    grd2.addColorStop(1, 'rgba(255,50,20,.0)');
+    ctx.fillStyle = grd2;
+    ctx.beginPath(); ctx.arc(ix, iy, 14, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#ff2244'; ctx.font = '14px serif';
+    ctx.fillText('👤', ix-7, iy+5);
+  }
+}
+
+const var_yellow = '#ffe033';
+
+/* ═══════════════════════════════════════════
+   시나리오 엔진
+═══════════════════════════════════════════ */
+const SCENE = {
+  active: false,
+  type: null,
+  step: 0,
+  activeCam: null,
+  timers: [],
+  startTime: null,
+  eventCount: 0,
+};
+
+const TL_ITEMS = [];
+let _tlCount = 0;
+
+function addTimeline(type, phase, msg) {
+  const now = new Date();
+  const ts = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+  TL_ITEMS.unshift({ type, phase, msg, ts });
+  _tlCount++;
+  renderTimeline();
+}
+
+function renderTimeline() {
+  const el = document.getElementById('timeline-list');
+  const cnt = document.getElementById('tl-count');
+  cnt.textContent = _tlCount;
+  cnt.className = `ph-badge ${_tlCount === 0 ? 'zero' : _tlCount > 0 ? 'red' : ''}`;
+
+  if (!TL_ITEMS.length) {
+    el.innerHTML = `<div style="text-align:center;padding:20px;color:var(--dim);font-size:11px;"><div style="font-size:28px;margin-bottom:8px;">🟢</div>야간 순찰 대기 중</div>`;
+    return;
+  }
+  el.innerHTML = TL_ITEMS.slice(0,30).map((item, i) => `
+    <div class="tl-item ${item.type}">
+      <div class="tl-line">
+        <div class="tl-dot"></div>
+        ${i < TL_ITEMS.length-1 ? '<div class="tl-vline"></div>' : ''}
+      </div>
+      <div class="tl-time">${item.ts}</div>
+      <div class="tl-body">
+        <div class="tl-phase">${item.phase}</div>
+        <div class="tl-msg">${item.msg}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function setStep(n) {
+  SCENE.step = n;
+  const now = new Date().toTimeString().slice(0,8);
+  for (let i = 1; i <= 6; i++) {
+    const el = document.getElementById(`step-${i}`);
+    if (!el) continue;
+    el.className = 'flow-step' + (i < n ? ' done' : i === n ? ' active' : '');
+    if (i === n) document.getElementById(`step-${n}-time`).textContent = now;
+  }
+}
+
+function setSituation(cls, icon, text, phase) {
+  const bar = document.getElementById('situation-bar');
+  bar.className = cls;
+  document.getElementById('sit-icon').textContent = icon;
+  document.getElementById('sit-text').textContent = text;
+  document.getElementById('sit-phase').textContent = phase;
+  // 시스템 상태
+  const dot = document.getElementById('sys-dot');
+  const lbl = document.getElementById('sys-label');
+  if (cls === 'sb-alert') {
+    dot.className = 'sys-dot alert'; lbl.className = 'sys-label alert'; lbl.textContent = 'ALERT';
+  } else if (cls === 'sb-dispatch') {
+    dot.className = 'sys-dot warn'; lbl.className = 'sys-label warn'; lbl.textContent = 'DISPATCH';
+  } else if (cls === 'sb-detect') {
+    dot.className = 'sys-dot warn'; lbl.className = 'sys-label warn'; lbl.textContent = 'DETECTED';
+  } else {
+    dot.className = 'sys-dot'; lbl.className = 'sys-label'; lbl.textContent = 'NORMAL';
+  }
+}
+
+function setOntology(time, auth, intrude, action) {
+  const fields = [
+    { id:'ont-time',    val: time,    valId:'ont-time-val' },
+    { id:'ont-auth',    val: auth,    valId:'ont-auth-val' },
+    { id:'ont-intrude', val: intrude, valId:'ont-intrude-val' },
+    { id:'ont-action',  val: action,  valId:'ont-action-val' },
+  ];
+  const config = {
+    '아님':    { cls:'triggered', vcls:'red' },
+    '없음':    { cls:'triggered', vcls:'red' },
+    '높음':    { cls:'triggered', vcls:'red' },
+    '드론출동':{ cls:'triggered', vcls:'orange' },
+    '방송':    { cls:'triggered', vcls:'orange' },
+    '정상':    { cls:'ok',        vcls:'green' },
+    '확인':    { cls:'ok',        vcls:'green' },
+    '낮음':    { cls:'ok',        vcls:'green' },
+    '대기':    { cls:'',          vcls:'green' },
+  };
+  fields.forEach(f => {
+    const box = document.getElementById(f.id);
+    const valEl = document.getElementById(f.valId);
+    const cfg = config[f.val] || { cls:'', vcls:'' };
+    box.className = `ont-item ${cfg.cls}`;
+    valEl.className = `ont-val ${cfg.vcls}`;
+    valEl.textContent = f.val;
+  });
+}
+
+function triggerSensor(id, label, status, color) {
+  const el = document.getElementById(`sens-${id}`);
+  if (!el) return;
+  el.classList.add('triggered');
+  const dot  = el.querySelector('.sensor-dot');
+  const stat = el.querySelector('.sensor-status');
+  if (dot)  { dot.style.background = color; dot.style.boxShadow = `0 0 6px ${color}`; }
+  if (stat) { stat.style.color = color; stat.textContent = status; }
+}
+
+function resetSensor(id, color='var(--green)', status='정상') {
+  const el = document.getElementById(`sens-${id}`);
+  if (!el) return;
+  el.classList.remove('triggered');
+  const dot  = el.querySelector('.sensor-dot');
+  const stat = el.querySelector('.sensor-status');
+  if (dot)  { dot.style.background = color; dot.style.boxShadow = `0 0 5px ${color}`; }
+  if (stat) { stat.style.color = color; stat.textContent = status; }
+}
+
+function setDroneStatus(statusKey, alt, spd, zone, mission) {
+  const badge = document.getElementById('drone-status-badge');
+  badge.className = `dsc-status-badge ${statusKey}`;
+  const labels = { standby:'STANDBY', patrol:'PATROL', deploy:'DEPLOYING', alert:'ON SCENE' };
+  badge.textContent = labels[statusKey] || statusKey.toUpperCase();
+  document.getElementById('d-alt').textContent = alt;
+  document.getElementById('d-spd').textContent = spd;
+  document.getElementById('d-zone').textContent = zone;
+  document.getElementById('d-mission').textContent = mission;
+}
+
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+async function runScenario(type) {
+  if (SCENE.active) return;
+  SCENE.active = true; SCENE.type = type; SCENE.step = 0;
+  SCENE.activeCam = null;
+
+  if (type === 'intrude') await scenarioIntrude();
+  else if (type === 'fire') await scenarioFire();
+  else if (type === 'patrol') await scenarioPatrol();
+
+  SCENE.active = false;
+}
+
+async function scenarioIntrude() {
+  SCENE.eventCount++;
+  document.getElementById('ft-events').textContent = SCENE.eventCount;
+  const INT_CAM = 'a1';
+  SCENE.activeCam = INT_CAM;
+
+  // ── Step 1: CCTV 감지 ──
+  setSituation('sb-detect', '🟡', '⚠ CCTV 이상 감지 — 출입구 인체 탐지 (02:14)', '02:14 야간');
+  setStep(1);
+  triggerSensor('cctv-a1', '침입감지', '⚠ 감지', '#ff2244');
+  triggerSensor('pir-1',   '동측PIR',  '⚠ 동작', '#ff9f2e');
+  _intruderVisible = true;
+  _intruderPos = { x:.25, y:.7 };
+  document.getElementById('cctv-a1').classList.add('active');
+  document.getElementById('cctv-drone').classList.add('active');
+  addTimeline('cctv', 'CCTV-A1 | YOLOv8', '<b>출입구 인체 감지</b> — 신뢰도 97.3%<br>좌표: Zone-A1 (x:234, y:512)');
+  await delay(1800);
+
+  // ── Step 2: 온톨로지 판단 ──
+  setStep(2);
+  setSituation('sb-dispatch', '🟠', '🧠 Ontology 분석 — 무허가 침입 판단 중...', '분석 중');
+  setOntology('아님', '없음', '높음', '드론출동');
+  addTimeline('ontology', 'Operational Ontology', '<b>침입 가능성 HIGH</b><br>작업시간: 아님 | 허가자: 없음 | 위협도: 0.94');
+  await delay(1500);
+
+  // ── Step 3: 드론 출동 ──
+  setStep(3);
+  setSituation('sb-alert', '🔴', '🚨 FPV 드론 출동 — Zone-A1 이동 중', '긴급 출동');
+  setDroneStatus('deploy', '2m', '8m/s', 'A1 이동중', '긴급 침입대응');
+  _droneTargetPos = { x:.7, y:.48 };
+  addTimeline('dispatch', '드론 출동', '<b>FPV-PATROL-01 출동</b><br>도킹스테이션 → Zone-A1 (ETA 8초)');
+  await delay(2000);
+
+  // ── Step 4: 현장 도착 ──
+  setStep(4);
+  setDroneStatus('alert', '8m', '0m/s', 'Zone-A1', '현장 영상 확보');
+  _droneTargetPos = { x:.25, y:.72 };
+  addTimeline('drone', '드론 현장 도착', '<b>현장 영상 확보 시작</b><br>FPV 카메라 → 관제센터 실시간 전송');
+  await delay(2000);
+
+  // ── Step 5: 스피커 방송 ──
+  setStep(5);
+  addTimeline('broadcast', '스피커 방송', '<b>AI TTS 방송 실행</b><br>"여기는 AI 보안시스템입니다. 즉시 신원을 확인하십시오."');
+  showBroadcast('여기는 AI 보안시스템입니다.<br>즉시 신원을 확인하십시오.', 'FPV 드론이 현장을 모니터링 중입니다. 관제센터에 실시간 영상이 전송되고 있습니다.');
+  await delay(3000);
+
+  // ── Step 6: 관제 보고 ──
+  setStep(6);
+  addTimeline('resolved', '관제센터 보고', '<b>영상·센서 데이터 전송 완료</b><br>경찰 자동 연동 · 증거 영상 저장');
+  setSituation('sb-alert', '🔴', '🔴 관제센터 보고 완료 — 경찰 연동 중', '대응 완료');
+  document.getElementById('stat-intrude').textContent =
+    parseInt(document.getElementById('stat-intrude').textContent) + 1;
+}
+
+async function scenarioFire() {
+  SCENE.eventCount++;
+  document.getElementById('ft-events').textContent = SCENE.eventCount;
+  SCENE.activeCam = 'c3';
+
+  setStep(1);
+  setSituation('sb-detect', '🟡', '⚠ 연기 감지 센서 — 생산라인 C구역', '긴급');
+  triggerSensor('smoke-1', '화재연기', '🔥 감지', '#ff9f2e');
+  triggerSensor('cctv-b2', '생산C',   '⚠ 연기', '#ff9f2e');
+  addTimeline('cctv', 'Smoke-1 | 연기감지', '<b>생산라인 연기 감지</b> — 농도 임계치 초과<br>Zone-C3 자동 격리 시작');
+  await delay(1500);
+
+  setStep(2);
+  setOntology('아님', '없음', '높음', '드론출동');
+  addTimeline('ontology', 'Operational Ontology', '<b>화재 가능성 HIGH</b><br>인명피해 0 (야간 무인) | 자동 소방 연동 권고');
+  await delay(1200);
+
+  setStep(3);
+  setSituation('sb-alert', '🔴', '🚨 드론 출동 — 화재 현장 확인', '화재 대응');
+  setDroneStatus('deploy', '3m', '10m/s', 'C3 이동중', '화재 현장 확인');
+  _droneTargetPos = { x:.25, y:.25 };
+  addTimeline('dispatch', '드론 출동', '<b>FPV-PATROL-01 출동</b><br>화재 Zone-C3 → 현장 확인');
+  await delay(1800);
+
+  setStep(4);
+  setDroneStatus('alert', '5m', '0m/s', 'Zone-C3', '열화상 촬영');
+  addTimeline('drone', '드론 현장 도착', '<b>열화상 카메라 가동</b><br>온도: 342°C 측정 · 소방서 자동 신고');
+  await delay(1500);
+
+  setStep(5);
+  addTimeline('broadcast', '비상 방송', '<b>비상 방송 실행</b><br>"화재 감지. 소방서 자동 신고 완료. 대피하십시오."');
+  showBroadcast('화재 감지.<br>소방서 자동 신고 완료.<br>즉시 대피하십시오.', '드론 열화상 카메라가 화재 현황을 실시간 전송 중입니다.');
+  await delay(2500);
+
+  setStep(6);
+  addTimeline('resolved', '소방 신고 완료', '<b>119 자동 신고 · GPS 좌표 전송</b><br>건물 평면도 + 실시간 영상 제공');
+  setSituation('sb-alert', '🔴', '🔴 소방서 출동 중 — 드론 현장 유지', '화재 대응');
+}
+
+async function scenarioPatrol() {
+  SCENE.activeCam = null;
+  setSituation('sb-normal', '🟢', '✅ 정기 순찰 실행 중 — 전구역 순찰', '순찰 중');
+  setDroneStatus('patrol', '6m', '4m/s', '순찰 중', '야간 정기 순찰');
+  setOntology('정상', '확인', '낮음', '대기');
+  addTimeline('drone', '정기 순찰', '<b>야간 정기 순찰 시작</b><br>전구역 15분 순찰 · 이상 없음');
+
+  const zones = [
+    { pos:{x:.25,.y:.25}, name:'생산라인 A', delay:1200 },
+    { pos:{x:.75,.y:.25}, name:'생산라인 B', delay:1200 },
+    { pos:{x:.2, y:.72},  name:'창고동',     delay:1200 },
+    { pos:{x:.5, y:.72},  name:'제어실',     delay:1200 },
+    { pos:{x:.8, y:.72},  name:'출입구',     delay:1200 },
+  ];
+
+  for (const z of zones) {
+    _droneTargetPos = z.pos;
+    SCENE.activeCam = null;
+    await delay(z.delay);
+    addTimeline('resolved', `Zone 순찰 완료`, `<b>${z.name}</b> — 이상 없음 ✅`);
+  }
+
+  _droneTargetPos = { x:.85, y:.85 };
+  setDroneStatus('standby', '0m', '0m/s', '도크', '순찰 완료 · 충전 중');
+  addTimeline('resolved', '순찰 완료', '<b>전구역 순찰 완료</b><br>이상 없음 · 도킹 스테이션 복귀');
+  setSituation('sb-normal', '🟢', '✅ 야간 순찰 완료 — 이상 없음', '02:30 야간');
+
+  const pc = document.getElementById('stat-patrol');
+  pc.textContent = parseInt(pc.textContent) + 1;
+}
+
+function showBroadcast(msg, sub) {
+  document.getElementById('bc-msg-text').innerHTML = msg;
+  document.getElementById('bc-msg-sub').textContent = sub;
+  document.getElementById('broadcast-overlay').classList.add('show');
+}
+function closeBroadcast() {
+  document.getElementById('broadcast-overlay').classList.remove('show');
+}
+
+function resetScenario() {
+  SCENE.active = false; SCENE.step = 0; SCENE.activeCam = null;
+  _intruderVisible = false;
+  _droneTargetPos = { x:.85, y:.85 };
+
+  setSituation('sb-normal', '🟢', '야간 순찰 모드 · 이상 없음', '02:00 야간');
+  setOntology('정상', '확인', '낮음', '대기');
+  setDroneStatus('standby', '0m', '0m/s', '도크', '대기 중');
+
+  // 센서 초기화
+  ['cctv-a1','cctv-b2','pir-1','pir-2','door-1','smoke-1'].forEach(id => resetSensor(id));
+  ['cctv-a1','cctv-b2','cctv-c3','cctv-drone'].forEach(id => {
+    document.getElementById(id)?.classList.remove('active');
+  });
+
+  // 스텝 초기화
+  for (let i = 1; i <= 6; i++) {
+    const el = document.getElementById(`step-${i}`);
+    if (el) el.className = 'flow-step';
+    const ti = document.getElementById(`step-${i}-time`);
+    if (ti) ti.textContent = '';
+  }
+
+  addTimeline('resolved', '시스템 초기화', '모든 상태 초기화 완료 · 야간 순찰 대기');
+}
+
+/* ═══════════════════════════════════════════
+   시계 + 렌더 루프
+═══════════════════════════════════════════ */
+function updateClock() {
+  const now = new Date();
+  const ts = now.toLocaleTimeString('ko-KR', { hour12: false });
+  document.getElementById('ft-time').textContent = ts;
+}
+
+let _raf;
+function renderLoop() {
+  renderAllCCTV();
+  renderFactoryMap();
+  _raf = requestAnimationFrame(renderLoop);
+}
+
+/* ═══════════════════════════════════════════
+   초기화
+═══════════════════════════════════════════ */
+window.addEventListener('DOMContentLoaded', () => {
+  initCCTVCanvases();
+  initFactoryMap();
+  renderLoop();
+  updateClock();
+  setInterval(updateClock, 1000);
+
+  // 리사이즈
+  window.addEventListener('resize', () => {
+    initCCTVCanvases();
+    initFactoryMap();
+  });
+
+  // 초기 타임라인
+  addTimeline('resolved', '시스템 시작', '<b>Smart Factory Patrol 가동</b><br>야간 보안 시스템 초기화 완료');
+  addTimeline('drone',    '드론 준비',   'FPV-PATROL-01 도킹 완료 · 배터리 94%');
+});
+</script>
+</body>
+</html>
