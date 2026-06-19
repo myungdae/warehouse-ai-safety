@@ -5,6 +5,7 @@ Gotham AIP — FastAPI + Neo4j Backend
 • RBAC: 보안등급별 접근 제어 (일반 < 대외비 < 비밀 < 극비)
 • MCP Layer: 센서 시뮬레이터 Agentic AI 제어
 • MOE Stats: 기여자 통계 트래킹
+• Threat Ontology: FPV 드론 위협 탐지→분류→ROE→INTERCEPT 파이프라인
 """
 
 import subprocess, sys
@@ -40,11 +41,19 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("gotham")
 
+# ─── Threat Ontology Engine ───────────────────────────────────────────────────
+from threat_ontology import (
+    ThreatOntologyEngine, ROEMode, DroneClass, DroneType,
+    ThreatLevel, InterceptDecision, DroneTrack, DEFAULT_ASSETS
+)
+
+_threat_engine = ThreatOntologyEngine(roe=ROEMode.WEAPONS_TIGHT)
+
 # ─── FastAPI App ───────────────────────────────────────────────────────────────
 app = FastAPI(
     title="Gotham AIP API",
-    version="2.0.0",
-    description="작전 상황인식 플랫폼 — Expert KB · RBAC · MCP · MOE Stats"
+    version="3.0.0",
+    description="작전 상황인식 플랫폼 — Expert KB · RBAC · MCP · MOE Stats · Threat Ontology"
 )
 
 app.add_middleware(
@@ -69,6 +78,47 @@ ROLE_CLEARANCE = {
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
+
+    # 위협 항적 테이블 (Threat Tracks)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS threat_tracks (
+            track_id      TEXT NOT NULL,
+            lat           REAL,
+            lon           REAL,
+            alt_m         REAL,
+            velocity_kph  REAL,
+            heading_deg   REAL,
+            ir_temp_c     REAL,
+            rf_freq_mhz   REAL,
+            drone_class   TEXT,
+            drone_type    TEXT,
+            threat_score  REAL,
+            threat_level  TEXT,
+            swarm_id      TEXT,
+            created_at    TEXT NOT NULL
+        )
+    """)
+
+    # 요격 명령 테이블 (Intercept Orders)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS intercept_orders (
+            order_id        TEXT PRIMARY KEY,
+            target_id       TEXT NOT NULL,
+            decision        TEXT NOT NULL,
+            atk_drone_id    TEXT,
+            intercept_lat   REAL,
+            intercept_lon   REAL,
+            intercept_alt_m REAL,
+            priority        INTEGER,
+            roe_mode        TEXT,
+            threat_score    REAL,
+            threat_level    TEXT,
+            reason          TEXT,
+            ttx_sec         REAL,
+            issued_at       TEXT NOT NULL
+        )
+    """)
+
 
     # Expert KB 테이블
     c.execute("""
@@ -193,6 +243,30 @@ class ExpertKBUpdate(BaseModel):
     clearance:   Optional[str] = None
     tags:        Optional[List[str]] = None
 
+# ── Threat Ontology Models ────────────────────────────────────────────────────
+class ThreatTrackInput(BaseModel):
+    """단일 드론 항적 입력 (다중 센서 융합 후)"""
+    track_id:     str
+    lat:          float
+    lon:          float
+    alt_m:        float = 100.0
+    velocity_kph: float = 0.0
+    heading_deg:  float = 0.0
+    ir_temp_c:    float = 28.0
+    rf_freq_mhz:  float = 0.0
+    rf_power_dbm: float = -80.0
+    iff_code:     Optional[str] = None
+    swarm_id:     Optional[str] = None
+
+class ThreatBatchInput(BaseModel):
+    """다중 항적 배치 입력"""
+    tracks:  List[ThreatTrackInput]
+    roe:     Optional[str] = None   # WEAPONS_FREE | WEAPONS_TIGHT | WEAPONS_HOLD
+
+class ROEChangeRequest(BaseModel):
+    roe: str   # WEAPONS_FREE | WEAPONS_TIGHT | WEAPONS_HOLD
+
+# ── Sensor Models ─────────────────────────────────────────────────────────────
 class SensorCommand(BaseModel):
     sensor_id:  str
     action:     str          # activate | deactivate | set_confidence | request_data
@@ -851,26 +925,33 @@ async def cop_websocket(websocket: WebSocket):
                       "EO-A1": "eo_ir", "AIS": "ais"}
             reading = _simulate_sensor_reading(sid, stypes.get(sid, "radar"))
 
-            # 드론 위협 시뮬레이션
-            drone_updates = []
-            for i in range(random.randint(1, 3)):
+            # 드론 위협 시뮬레이션 → 온톨로지 엔진 실제 처리
+            raw_tracks = []
+            for i in range(random.randint(2, 4)):
                 side = random.choice(["E", "W"])
                 num  = random.randint(1, 20)
-                drone_updates.append({
-                    "id":     f"EG-{side}{str(num).zfill(2)}",
-                    "lat":    round(37.0 + random.uniform(-0.3, 0.3), 5),
-                    "lon":    round(126.8 + random.uniform(-0.3, 0.3) + (0.5 if side == "E" else -0.5), 5),
-                    "vel":    round(random.uniform(50, 92), 1),
-                    "ir_temp": round(random.uniform(28, 38), 1)
+                is_kamikaze = random.random() < 0.4
+                raw_tracks.append({
+                    "track_id":     f"EG-{side}{str(num).zfill(2)}",
+                    "lat":          round(37.0 + random.uniform(-0.3, 0.3), 5),
+                    "lon":          round(126.8 + random.uniform(-0.3, 0.3) + (0.5 if side == "E" else -0.5), 5),
+                    "alt_m":        round(random.uniform(20, 40) if is_kamikaze else random.uniform(60, 150), 1),
+                    "velocity_kph": round(random.uniform(80, 95) if is_kamikaze else random.uniform(15, 55), 1),
+                    "heading_deg":  round(random.uniform(160, 200) if side == "E" else random.uniform(340, 380) % 360, 1),
+                    "ir_temp_c":    round(random.uniform(38, 45) if is_kamikaze else random.uniform(28, 33), 1),
+                    "rf_freq_mhz":  433.0 if is_kamikaze else random.choice([868.0, 2450.0]),
+                    "swarm_id":     f"SW-{side}" if random.random() < 0.6 else None,
                 })
 
+            threat_result = _threat_engine.process(raw_tracks)
+
             await websocket.send_json({
-                "type":         "sensor_update",
-                "sensor_id":    sid,
-                "reading":      reading,
-                "drone_updates": drone_updates,
-                "tick":         tick,
-                "timestamp":    now_iso()
+                "type":          "sensor_update",
+                "sensor_id":     sid,
+                "reading":       reading,
+                "threat_update": threat_result.to_dict(),
+                "tick":          tick,
+                "timestamp":     now_iso()
             })
 
     except WebSocketDisconnect:
@@ -879,6 +960,199 @@ async def cop_websocket(websocket: WebSocket):
     except Exception as e:
         ws_manager.disconnect(websocket)
         logger.warning(f"WS error: {e}")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# THREAT ONTOLOGY API
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@app.post("/api/threat/process")
+async def threat_process(body: ThreatBatchInput, x_auth_token: str = ""):
+    """
+    FPV 드론 위협 온톨로지 파이프라인 실행
+
+    Observation → Classification → Threat Score → ROE → INTERCEPT 명령
+    """
+    user = get_current_user(x_auth_token)
+    if not check_clearance(user, "대외비"):
+        raise HTTPException(403, "위협 분석은 대외비 등급 이상 필요")
+
+    # ROE 동적 변경
+    if body.roe:
+        try:
+            _threat_engine.set_roe(ROEMode(body.roe))
+        except ValueError:
+            raise HTTPException(400, f"유효하지 않은 ROE 모드: {body.roe}")
+
+    raw = [t.dict() for t in body.tracks]
+    result = _threat_engine.process(raw)
+
+    # DB 저장
+    now = now_iso()
+    conn = get_conn()
+    c = conn.cursor()
+    for t in result.tracks:
+        c.execute("""
+            INSERT INTO threat_tracks
+            (track_id, lat, lon, alt_m, velocity_kph, heading_deg, ir_temp_c,
+             rf_freq_mhz, drone_class, drone_type, threat_score, threat_level,
+             swarm_id, created_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        """, (t.track_id, t.lat, t.lon, t.alt_m, t.velocity_kph, t.heading_deg,
+               t.ir_temp_c, t.rf_freq_mhz, t.drone_class.value, t.drone_type.value,
+               t.threat_score, t.threat_level.value, t.swarm_id, now))
+    for o in result.orders:
+        c.execute("""
+            INSERT OR REPLACE INTO intercept_orders
+            (order_id, target_id, decision, atk_drone_id, intercept_lat,
+             intercept_lon, intercept_alt_m, priority, roe_mode,
+             threat_score, threat_level, reason, ttx_sec, issued_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        """, (o.order_id, o.target_id, o.decision.value, o.atk_drone_id,
+               o.intercept_lat, o.intercept_lon, o.intercept_alt_m,
+               o.priority, o.roe_mode.value, o.threat_score,
+               o.threat_level.value, o.reason, o.ttx_sec, now))
+    conn.commit()
+    conn.close()
+
+    # WebSocket 브로드캐스트
+    await ws_manager.broadcast({
+        "type":    "threat_update",
+        "payload": result.to_dict(),
+    })
+
+    return result.to_dict()
+
+
+@app.get("/api/threat/roe")
+async def get_roe(x_auth_token: str = ""):
+    """현재 ROE 모드 조회"""
+    user = get_current_user(x_auth_token)
+    if not check_clearance(user, "대외비"):
+        raise HTTPException(403, "대외비 등급 이상 필요")
+    return {"roe": _threat_engine.roe.value,
+            "description": {
+                "WEAPONS_FREE":  "자유 교전 — 위협 식별 즉시 교전 허가",
+                "WEAPONS_TIGHT": "제한 교전 — 확실한 적만 교전",
+                "WEAPONS_HOLD":  "교전 보류 — 지휘관 승인 필요",
+            }.get(_threat_engine.roe.value, "")}
+
+
+@app.post("/api/threat/roe")
+async def set_roe(req: ROEChangeRequest, x_auth_token: str = ""):
+    """ROE 모드 변경 (commander 이상)"""
+    user = get_current_user(x_auth_token)
+    if not check_clearance(user, "비밀"):
+        raise HTTPException(403, "ROE 변경은 비밀 등급(commander) 이상 필요")
+    try:
+        new_roe = ROEMode(req.roe)
+    except ValueError:
+        raise HTTPException(400, f"유효하지 않은 ROE: {req.roe}. 가능 값: WEAPONS_FREE, WEAPONS_TIGHT, WEAPONS_HOLD")
+    _threat_engine.set_roe(new_roe)
+    logger.info(f"ROE 변경: {new_roe.value} (by {user['username']})")
+    return {"ok": True, "roe": new_roe.value, "changed_by": user["username"]}
+
+
+@app.get("/api/threat/orders")
+async def get_intercept_orders(limit: int = 50, x_auth_token: str = ""):
+    """최근 요격 명령 이력 조회"""
+    user = get_current_user(x_auth_token)
+    if not check_clearance(user, "대외비"):
+        raise HTTPException(403, "대외비 등급 이상 필요")
+    conn = get_conn()
+    c = conn.cursor()
+    c.execute("""
+        SELECT order_id, target_id, decision, atk_drone_id,
+               intercept_lat, intercept_lon, priority, roe_mode,
+               threat_score, threat_level, reason, ttx_sec, issued_at
+        FROM intercept_orders ORDER BY issued_at DESC LIMIT ?
+    """, (limit,))
+    cols = ["order_id","target_id","decision","atk_drone_id",
+            "intercept_lat","intercept_lon","priority","roe_mode",
+            "threat_score","threat_level","reason","ttx_sec","issued_at"]
+    rows = [dict(zip(cols, r)) for r in c.fetchall()]
+    conn.close()
+    return {"orders": rows, "count": len(rows)}
+
+
+@app.get("/api/threat/tracks")
+async def get_threat_tracks(limit: int = 100, x_auth_token: str = ""):
+    """최근 위협 항적 이력 조회"""
+    user = get_current_user(x_auth_token)
+    if not check_clearance(user, "대외비"):
+        raise HTTPException(403, "대외비 등급 이상 필요")
+    conn = get_conn()
+    c = conn.cursor()
+    c.execute("""
+        SELECT track_id, lat, lon, alt_m, velocity_kph, heading_deg,
+               ir_temp_c, drone_class, drone_type, threat_score, threat_level,
+               swarm_id, created_at
+        FROM threat_tracks ORDER BY created_at DESC LIMIT ?
+    """, (limit,))
+    cols = ["track_id","lat","lon","alt_m","velocity_kph","heading_deg",
+            "ir_temp_c","drone_class","drone_type","threat_score",
+            "threat_level","swarm_id","created_at"]
+    rows = [dict(zip(cols, r)) for r in c.fetchall()]
+    conn.close()
+    return {"tracks": rows, "count": len(rows)}
+
+
+@app.post("/api/threat/simulate")
+async def threat_simulate(x_auth_token: str = ""):
+    """
+    FPV 드론 시나리오 시뮬레이션 (테스트용)
+    — 동해 자폭 편대 3대 + 정찰기 1대 + 미끼 1대
+    """
+    import random as _rnd
+
+    base_lat, base_lon = 37.55, 126.97
+
+    sim_tracks = []
+    # 동해 자폭 편대 (SW-EAST)
+    for i in range(3):
+        sim_tracks.append({
+            "track_id":     f"SIM-EG-E{i+1:02d}",
+            "lat":          round(base_lat + _rnd.uniform(0.02, 0.08), 5),
+            "lon":          round(base_lon + _rnd.uniform(0.05, 0.15), 5),
+            "alt_m":        round(_rnd.uniform(20, 40), 1),
+            "velocity_kph": round(_rnd.uniform(82, 95), 1),
+            "heading_deg":  round(180 + _rnd.uniform(-10, 10), 1),
+            "ir_temp_c":    round(_rnd.uniform(38, 45), 1),
+            "rf_freq_mhz":  round(433.0 + _rnd.uniform(-1, 1), 2),
+            "swarm_id":     "SW-EAST",
+        })
+    # 정찰기
+    sim_tracks.append({
+        "track_id":     "SIM-SCOUT-01",
+        "lat":          round(base_lat + 0.12, 5),
+        "lon":          round(base_lon - 0.05, 5),
+        "alt_m":        150,
+        "velocity_kph": round(_rnd.uniform(10, 18), 1),
+        "heading_deg":  270,
+        "ir_temp_c":    29.5,
+        "rf_freq_mhz":  2450.0,
+    })
+    # 미끼
+    sim_tracks.append({
+        "track_id":     "SIM-DECOY-01",
+        "lat":          round(base_lat - 0.05, 5),
+        "lon":          round(base_lon + 0.02, 5),
+        "alt_m":        80,
+        "velocity_kph": round(_rnd.uniform(35, 50), 1),
+        "heading_deg":  round(_rnd.uniform(0, 360), 1),
+        "ir_temp_c":    31.0,
+        "rf_freq_mhz":  868.0,
+    })
+
+    result = _threat_engine.process(sim_tracks)
+
+    # WebSocket 브로드캐스트
+    await ws_manager.broadcast({
+        "type":    "threat_update",
+        "payload": result.to_dict(),
+    })
+
+    return result.to_dict()
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -893,13 +1167,24 @@ async def health():
     c.execute("SELECT COUNT(*) FROM sensor_state WHERE status='active'")
     active_sensors = c.fetchone()[0]
     conn.close()
+    conn2 = get_conn()
+    c2 = conn2.cursor()
+    c2.execute("SELECT COUNT(*) FROM intercept_orders")
+    order_count = c2.fetchone()[0]
+    c2.execute("SELECT COUNT(*) FROM threat_tracks")
+    track_count = c2.fetchone()[0]
+    conn2.close()
     return {
-        "status":          "ok",
-        "version":         "2.0.0",
-        "expert_kb_count": kb_count,
-        "active_sensors":  active_sensors,
-        "neo4j":           "sqlite-fallback",  # Neo4j 미설치 시 SQLite 폴백
-        "timestamp":       now_iso()
+        "status":              "ok",
+        "version":             "3.0.0",
+        "expert_kb_count":     kb_count,
+        "active_sensors":      active_sensors,
+        "threat_ontology":     "active",
+        "current_roe":         _threat_engine.roe.value,
+        "intercept_orders":    order_count,
+        "threat_tracks":       track_count,
+        "neo4j":               "sqlite-fallback",
+        "timestamp":           now_iso()
     }
 
 @app.get("/api/events")
