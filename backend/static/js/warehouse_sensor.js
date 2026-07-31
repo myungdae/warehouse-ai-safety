@@ -645,21 +645,114 @@ class SensorObservation {
     }
 }
 
+const TILT_RISK_RULE = Object.freeze({
+    ENTRY_THRESHOLD_DEGREES: 20,
+    CLEAR_THRESHOLD_DEGREES: 15,
+    MINIMUM_DURATION_MS: 1500
+});
+
+const tiltRiskStates = new Map();
+
 function observationToRiskSignal(observation) {
     if (!(observation instanceof SensorObservation)) {
         return {
             shouldCreateRisk: false,
+            shouldClearRisk: false,
             eventInput: null,
             observation: null,
             reason: 'INVALID_OBSERVATION'
         };
     }
 
+    if (observation.observationType === ObservationType.TILT) {
+        return tiltObservationToRiskSignal(observation);
+    }
+
     return {
         shouldCreateRisk: false,
+        shouldClearRisk: false,
         eventInput: null,
         observation: observation.toJSON(),
         reason: 'NO_RISK_RULE_CONFIGURED'
+    };
+}
+
+function tiltObservationToRiskSignal(observation) {
+    const tiltDegrees = Number(observation.value);
+    if (!Number.isFinite(tiltDegrees)) {
+        return {
+            shouldCreateRisk: false,
+            shouldClearRisk: false,
+            eventInput: null,
+            observation: observation.toJSON(),
+            reason: 'INVALID_TILT_VALUE'
+        };
+    }
+
+    const observedAtMs = Date.parse(observation.observedAt);
+    const targetState = tiltRiskStates.get(observation.targetId) || {
+        thresholdEnteredAt: null,
+        riskActive: false
+    };
+
+    if (targetState.riskActive) {
+        if (tiltDegrees < TILT_RISK_RULE.CLEAR_THRESHOLD_DEGREES) {
+            tiltRiskStates.delete(observation.targetId);
+            return {
+                shouldCreateRisk: false,
+                shouldClearRisk: true,
+                eventInput: null,
+                observation: observation.toJSON(),
+                reason: 'TILT_CLEARED'
+            };
+        }
+
+        tiltRiskStates.set(observation.targetId, targetState);
+        return createTiltRiskSignal(observation, 'TILT_RISK_MAINTAINED');
+    }
+
+    if (tiltDegrees >= TILT_RISK_RULE.ENTRY_THRESHOLD_DEGREES) {
+        if (targetState.thresholdEnteredAt === null || observedAtMs < targetState.thresholdEnteredAt) {
+            targetState.thresholdEnteredAt = observedAtMs;
+        }
+
+        if (observedAtMs - targetState.thresholdEnteredAt >= TILT_RISK_RULE.MINIMUM_DURATION_MS) {
+            targetState.riskActive = true;
+            tiltRiskStates.set(observation.targetId, targetState);
+            return createTiltRiskSignal(observation, 'TILT_RISK_CONFIRMED');
+        }
+
+        tiltRiskStates.set(observation.targetId, targetState);
+        return {
+            shouldCreateRisk: false,
+            shouldClearRisk: false,
+            eventInput: null,
+            observation: observation.toJSON(),
+            reason: 'TILT_MINIMUM_DURATION_PENDING'
+        };
+    }
+
+    tiltRiskStates.delete(observation.targetId);
+    return {
+        shouldCreateRisk: false,
+        shouldClearRisk: false,
+        eventInput: null,
+        observation: observation.toJSON(),
+        reason: 'TILT_BELOW_ENTRY_THRESHOLD'
+    };
+}
+
+function createTiltRiskSignal(observation, reason) {
+    return {
+        shouldCreateRisk: true,
+        shouldClearRisk: false,
+        eventInput: {
+            eventType: 'DANGEROUS_TILT',
+            targetId: observation.targetId,
+            severity: 'HIGH'
+        },
+        observation: observation.toJSON(),
+        reason
     };
 }
 
@@ -1778,9 +1871,10 @@ const IMU_THRESHOLDS = {
     HARD_ACCEL: 3.0,      // m/s² - 급가속
     HARD_BRAKE: -3.0,     // m/s² - 급감속
     SHARP_TURN: 45,       // °/s - 급회전
-    TILT_WARNING: 15,     // ° - 기울기 경고
-    TILT_DANGER: 25       // ° - 기울기 위험
+    TILT_WARNING: 15      // ° - 기울기 경고
 };
+
+let tiltObservationSequence = 0;
 
 // Update IMU Data for Forklifts
 function updateIMUData() {
@@ -1802,13 +1896,32 @@ function updateIMUData() {
         // Simulate tilt based on speed (higher speed = more tilt in turns)
         f.tilt = Math.min(Math.abs(f.speed) * 2, 20);
         
+        const tiltObservation = createTiltObservation(f, now);
+
         // Detect anomalies
-        detectIMUAnomalies(f);
+        detectIMUAnomalies(f, tiltObservation);
+    });
+}
+
+function createTiltObservation(forklift, observedAtMs = Date.now()) {
+    tiltObservationSequence += 1;
+    const imuSensor = sensorData.imu.find(sensor => sensor.forklift === forklift.id);
+
+    return new SensorObservation({
+        observationId: `tilt-${forklift.id}-${observedAtMs}-${tiltObservationSequence}`,
+        observationType: ObservationType.TILT,
+        sensorId: imuSensor ? imuSensor.id : `imu-sim-${forklift.id}`,
+        targetId: forklift.id,
+        value: forklift.tilt,
+        unit: 'degree',
+        confidence: 1,
+        observedAt: new Date(observedAtMs).toISOString(),
+        metadata: { source: 'imu-simulation' }
     });
 }
 
 // Detect IMU Anomalies
-function detectIMUAnomalies(forklift) {
+function detectIMUAnomalies(forklift, tiltObservation) {
     // Hard Acceleration
     if (forklift.accel > IMU_THRESHOLDS.HARD_ACCEL) {
         handleHardAcceleration(forklift);
@@ -1830,10 +1943,11 @@ function detectIMUAnomalies(forklift) {
         riskEventStateMachine.clear('SHARP_TURN', forklift.id);
     }
     
-    // Dangerous Tilt
-    if (forklift.tilt > IMU_THRESHOLDS.TILT_DANGER) {
-        handleDangerousTilt(forklift);
-    } else {
+    // Dangerous Tilt Observation
+    const tiltRiskSignal = observationToRiskSignal(tiltObservation);
+    if (tiltRiskSignal.shouldCreateRisk) {
+        handleDangerousTilt(forklift, tiltRiskSignal.eventInput);
+    } else if (tiltRiskSignal.shouldClearRisk) {
         riskEventStateMachine.clear('DANGEROUS_TILT', forklift.id);
     }
 }
@@ -1881,12 +1995,12 @@ function handleSharpTurn(forklift) {
 }
 
 // Handle Dangerous Tilt
-function handleDangerousTilt(forklift) {
+function handleDangerousTilt(forklift, eventInput = {}) {
     const name = formatForkliftIdForSpeech(forklift.id);
     const result = riskEventStateMachine.observe({
-        eventType: 'DANGEROUS_TILT',
-        targetId: forklift.id,
-        severity: 'HIGH',
+        eventType: eventInput.eventType || 'DANGEROUS_TILT',
+        targetId: eventInput.targetId || forklift.id,
+        severity: eventInput.severity || 'HIGH',
         speechMessage: `${name} 기울기 위험! 과적재 확인하세요!`,
         speechPriority: 'high'
     });
