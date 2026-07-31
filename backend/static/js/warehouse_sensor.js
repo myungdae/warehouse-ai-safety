@@ -545,6 +545,225 @@ function updateClock() {
 }
 
 // ========================================
+// RISK EVENT STATE MACHINE
+// ========================================
+
+const EventState = Object.freeze({
+    NEW: 'NEW',
+    ACTIVE: 'ACTIVE',
+    ACKNOWLEDGED: 'ACKNOWLEDGED',
+    CLEARED: 'CLEARED'
+});
+
+class RiskEvent {
+    constructor({ eventId, eventType, targetId, severity, timestamp }) {
+        this.eventId = eventId;
+        this.eventType = eventType;
+        this.targetId = targetId;
+        this.createdTime = timestamp;
+        this.updatedTime = timestamp;
+        this.state = EventState.NEW;
+        this.severity = severity;
+        this.lastSpeechTime = null;
+        this.acknowledgedTime = null;
+        this.clearedTime = null;
+    }
+
+    toJSON() {
+        return {
+            eventId: this.eventId,
+            eventType: this.eventType,
+            targetId: this.targetId,
+            createdTime: this.createdTime,
+            updatedTime: this.updatedTime,
+            state: this.state,
+            severity: this.severity,
+            lastSpeechTime: this.lastSpeechTime,
+            acknowledgedTime: this.acknowledgedTime,
+            clearedTime: this.clearedTime
+        };
+    }
+}
+
+class EventStateMachine {
+    constructor({ activeSpeechInterval = 10000, maxHistorySize = 1000 } = {}) {
+        this.activeSpeechInterval = activeSpeechInterval;
+        this.maxHistorySize = maxHistorySize;
+        this.activeEvents = new Map();
+        this.eventHistory = [];
+        this.speechMetadata = new Map();
+        this.sequence = 0;
+    }
+
+    createEventId(eventType, targetId, now) {
+        this.sequence += 1;
+        const safeType = String(eventType).replace(/[^a-zA-Z0-9_-]/g, '-');
+        const safeTarget = String(targetId).replace(/[^a-zA-Z0-9_-]/g, '-');
+        return `${safeType}-${safeTarget}-${now}-${this.sequence}`;
+    }
+
+    getEventKey(eventType, targetId) {
+        return `${eventType}::${targetId}`;
+    }
+
+    observe({ eventType, targetId, severity, speechMessage, speechPriority = 'high' }) {
+        const now = Date.now();
+        const timestamp = new Date(now).toISOString();
+        const key = this.getEventKey(eventType, targetId);
+        let event = this.activeEvents.get(key);
+
+        if (!event) {
+            event = new RiskEvent({
+                eventId: this.createEventId(eventType, targetId, now),
+                eventType,
+                targetId,
+                severity,
+                timestamp
+            });
+            this.activeEvents.set(key, event);
+            this.eventHistory.push(event);
+            this.trimHistory();
+            this.speechMetadata.set(event.eventId, {
+                message: speechMessage,
+                priority: speechPriority
+            });
+            return {
+                event,
+                didSpeak: this.speakForEvent(event, now)
+            };
+        }
+
+        event.updatedTime = timestamp;
+        event.severity = severity;
+        this.speechMetadata.set(event.eventId, {
+            message: speechMessage,
+            priority: speechPriority
+        });
+
+        if (event.state === EventState.NEW) {
+            event.state = EventState.ACTIVE;
+        }
+
+        let didSpeak = false;
+        if (
+            event.state === EventState.ACTIVE &&
+            now - this.getTimestamp(event.lastSpeechTime) >= this.activeSpeechInterval
+        ) {
+            didSpeak = this.speakForEvent(event, now);
+        }
+
+        return { event, didSpeak };
+    }
+
+    acknowledge(eventId) {
+        const event = this.eventHistory.find(item => item.eventId === eventId);
+        if (!event || event.state === EventState.CLEARED) return null;
+
+        const timestamp = new Date().toISOString();
+        event.state = EventState.ACKNOWLEDGED;
+        event.updatedTime = timestamp;
+        event.acknowledgedTime = timestamp;
+
+        if (window.speechSynthesis) {
+            window.speechSynthesis.cancel();
+        }
+
+        return event;
+    }
+
+    clear(eventType, targetId) {
+        const key = this.getEventKey(eventType, targetId);
+        const event = this.activeEvents.get(key);
+        if (!event) return null;
+
+        const timestamp = new Date().toISOString();
+        event.state = EventState.CLEARED;
+        event.updatedTime = timestamp;
+        event.clearedTime = timestamp;
+        this.activeEvents.delete(key);
+        this.speechMetadata.delete(event.eventId);
+        this.trimHistory();
+        return event;
+    }
+
+    trimHistory() {
+        while (this.eventHistory.length > this.maxHistorySize) {
+            const removableIndex = this.eventHistory.findIndex(event => {
+                const key = this.getEventKey(event.eventType, event.targetId);
+                return this.activeEvents.get(key) !== event;
+            });
+
+            if (removableIndex === -1) {
+                break;
+            }
+
+            this.eventHistory.splice(removableIndex, 1);
+        }
+    }
+
+    clearUnobserved(eventType, observedTargetIds) {
+        const targets = new Set(observedTargetIds);
+        Array.from(this.activeEvents.values()).forEach(event => {
+            if (event.eventType === eventType && !targets.has(event.targetId)) {
+                this.clear(event.eventType, event.targetId);
+            }
+        });
+    }
+
+    clearAll() {
+        Array.from(this.activeEvents.values()).forEach(event => {
+            this.clear(event.eventType, event.targetId);
+        });
+    }
+
+    speakForEvent(event, now) {
+        if (event.state === EventState.ACKNOWLEDGED || event.state === EventState.CLEARED) {
+            return false;
+        }
+
+        const speech = this.speechMetadata.get(event.eventId);
+        if (!speech || !speech.message) return false;
+
+        speak(speech.message, speech.priority);
+        event.lastSpeechTime = new Date(now).toISOString();
+        return true;
+    }
+
+    getTimestamp(timestamp) {
+        if (!timestamp) return 0;
+        const value = Date.parse(timestamp);
+        return Number.isNaN(value) ? 0 : value;
+    }
+
+    toJSON() {
+        return this.eventHistory.map(event => event.toJSON());
+    }
+}
+
+const riskEventStateMachine = new EventStateMachine({
+    activeSpeechInterval: 10000,
+    maxHistorySize: 1000
+});
+
+function acknowledgeRiskEvent(eventId) {
+    return riskEventStateMachine.acknowledge(eventId);
+}
+
+function getActiveRiskEvents() {
+    return Array.from(riskEventStateMachine.activeEvents.values())
+        .filter(event => event.state !== EventState.CLEARED)
+        .map(event => event.toJSON());
+}
+
+function getRiskEventHistory() {
+    return riskEventStateMachine.toJSON();
+}
+
+function getRiskEvents() {
+    return getRiskEventHistory();
+}
+
+// ========================================
 // DIGITAL TWIN ANIMATION SYSTEM
 // ========================================
 
@@ -748,6 +967,8 @@ function moveForklifts() {
 
 // Detect Collisions
 function detectCollisions() {
+    const observedCollisions = new Set();
+
     for (let i = 0; i < animationState.forklifts.length; i++) {
         for (let j = i + 1; j < animationState.forklifts.length; j++) {
             const f1 = animationState.forklifts[i];
@@ -759,30 +980,39 @@ function detectCollisions() {
             
             // Show danger zone and voice warning
             if (distance < 80) {
+                const collisionTargetId = getCollisionTargetId(f1.id, f2.id);
+                observedCollisions.add(collisionTargetId);
                 showDangerZone(f1, f2, distance);
                 // Automatic voice warning
                 speakCollisionWarning(f1, f2);
             }
         }
     }
+    riskEventStateMachine.clearUnobserved('COLLISION_RISK', observedCollisions);
     
     // Check pedestrian proximity
     const pedestrian = document.getElementById('pedestrian-P02');
+    const observedPedestrianRisks = new Set();
     if (pedestrian) {
         animationState.forklifts.forEach(f => {
             const dist = Math.sqrt(Math.pow(f.x - 520, 2) + Math.pow(f.y - 230, 2));
             if (dist < 100) {
+                observedPedestrianRisks.add(f.id);
                 speakPedestrianWarning(f.id);
             }
         });
     }
+    riskEventStateMachine.clearUnobserved('PEDESTRIAN_PROXIMITY', observedPedestrianRisks);
     
     // Check speed violations in pedestrian zone
+    const observedSpeedRisks = new Set();
     animationState.forklifts.forEach(f => {
         if (f.x >= 50 && f.x <= 150 && f.y >= 250 && f.y <= 350 && f.speed > 2.0) {
+            observedSpeedRisks.add(f.id);
             speakSpeedWarning(f.id, '보행자 구역');
         }
     });
+    riskEventStateMachine.clearUnobserved('SPEED_VIOLATION', observedSpeedRisks);
 }
 
 // Show Danger Zone
@@ -807,9 +1037,6 @@ function showDangerZone(f1, f2, distance) {
     `;
     svg.appendChild(g);
     
-    // 🔊 Automatic voice warning
-    speakCollisionWarning(f1, f2);
-    
     // Remove after 2 seconds
     setTimeout(() => {
         const zone = document.getElementById('danger-zone');
@@ -821,6 +1048,7 @@ function showDangerZone(f1, f2, distance) {
 function resetDigitalTwinView() {
     // Reset forklift positions
     stopAnimation();
+    riskEventStateMachine.clearAll();
     initializeAnimatedForklifts();
     startAnimation();
 }
@@ -1266,9 +1494,7 @@ function showNotificationPopup(message, type = 'info') {
 
 // Global TTS State
 const ttsState = {
-    enabled: true,
-    lastWarningTime: {},
-    warningCooldown: 3000 // 3 seconds between same warnings
+    enabled: true
 };
 
 // Initialize TTS
@@ -1306,19 +1532,6 @@ function speak(text, priority = 'normal') {
     window.speechSynthesis.speak(utterance);
 }
 
-// Check Warning Cooldown
-function canSpeak(warningId) {
-    const now = Date.now();
-    const lastTime = ttsState.lastWarningTime[warningId] || 0;
-    
-    if (now - lastTime < ttsState.warningCooldown) {
-        return false;
-    }
-    
-    ttsState.lastWarningTime[warningId] = now;
-    return true;
-}
-
 // Convert Forklift ID to natural speech
 function formatForkliftIdForSpeech(id) {
     // Convert "F-07" to "에프공칠"
@@ -1349,41 +1562,51 @@ function formatForkliftIdForSpeech(id) {
     return `에프${spokenNumber}`;
 }
 
+function getCollisionTargetId(forkliftId1, forkliftId2) {
+    return [forkliftId1, forkliftId2].sort().join('|');
+}
+
 // Collision Warning Voice
 function speakCollisionWarning(forklift1, forklift2) {
-    const warningId = `collision_${forklift1.id}_${forklift2.id}`;
-    
-    if (!canSpeak(warningId)) return;
-    
     const f1Name = formatForkliftIdForSpeech(forklift1.id);
     const f2Name = formatForkliftIdForSpeech(forklift2.id);
-    
     const message = `경고! ${f1Name}과 ${f2Name} 충돌 위험! 속도를 줄이세요!`;
-    speak(message, 'high');
+    const result = riskEventStateMachine.observe({
+        eventType: 'COLLISION_RISK',
+        targetId: getCollisionTargetId(forklift1.id, forklift2.id),
+        severity: 'HIGH',
+        speechMessage: message,
+        speechPriority: 'high'
+    });
+    return result.didSpeak;
 }
 
 // Pedestrian Warning Voice
 function speakPedestrianWarning(forkliftId) {
-    const warningId = `pedestrian_${forkliftId}`;
-    
-    if (!canSpeak(warningId)) return;
-    
     const forkliftName = formatForkliftIdForSpeech(forkliftId);
-    
     const message = `${forkliftName} 정지! 보행자 접근 중입니다!`;
-    speak(message, 'high');
+    const result = riskEventStateMachine.observe({
+        eventType: 'PEDESTRIAN_PROXIMITY',
+        targetId: forkliftId,
+        severity: 'CRITICAL',
+        speechMessage: message,
+        speechPriority: 'high'
+    });
+    return result.didSpeak;
 }
 
 // Speed Violation Warning Voice
 function speakSpeedWarning(forkliftId, zone) {
-    const warningId = `speed_${forkliftId}`;
-    
-    if (!canSpeak(warningId)) return;
-    
     const forkliftName = formatForkliftIdForSpeech(forkliftId);
-    
     const message = `${forkliftName} 과속! ${zone} 구역에서 속도를 줄이세요!`;
-    speak(message, 'high');
+    const result = riskEventStateMachine.observe({
+        eventType: 'SPEED_VIOLATION',
+        targetId: forkliftId,
+        severity: 'HIGH',
+        speechMessage: message,
+        speechPriority: 'high'
+    });
+    return result.didSpeak;
 }
 
 // Scenario Announcement
@@ -1470,61 +1693,85 @@ function detectIMUAnomalies(forklift) {
     // Hard Acceleration
     if (forklift.accel > IMU_THRESHOLDS.HARD_ACCEL) {
         handleHardAcceleration(forklift);
+    } else {
+        riskEventStateMachine.clear('HARD_ACCELERATION', forklift.id);
     }
     
     // Hard Braking
     if (forklift.accel < IMU_THRESHOLDS.HARD_BRAKE) {
         handleHardBraking(forklift);
+    } else {
+        riskEventStateMachine.clear('HARD_BRAKING', forklift.id);
     }
     
     // Sharp Turn
     if (forklift.gyro > IMU_THRESHOLDS.SHARP_TURN) {
         handleSharpTurn(forklift);
+    } else {
+        riskEventStateMachine.clear('SHARP_TURN', forklift.id);
     }
     
     // Dangerous Tilt
     if (forklift.tilt > IMU_THRESHOLDS.TILT_DANGER) {
         handleDangerousTilt(forklift);
+    } else {
+        riskEventStateMachine.clear('DANGEROUS_TILT', forklift.id);
     }
 }
 
 // Handle Hard Acceleration
 function handleHardAcceleration(forklift) {
-    const warningId = `accel_${forklift.id}`;
-    if (!canSpeak(warningId)) return;
-    
     const name = formatForkliftIdForSpeech(forklift.id);
-    speak(`${name} 급가속 감지! 속도를 조절하세요!`, 'high');
+    const result = riskEventStateMachine.observe({
+        eventType: 'HARD_ACCELERATION',
+        targetId: forklift.id,
+        severity: 'MEDIUM',
+        speechMessage: `${name} 급가속 감지! 속도를 조절하세요!`,
+        speechPriority: 'high'
+    });
+    if (!result.didSpeak) return;
     showWarningIndicator(forklift, '⚡ 급가속', '#FF9800');
 }
 
 // Handle Hard Braking
 function handleHardBraking(forklift) {
-    const warningId = `brake_${forklift.id}`;
-    if (!canSpeak(warningId)) return;
-    
     const name = formatForkliftIdForSpeech(forklift.id);
-    speak(`${name} 급브레이크! 충격 감지!`, 'high');
+    const result = riskEventStateMachine.observe({
+        eventType: 'HARD_BRAKING',
+        targetId: forklift.id,
+        severity: 'HIGH',
+        speechMessage: `${name} 급브레이크! 충격 감지!`,
+        speechPriority: 'high'
+    });
+    if (!result.didSpeak) return;
     showWarningIndicator(forklift, '🛑 급정지', '#ef4444');
 }
 
 // Handle Sharp Turn
 function handleSharpTurn(forklift) {
-    const warningId = `turn_${forklift.id}`;
-    if (!canSpeak(warningId)) return;
-    
     const name = formatForkliftIdForSpeech(forklift.id);
-    speak(`${name} 급회전 주의!`, 'normal');
+    const result = riskEventStateMachine.observe({
+        eventType: 'SHARP_TURN',
+        targetId: forklift.id,
+        severity: 'MEDIUM',
+        speechMessage: `${name} 급회전 주의!`,
+        speechPriority: 'normal'
+    });
+    if (!result.didSpeak) return;
     showWarningIndicator(forklift, '🔄 급회전', '#3b82f6');
 }
 
 // Handle Dangerous Tilt
 function handleDangerousTilt(forklift) {
-    const warningId = `tilt_${forklift.id}`;
-    if (!canSpeak(warningId)) return;
-    
     const name = formatForkliftIdForSpeech(forklift.id);
-    speak(`${name} 기울기 위험! 과적재 확인하세요!`, 'high');
+    const result = riskEventStateMachine.observe({
+        eventType: 'DANGEROUS_TILT',
+        targetId: forklift.id,
+        severity: 'HIGH',
+        speechMessage: `${name} 기울기 위험! 과적재 확인하세요!`,
+        speechPriority: 'high'
+    });
+    if (!result.didSpeak) return;
     showWarningIndicator(forklift, '⚠️ 기울기 위험', '#f59e0b');
 }
 
