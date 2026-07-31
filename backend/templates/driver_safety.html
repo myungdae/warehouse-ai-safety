@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="icon" href="data:,">
   <title>Driver Safety · IMC Agentic AI</title>
+  <link rel="stylesheet" href="/static/css/driver_safety.css">
   <style>
     :root {
       --bg: #070b14;
@@ -150,6 +151,44 @@
       <div class="status"><span class="status-dot"></span> 설계 문서 단계 · 감지 런타임 미구현</div>
     </section>
 
+    <div class="simulation-banner" role="status">
+      <strong>SIMULATION · 실제 센서 미연결</strong>
+      Deterministic Test Observation 전용이며 운영 판정에 사용 금지입니다.
+    </div>
+
+    <section class="driver-test-panel" aria-labelledby="driverTestTitle">
+      <h2 id="driverTestTitle" class="panel-title">Common Driver State Observation</h2>
+      <p class="panel-copy">실제 위험 판정이나 RiskEvent를 만들지 않고 표준 SensorObservation JSON만 생성합니다.</p>
+      <form id="driverStateTestForm">
+        <div class="driver-form-grid">
+          <label class="driver-field">Vehicle Type
+            <select id="driverVehicleType">
+              <option>FORKLIFT</option><option>BOX_TRUCK</option><option>CARGO_TRUCK</option>
+              <option>BUS</option><option>SPECIAL_VEHICLE</option>
+            </select>
+          </label>
+          <label class="driver-field">Vehicle ID<input id="driverVehicleId" value="F-03" required></label>
+          <label class="driver-field">Driver ID<input id="driverId" value="DRIVER001" required></label>
+          <label class="driver-field">Assignment ID<input id="driverAssignmentId" value="ASSIGNMENT001" required></label>
+          <label class="driver-field">Observation Type
+            <select id="driverObservationType">
+              <option>DROWSINESS</option><option>INCAPACITATION</option><option>ALCOHOL_LEVEL</option>
+            </select>
+          </label>
+          <div class="driver-field">Target ID<strong id="driverTargetId" class="driver-target">-</strong></div>
+        </div>
+        <div class="actions">
+          <button class="button button-primary" type="submit">Deterministic sequence 실행</button>
+        </div>
+      </form>
+      <div id="driverSequenceStatus" class="driver-sequence">NORMAL → ENTRY_PENDING → RISK_CONFIRMED → RISK_MAINTAINED → CLEAR</div>
+      <div class="driver-output-grid">
+        <article class="driver-output"><h3>VehicleContext</h3><pre id="vehicleContextOutput">{}</pre></article>
+        <article class="driver-output"><h3>Adapter Status</h3><pre id="driverAdapterStatus">DISCONNECTED</pre></article>
+        <article class="driver-output" style="grid-column: 1 / -1"><h3>Last SensorObservation JSON</h3><pre id="lastDriverObservation">아직 생성되지 않음</pre></article>
+      </div>
+    </section>
+
     <nav class="tabs" aria-label="Driver Safety 정보">
       <button class="tab-button active" type="button" data-tab="overview">구현 현황</button>
       <button class="tab-button" type="button" data-tab="ontology">Ontology 흐름</button>
@@ -212,7 +251,12 @@
     </section>
   </main>
 
+  <script src="/static/js/sensor_observation.js"></script>
+  <script src="/static/js/driver_state_config.js"></script>
+  <script src="/static/js/driver_state.js"></script>
+  <script src="/static/js/driver_sensor_adapters.js"></script>
   <script>
+    window.DriverState.initializeDriverStatePage();
     const tabButtons = document.querySelectorAll('.tab-button');
     const tabPanels = document.querySelectorAll('.tab-panel');
 
