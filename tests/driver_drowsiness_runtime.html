@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><title>Driver drowsiness runtime regression</title></head>
+<body>
+  <form id="driverStateTestForm">
+    <select id="driverVehicleType"><option>FORKLIFT</option></select>
+    <input id="driverVehicleId" value="F-03">
+    <input id="driverId" value="DRIVER001">
+    <input id="driverAssignmentId" value="ASSIGNMENT001">
+    <select id="driverObservationType">
+      <option>DROWSINESS</option><option>INCAPACITATION</option><option>ALCOHOL_LEVEL</option>
+    </select>
+    <button id="drowsinessTestButton" type="submit">DROWSINESS TEST</button>
+    <button id="genericTestButton" type="submit">GENERIC TEST</button>
+  </form>
+  <span id="driverTargetId"></span><pre id="vehicleContextOutput"></pre>
+  <pre id="lastDriverObservation"></pre><pre id="driverSequenceStatus"></pre>
+  <pre id="driverAdapterStatus"></pre><pre id="lastDriverRiskSignal"></pre>
+  <pre id="driverRiskEventHistory"></pre><pre id="driverCurrentEventId"></pre>
+  <pre id="driverCurrentEventState"></pre><pre id="result">RUNNING</pre>
+  <script src="../backend/static/js/sensor_observation.js"></script>
+  <script src="../backend/static/js/driver_state_config.js"></script>
+  <script src="../backend/static/js/driver_state.js"></script>
+  <script src="../backend/static/js/driver_sensor_adapters.js"></script>
+  <script src="../backend/static/js/driver_risk_runtime.js"></script>
+  <script>
+    (function runRegression() {
+      'use strict';
+      const output = document.getElementById('result');
+      const assert = (condition, message) => { if (!condition) throw new Error(message); };
+      const scheduled = new Map();
+      let timerSequence = 0;
+      window.setTimeout = callback => {
+        timerSequence += 1;
+        scheduled.set(timerSequence, { callback, cleared: false });
+        return timerSequence;
+      };
+      window.clearTimeout = handle => {
+        const timer = scheduled.get(handle);
+        if (timer) timer.cleared = true;
+      };
+      const runNextTimer = ({ includeCleared = false } = {}) => {
+        const entry = Array.from(scheduled.entries()).find(([, timer]) => includeCleared || !timer.cleared);
+        if (!entry) throw new Error('Expected a scheduled callback');
+        scheduled.delete(entry[0]);
+        entry[1].callback();
+        return entry[1];
+      };
+      const runToCompletion = () => {
+        while (Array.from(scheduled.values()).some(timer => !timer.cleared)) runNextTimer();
+      };
+      const submit = button => document.getElementById('driverStateTestForm').requestSubmit(button);
+
+      try {
+        const D = window.DriverState;
+        const A = window.DriverSensorAdapters;
+        const R = window.DriverRiskRuntime;
+        const O = window.SafetyObservation.ObservationType;
+        const adapter = new A.DeterministicDriverTestAdapter();
+        window.DriverStatePage = D.initializeDriverStatePage();
+
+        submit(document.getElementById('drowsinessTestButton'));
+        runToCompletion();
+        const firstRun = JSON.parse(document.getElementById('driverRiskEventHistory').textContent);
+        assert(firstRun.length === 1 && firstRun[0].state === 'CLEARED', 'Normal run must end CLEARED');
+        const firstId = firstRun[0].eventId;
+
+        submit(document.getElementById('drowsinessTestButton'));
+        runToCompletion();
+        const secondRun = JSON.parse(document.getElementById('driverRiskEventHistory').textContent);
+        assert(secondRun.length === 1, 'Current-run UI must exclude previous history');
+        assert(secondRun[0].eventId !== firstId, 'Completed restart must create a new eventId');
+
+        submit(document.getElementById('drowsinessTestButton'));
+        runNextTimer();
+        runNextTimer();
+        const interruptedId = document.getElementById('driverCurrentEventId').textContent;
+        const staleTimer = Array.from(scheduled.values()).find(timer => !timer.cleared);
+        assert(interruptedId !== '-', 'Interrupted run must have an active event');
+        submit(document.getElementById('drowsinessTestButton'));
+        assert(staleTimer.cleared, 'Previous timer must be cancelled');
+        const newGeneration = window.DriverStatePage.getSequenceRunState().generation;
+        const observationsBeforeStale = window.DriverStatePage.getSequenceRunState().observationHistory.length;
+        staleTimer.callback();
+        assert(window.DriverStatePage.getSequenceRunState().generation === newGeneration,
+          'Stale callback must not change generation');
+        assert(window.DriverStatePage.getSequenceRunState().observationHistory.length === observationsBeforeStale,
+          'Stale callback must not append observations');
+        runToCompletion();
+        const restartedRun = JSON.parse(document.getElementById('driverRiskEventHistory').textContent);
+        assert(restartedRun.length === 1 && restartedRun[0].eventId !== interruptedId,
+          'Interrupted restart must use a new eventId and run-scoped UI history');
+        const audit = window.DriverStatePage.getRiskEventHistory();
+        const interruptedAudit = audit.find(event => event.eventId === interruptedId);
+        assert(interruptedAudit && interruptedAudit.state === 'CLEARED', 'Interrupted event must be explicitly CLEARED');
+
+        const context = (assignment, vehicle = 'F-03', driver = 'DRIVER001') => new D.VehicleContext({
+          vehicleType: 'FORKLIFT', vehicleId: vehicle, driverId: driver, driverAssignmentId: assignment
+        });
+        const assignmentOne = context('ASSIGNMENT001');
+        const assignmentTwo = context('ASSIGNMENT002');
+        assert(assignmentOne.targetId === 'F03|DRIVER001|ASSIGNMENT001', 'Unexpected targetId format');
+        assert(assignmentOne.targetId !== assignmentTwo.targetId, 'Assignments must be isolated');
+
+        const machine = new R.RiskEventStateMachine();
+        R.resetDrowsinessRiskState(assignmentOne.targetId);
+        const transitionSequence = adapter.createSequence({
+          context: assignmentOne, observationType: O.DROWSINESS, startedAt: 100
+        });
+        const transitionStates = [];
+        transitionSequence.forEach(observation => {
+          const signal = R.observationToRiskSignal(observation);
+          let event = null;
+          if (signal.shouldCreateRisk) {
+            event = machine.observe(signal.eventInput, observation.observedAt);
+            transitionStates.push(event.state);
+            if (event.state === R.EventState.ACTIVE) {
+              machine.acknowledge(event.eventId, observation.observedAt);
+              transitionStates.push(event.state);
+            }
+          } else if (signal.shouldClearRisk) {
+            event = machine.clear('DROWSINESS', observation.targetId, observation.observedAt);
+            transitionStates.push(event.state);
+          }
+        });
+        assert(transitionStates.join('|') === 'NEW|ACTIVE|ACKNOWLEDGED|CLEARED',
+          `Unexpected event transitions: ${transitionStates.join(',')}`);
+        const createEvent = (ctx, startedAt) => {
+          R.resetDrowsinessRiskState(ctx.targetId);
+          const sequence = adapter.createSequence({ context: ctx, observationType: O.DROWSINESS, startedAt });
+          R.observationToRiskSignal(sequence[1]);
+          const signal = R.observationToRiskSignal(sequence[2]);
+          return machine.observe(signal.eventInput, sequence[2].observedAt);
+        };
+        const assignmentOneEvent = createEvent(assignmentOne, 1000);
+        const sameActiveEvent = machine.observe({
+          eventType: 'DROWSINESS', targetId: assignmentOne.targetId, severity: 'HIGH'
+        }, new Date(1600));
+        assert(sameActiveEvent.eventId === assignmentOneEvent.eventId,
+          'An active event in the same assignment must reuse its eventId');
+        const assignmentTwoEvent = createEvent(assignmentTwo, 2000);
+        assert(assignmentOneEvent.eventId !== assignmentTwoEvent.eventId, 'Assignment events must be independent');
+        assert(machine.activeEvents.size === 2, 'Both assignment targets must remain active');
+        machine.clear('DROWSINESS', assignmentOne.targetId, new Date(3000));
+        const assignmentOneAgain = createEvent(assignmentOne, 4000);
+        assert(assignmentOneAgain.eventId !== assignmentOneEvent.eventId,
+          'A cleared event in the same assignment must receive a new eventId');
+        assert(machine.activeEvents.has(machine.getEventKey('DROWSINESS', assignmentTwo.targetId)),
+          'Restarting one target must preserve another target active event');
+
+        ['INCAPACITATION', 'ALCOHOL_LEVEL'].forEach(type => {
+          const observation = adapter.createObservation({
+            context: assignmentOne, observationType: type,
+            sequenceState: A.DeterministicSequenceState.NORMAL, observedAt: new Date(5000)
+          });
+          const signal = R.observationToRiskSignal(observation);
+          assert(signal.reason === 'NO_RISK_RULE_CONFIGURED' && !signal.shouldCreateRisk,
+            `${type} must not create a RiskEvent`);
+        });
+
+        output.textContent = 'PASS\nNormal, completed restart, interrupted restart, stale callback, assignment isolation, unsupported types';
+        document.title = 'PASS';
+      } catch (error) {
+        output.textContent = `FAIL\n${error.stack || error.message}`;
+        document.title = 'FAIL';
+      }
+    }());
+  </script>
+</body>
+</html>

@@ -54,8 +54,12 @@
         return normalized;
     }
 
-    function createDriverTargetId(vehicleId, driverId) {
-        return `${normalizeIdentity(vehicleId, 'vehicleId')}|${normalizeIdentity(driverId, 'driverId')}`;
+    function createDriverTargetId(vehicleId, driverId, driverAssignmentId) {
+        return [
+            normalizeIdentity(vehicleId, 'vehicleId'),
+            normalizeIdentity(driverId, 'driverId'),
+            normalizeIdentity(driverAssignmentId, 'driverAssignmentId')
+        ].join('|');
     }
 
     class VehicleContext {
@@ -72,7 +76,11 @@
             this.driverAssignmentId = requireNonEmptyString(input.driverAssignmentId, 'driverAssignmentId');
             this.capabilities = cloneJsonValue(input.capabilities || {}, 'capabilities');
             this.sensorBindings = cloneJsonValue(input.sensorBindings || {}, 'sensorBindings');
-            this.targetId = createDriverTargetId(this.vehicleId, this.driverId);
+            this.targetId = createDriverTargetId(
+                this.vehicleId,
+                this.driverId,
+                this.driverAssignmentId
+            );
         }
 
         toJSON() {
@@ -167,10 +175,21 @@
         const observationOutput = document.getElementById('lastDriverObservation');
         const sequenceOutput = document.getElementById('driverSequenceStatus');
         const adapterOutput = document.getElementById('driverAdapterStatus');
+        const riskOutput = document.getElementById('lastDriverRiskSignal');
+        const eventOutput = document.getElementById('driverRiskEventHistory');
+        const currentEventIdOutput = document.getElementById('driverCurrentEventId');
+        const currentEventStateOutput = document.getElementById('driverCurrentEventState');
+        const riskEventStateMachine = global.DriverRiskRuntime
+            ? new global.DriverRiskRuntime.RiskEventStateMachine()
+            : null;
         const sequenceRunState = {
             timerHandle: null,
             generation: 0,
-            observationHistory: []
+            runId: null,
+            targetId: null,
+            observationType: null,
+            observationHistory: [],
+            eventIds: new Set()
         };
         adapterOutput.textContent = Object.entries(adapters)
             .map(([name, adapter]) => `${name}: ${adapter.isConnected() ? 'CONNECTED' : 'DISCONNECTED'}`)
@@ -210,11 +229,37 @@
                 sequenceRunState.timerHandle = null;
             }
             sequenceRunState.generation += 1;
+            sequenceRunState.runId = `driver-run-${Date.now()}-${sequenceRunState.generation}`;
             sequenceRunState.observationHistory = [];
+            sequenceRunState.eventIds = new Set();
             const runGeneration = sequenceRunState.generation;
-            const observationType = document.getElementById('driverObservationType').value;
-            const observations = adapters.deterministic.createSequence({ context, observationType });
-            sequenceOutput.textContent = observations.map(item => item.value).join(' → ');
+            const submitter = event.submitter;
+            const observationType = submitter && submitter.id === 'drowsinessTestButton'
+                ? ObservationType.DROWSINESS
+                : document.getElementById('driverObservationType').value;
+            if (
+                sequenceRunState.observationType === ObservationType.DROWSINESS &&
+                sequenceRunState.targetId &&
+                riskEventStateMachine
+            ) {
+                riskEventStateMachine.clear('DROWSINESS', sequenceRunState.targetId, new Date());
+                global.DriverRiskRuntime.resetDrowsinessRiskState(sequenceRunState.targetId);
+            }
+            sequenceRunState.targetId = context.targetId;
+            sequenceRunState.observationType = observationType;
+            if (observationType === ObservationType.DROWSINESS && global.DriverRiskRuntime) {
+                global.DriverRiskRuntime.resetDrowsinessRiskState(context.targetId);
+            }
+            riskOutput.textContent = '현재 실행의 RiskSignal 대기 중';
+            eventOutput.textContent = '[]';
+            currentEventIdOutput.textContent = '-';
+            currentEventStateOutput.textContent = 'NORMAL';
+            sequenceOutput.textContent = 'STARTING';
+            const observations = adapters.deterministic.createSequence({
+                context,
+                observationType,
+                runId: sequenceRunState.runId
+            });
             const renderObservation = index => {
                 if (runGeneration !== sequenceRunState.generation) {
                     return;
@@ -222,6 +267,28 @@
                 const observationJson = observations[index].toJSON();
                 sequenceRunState.observationHistory.push(observationJson);
                 observationOutput.textContent = JSON.stringify(observationJson, null, 2);
+                sequenceOutput.textContent = observationJson.metadata.metrics.sequenceState;
+                if (observationType === ObservationType.DROWSINESS && riskEventStateMachine) {
+                    const riskSignal = global.DriverRiskRuntime.observationToRiskSignal(observations[index]);
+                    riskOutput.textContent = JSON.stringify(riskSignal, null, 2);
+                    let riskEvent = null;
+                    if (riskSignal.shouldCreateRisk) {
+                        riskEvent = riskEventStateMachine.observe(riskSignal.eventInput, observations[index].observedAt);
+                        sequenceRunState.eventIds.add(riskEvent.eventId);
+                        if (riskEvent.state === global.DriverRiskRuntime.EventState.ACTIVE) {
+                            riskEventStateMachine.acknowledge(riskEvent.eventId, observations[index].observedAt);
+                        }
+                    } else if (riskSignal.shouldClearRisk) {
+                        riskEvent = riskEventStateMachine.clear('DROWSINESS', observations[index].targetId, observations[index].observedAt);
+                    }
+                    if (riskEvent) {
+                        currentEventIdOutput.textContent = riskEvent.eventId;
+                        currentEventStateOutput.textContent = riskEvent.state;
+                    }
+                    const currentRunHistory = riskEventStateMachine.toJSON()
+                        .filter(item => sequenceRunState.eventIds.has(item.eventId));
+                    eventOutput.textContent = JSON.stringify(currentRunHistory, null, 2);
+                }
                 if (index === observations.length - 1) {
                     sequenceRunState.timerHandle = null;
                     return;
@@ -239,8 +306,14 @@
                 return {
                     timerHandle: sequenceRunState.timerHandle,
                     generation: sequenceRunState.generation,
+                    runId: sequenceRunState.runId,
+                    targetId: sequenceRunState.targetId,
+                    observationType: sequenceRunState.observationType,
                     observationHistory: cloneJsonValue(sequenceRunState.observationHistory)
                 };
+            },
+            getRiskEventHistory() {
+                return riskEventStateMachine ? riskEventStateMachine.toJSON() : [];
             }
         });
     }

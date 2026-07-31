@@ -158,7 +158,7 @@
 
     <section class="driver-test-panel" aria-labelledby="driverTestTitle">
       <h2 id="driverTestTitle" class="panel-title">Common Driver State Observation</h2>
-      <p class="panel-copy">실제 위험 판정이나 RiskEvent를 만들지 않고 표준 SensorObservation JSON만 생성합니다.</p>
+      <p class="panel-copy">DROWSINESS는 Deterministic Test Observation을 표준 위험 신호와 RiskEvent 상태 머신에 연결합니다.</p>
       <form id="driverStateTestForm">
         <div class="driver-form-grid">
           <label class="driver-field">Vehicle Type
@@ -179,13 +179,18 @@
         </div>
         <div class="actions">
           <button class="button button-primary" type="submit">Deterministic sequence 실행</button>
+          <button id="drowsinessTestButton" class="button button-secondary" type="submit">DROWSINESS TEST</button>
         </div>
       </form>
-      <div id="driverSequenceStatus" class="driver-sequence">NORMAL → ENTRY_PENDING → RISK_CONFIRMED → RISK_MAINTAINED → CLEAR</div>
+      <div id="driverSequenceStatus" class="driver-sequence">NORMAL → ENTRY_PENDING → RISK_CONFIRMED → RISK_MAINTAINED → CLEAR_PENDING → CLEAR</div>
       <div class="driver-output-grid">
         <article class="driver-output"><h3>VehicleContext</h3><pre id="vehicleContextOutput">{}</pre></article>
         <article class="driver-output"><h3>Adapter Status</h3><pre id="driverAdapterStatus">DISCONNECTED</pre></article>
         <article class="driver-output" style="grid-column: 1 / -1"><h3>Last SensorObservation JSON</h3><pre id="lastDriverObservation">아직 생성되지 않음</pre></article>
+        <article class="driver-output"><h3>Last RiskSignal</h3><pre id="lastDriverRiskSignal">아직 생성되지 않음</pre></article>
+        <article class="driver-output"><h3>RiskEvent History</h3><pre id="driverRiskEventHistory">[]</pre></article>
+        <article class="driver-output"><h3>Current Event ID</h3><pre id="driverCurrentEventId">-</pre></article>
+        <article class="driver-output"><h3>Current State</h3><pre id="driverCurrentEventState">NORMAL</pre></article>
       </div>
     </section>
 
@@ -255,8 +260,9 @@
   <script src="/static/js/driver_state_config.js"></script>
   <script src="/static/js/driver_state.js"></script>
   <script src="/static/js/driver_sensor_adapters.js"></script>
+  <script src="/static/js/driver_risk_runtime.js"></script>
   <script>
-    window.DriverState.initializeDriverStatePage();
+    window.DriverStatePage = window.DriverState.initializeDriverStatePage();
     const tabButtons = document.querySelectorAll('.tab-button');
     const tabPanels = document.querySelectorAll('.tab-panel');
 
