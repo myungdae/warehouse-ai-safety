@@ -153,14 +153,17 @@
         ['INCAPACITATION', 'ALCOHOL_LEVEL'].forEach(type => {
           const observation = adapter.createObservation({
             context: assignmentOne, observationType: type,
-            sequenceState: A.DeterministicSequenceState.NORMAL, observedAt: new Date(5000)
+            sequenceState: type === 'ALCOHOL_LEVEL'
+              ? A.DeterministicSequenceState.READY
+              : A.DeterministicSequenceState.NORMAL,
+            observedAt: new Date(5000)
           });
           const signal = R.observationToRiskSignal(observation);
           const expectedReason = type === 'ALCOHOL_LEVEL'
-            ? 'NO_RISK_RULE_CONFIGURED'
+            ? 'ALCOHOL_READY_NO_DECISION'
             : 'INCAPACITATION_NO_DECISION_QUALITY_INVALID';
           assert(signal.reason === expectedReason && !signal.shouldCreateRisk,
-            `${type} NORMAL observation must not create a RiskEvent`);
+            `${type} non-risk observation must not create a RiskEvent`);
         });
 
         output.textContent = 'PASS\nNormal, completed restart, interrupted restart, stale callback, assignment isolation, unsupported types';

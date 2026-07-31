@@ -158,7 +158,7 @@
 
     <section class="driver-test-panel" aria-labelledby="driverTestTitle">
       <h2 id="driverTestTitle" class="panel-title">Common Driver State Observation</h2>
-      <p class="panel-copy">DROWSINESS와 INCAPACITATION simulation candidate를 Deterministic Test Observation으로만 검증합니다. 운영 판정 기준이 아닙니다.</p>
+      <p class="panel-copy">Driver State simulation candidate를 Deterministic Test Observation으로만 검증합니다. 실제 법적 기준 또는 운영 판정 기준이 아닙니다.</p>
       <form id="driverStateTestForm">
         <div class="driver-form-grid">
           <label class="driver-field">Vehicle Type
@@ -181,6 +181,7 @@
           <button class="button button-primary" type="submit">Deterministic sequence 실행</button>
           <button id="drowsinessTestButton" class="button button-secondary" type="submit">DROWSINESS TEST</button>
           <button id="incapacitationTestButton" class="button button-secondary" type="submit">INCAPACITATION TEST</button>
+          <button id="alcoholTestButton" class="button button-secondary" type="submit">ALCOHOL TEST</button>
         </div>
       </form>
       <div id="driverSequenceStatus" class="driver-sequence">NORMAL → ENTRY_PENDING → RISK_CONFIRMED → RISK_MAINTAINED → CLEAR_PENDING → CLEAR</div>
@@ -196,6 +197,14 @@
         <article class="driver-output"><h3>Quality Valid</h3><pre id="driverQualityValid">-</pre></article>
         <article class="driver-output"><h3>Vehicle Moving</h3><pre id="driverVehicleMoving">-</pre></article>
         <article class="driver-output"><h3>Runtime Policy</h3><pre>SIMULATION · SENSOR DISCONNECTED · NOT FOR OPERATIONAL USE</pre></article>
+        <article class="driver-output"><h3>Alcohol Measurement Mode</h3><pre id="driverAlcoholMeasurementMode">-</pre></article>
+        <article class="driver-output"><h3>Alcohol Measurement Status</h3><pre id="driverAlcoholMeasurementStatus">-</pre></article>
+        <article class="driver-output"><h3>Alcohol Raw Value / Unit</h3><pre><span id="driverAlcoholRawValue">-</span> <span id="driverAlcoholUnit">-</span></pre></article>
+        <article class="driver-output"><h3>Alcohol Policy Decision</h3><pre id="driverAlcoholPolicyDecision">-</pre></article>
+        <article class="driver-output"><h3>Retry Count</h3><pre id="driverAlcoholRetryCount">-</pre></article>
+        <article class="driver-output"><h3>Identity Verified</h3><pre id="driverAlcoholIdentityVerified">-</pre></article>
+        <article class="driver-output"><h3>Calibration Status</h3><pre id="driverAlcoholCalibrationStatus">-</pre></article>
+        <article class="driver-output"><h3>Sample Quality</h3><pre id="driverAlcoholSampleQuality">-</pre></article>
       </div>
     </section>
 

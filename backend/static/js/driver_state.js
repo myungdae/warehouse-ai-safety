@@ -127,9 +127,18 @@
             simulation: input.simulation,
             sensorConnected: input.sensorConnected,
             measurementStatus,
+            measurementMode: input.measurementMode || null,
+            sampleId: input.sampleId || null,
+            attemptNumber: input.attemptNumber ?? null,
+            identityVerified: input.identityVerified ?? null,
+            sampleQuality: input.sampleQuality ?? null,
+            calibrationStatus: input.calibrationStatus || null,
+            bypassSuspected: input.bypassSuspected ?? null,
             sampleWindowMs,
             algorithmVersion: requireNonEmptyString(input.algorithmVersion, 'algorithmVersion'),
             configurationVersion: requireNonEmptyString(input.configurationVersion, 'configurationVersion'),
+            policyVersion: input.policyVersion || null,
+            operationalUseAllowed: input.operationalUseAllowed ?? null,
             metrics: input.metrics || {},
             quality: input.quality || {},
             policy: input.policy || {}
@@ -168,7 +177,8 @@
             camera: new global.DriverSensorAdapters.DriverCameraAdapter(),
             alcohol: new global.DriverSensorAdapters.AlcoholSensorAdapter(),
             controls: new global.DriverSensorAdapters.VehicleControlInputAdapter(),
-            deterministic: new global.DriverSensorAdapters.DeterministicDriverTestAdapter()
+            deterministic: new global.DriverSensorAdapters.DeterministicDriverTestAdapter(),
+            deterministicAlcohol: new global.DriverSensorAdapters.DeterministicAlcoholTestAdapter()
         };
         const contextOutput = document.getElementById('vehicleContextOutput');
         const targetOutput = document.getElementById('driverTargetId');
@@ -182,6 +192,15 @@
         const compositeCountOutput = document.getElementById('driverCompositeSignalCount');
         const qualityValidOutput = document.getElementById('driverQualityValid');
         const vehicleMovingOutput = document.getElementById('driverVehicleMoving');
+        const alcoholModeOutput = document.getElementById('driverAlcoholMeasurementMode');
+        const alcoholStatusOutput = document.getElementById('driverAlcoholMeasurementStatus');
+        const alcoholRawValueOutput = document.getElementById('driverAlcoholRawValue');
+        const alcoholUnitOutput = document.getElementById('driverAlcoholUnit');
+        const alcoholPolicyOutput = document.getElementById('driverAlcoholPolicyDecision');
+        const alcoholRetryOutput = document.getElementById('driverAlcoholRetryCount');
+        const alcoholIdentityOutput = document.getElementById('driverAlcoholIdentityVerified');
+        const alcoholCalibrationOutput = document.getElementById('driverAlcoholCalibrationStatus');
+        const alcoholQualityOutput = document.getElementById('driverAlcoholSampleQuality');
         const riskEventStateMachine = global.DriverRiskRuntime
             ? new global.DriverRiskRuntime.RiskEventStateMachine()
             : null;
@@ -205,7 +224,10 @@
                 driverId: document.getElementById('driverId').value,
                 driverAssignmentId: document.getElementById('driverAssignmentId').value,
                 capabilities: {},
-                sensorBindings: { deterministic: adapters.deterministic.adapterId }
+                sensorBindings: {
+                    deterministic: adapters.deterministic.adapterId,
+                    deterministicAlcohol: adapters.deterministicAlcohol.adapterId
+                }
             });
         }
 
@@ -241,12 +263,16 @@
                 ? ObservationType.DROWSINESS
                 : (submitter && submitter.id === 'incapacitationTestButton'
                     ? ObservationType.INCAPACITATION
-                    : document.getElementById('driverObservationType').value);
+                    : (submitter && submitter.id === 'alcoholTestButton'
+                        ? ObservationType.ALCOHOL_LEVEL
+                        : document.getElementById('driverObservationType').value));
             const previousEventType = sequenceRunState.observationType === ObservationType.DROWSINESS
                 ? 'DROWSINESS'
                 : (sequenceRunState.observationType === ObservationType.INCAPACITATION
                     ? 'DRIVER_INCAPACITATION'
-                    : null);
+                    : (sequenceRunState.observationType === ObservationType.ALCOHOL_LEVEL
+                        ? 'ALCOHOL_POLICY_VIOLATION'
+                        : null));
             if (
                 previousEventType &&
                 sequenceRunState.targetId &&
@@ -255,8 +281,10 @@
                 riskEventStateMachine.clear(previousEventType, sequenceRunState.targetId, new Date());
                 if (sequenceRunState.observationType === ObservationType.DROWSINESS) {
                     global.DriverRiskRuntime.resetDrowsinessRiskState(sequenceRunState.targetId);
-                } else {
+                } else if (sequenceRunState.observationType === ObservationType.INCAPACITATION) {
                     global.DriverRiskRuntime.resetIncapacitationRiskState(sequenceRunState.targetId);
+                } else {
+                    global.DriverRiskRuntime.resetAlcoholRiskState(sequenceRunState.targetId);
                 }
             }
             sequenceRunState.targetId = context.targetId;
@@ -265,6 +293,8 @@
                 global.DriverRiskRuntime.resetDrowsinessRiskState(context.targetId);
             } else if (observationType === ObservationType.INCAPACITATION && global.DriverRiskRuntime) {
                 global.DriverRiskRuntime.resetIncapacitationRiskState(context.targetId);
+            } else if (observationType === ObservationType.ALCOHOL_LEVEL && global.DriverRiskRuntime) {
+                global.DriverRiskRuntime.resetAlcoholRiskState(context.targetId);
             }
             riskOutput.textContent = '현재 실행의 RiskSignal 대기 중';
             eventOutput.textContent = '[]';
@@ -273,8 +303,16 @@
             compositeCountOutput.textContent = '-';
             qualityValidOutput.textContent = '-';
             vehicleMovingOutput.textContent = '-';
+            [
+                alcoholModeOutput, alcoholStatusOutput, alcoholRawValueOutput, alcoholUnitOutput,
+                alcoholPolicyOutput, alcoholRetryOutput, alcoholIdentityOutput,
+                alcoholCalibrationOutput, alcoholQualityOutput
+            ].forEach(output => { if (output) output.textContent = '-'; });
             sequenceOutput.textContent = 'STARTING';
-            const observations = adapters.deterministic.createSequence({
+            const deterministicAdapter = observationType === ObservationType.ALCOHOL_LEVEL
+                ? adapters.deterministicAlcohol
+                : adapters.deterministic;
+            const observations = deterministicAdapter.createSequence({
                 context,
                 observationType,
                 runId: sequenceRunState.runId
@@ -292,12 +330,29 @@
                     qualityValidOutput.textContent = String(observationJson.value.qualityValid);
                     vehicleMovingOutput.textContent = String(observationJson.value.vehicleMoving);
                 }
+                if (observationType === ObservationType.ALCOHOL_LEVEL) {
+                    alcoholModeOutput.textContent = observationJson.value.measurementMode;
+                    alcoholStatusOutput.textContent = observationJson.value.measurementStatus;
+                    alcoholRawValueOutput.textContent = String(observationJson.value.rawValue);
+                    alcoholUnitOutput.textContent = observationJson.value.unit;
+                    alcoholRetryOutput.textContent = String(observationJson.value.retryCount);
+                    alcoholIdentityOutput.textContent = String(observationJson.value.identityVerified);
+                    alcoholCalibrationOutput.textContent = observationJson.value.calibrationStatus;
+                    alcoholQualityOutput.textContent = String(observationJson.value.sampleQuality);
+                }
                 if (
-                    [ObservationType.DROWSINESS, ObservationType.INCAPACITATION].includes(observationType) &&
+                    [
+                        ObservationType.DROWSINESS,
+                        ObservationType.INCAPACITATION,
+                        ObservationType.ALCOHOL_LEVEL
+                    ].includes(observationType) &&
                     riskEventStateMachine
                 ) {
                     const riskSignal = global.DriverRiskRuntime.observationToRiskSignal(observations[index]);
                     riskOutput.textContent = JSON.stringify(riskSignal, null, 2);
+                    if (observationType === ObservationType.ALCOHOL_LEVEL) {
+                        alcoholPolicyOutput.textContent = riskSignal.policyDecision || 'NO_DECISION';
+                    }
                     let riskEvent = null;
                     if (riskSignal.shouldCreateRisk) {
                         riskEvent = riskEventStateMachine.observe(riskSignal.eventInput, observations[index].observedAt);
@@ -308,7 +363,9 @@
                     } else if (riskSignal.shouldClearRisk) {
                         const eventType = observationType === ObservationType.DROWSINESS
                             ? 'DROWSINESS'
-                            : 'DRIVER_INCAPACITATION';
+                            : (observationType === ObservationType.INCAPACITATION
+                                ? 'DRIVER_INCAPACITATION'
+                                : 'ALCOHOL_POLICY_VIOLATION');
                         riskEvent = riskEventStateMachine.clear(
                             eventType,
                             observations[index].targetId,

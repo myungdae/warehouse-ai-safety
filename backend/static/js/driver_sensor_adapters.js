@@ -11,12 +11,24 @@
         QUALITY_VALID: 'QUALITY_VALID',
         COMPOSITE_PENDING: 'COMPOSITE_PENDING',
         ENTRY_PENDING: 'ENTRY_PENDING',
+        NEW: 'NEW',
+        ACTIVE: 'ACTIVE',
         RISK_CONFIRMED: 'RISK_CONFIRMED',
         RISK_MAINTAINED: 'RISK_MAINTAINED',
         ACKNOWLEDGED: 'ACKNOWLEDGED',
         RECOVERY_PENDING: 'RECOVERY_PENDING',
         CLEAR_PENDING: 'CLEAR_PENDING',
-        CLEAR: 'CLEAR'
+        CLEAR: 'CLEAR',
+        READY: 'READY',
+        WARMING_UP: 'WARMING_UP',
+        MEASURING: 'MEASURING',
+        VALID_OVER_THRESHOLD: 'VALID_OVER_THRESHOLD',
+        VALID_CLEAR: 'VALID_CLEAR',
+        CLEARED: 'CLEARED',
+        FAILED: 'FAILED',
+        IDENTITY_UNVERIFIED: 'IDENTITY_UNVERIFIED',
+        BYPASS_SUSPECTED: 'BYPASS_SUSPECTED',
+        IN_OPERATION_OVER_THRESHOLD: 'IN_OPERATION_OVER_THRESHOLD'
     });
     const DrowsinessSequence = Object.freeze([
         DeterministicSequenceState.NORMAL,
@@ -35,6 +47,24 @@
         DeterministicSequenceState.ACKNOWLEDGED,
         DeterministicSequenceState.RECOVERY_PENDING,
         DeterministicSequenceState.CLEAR
+    ]);
+    const AlcoholSequence = Object.freeze([
+        DeterministicSequenceState.READY,
+        DeterministicSequenceState.WARMING_UP,
+        DeterministicSequenceState.MEASURING,
+        DeterministicSequenceState.VALID_OVER_THRESHOLD,
+        DeterministicSequenceState.NEW,
+        DeterministicSequenceState.ACTIVE,
+        DeterministicSequenceState.ACKNOWLEDGED,
+        DeterministicSequenceState.VALID_CLEAR,
+        DeterministicSequenceState.CLEARED
+    ]);
+    const AlcoholObservationStates = Object.freeze([
+        ...AlcoholSequence,
+        DeterministicSequenceState.FAILED,
+        DeterministicSequenceState.IDENTITY_UNVERIFIED,
+        DeterministicSequenceState.BYPASS_SUSPECTED,
+        DeterministicSequenceState.IN_OPERATION_OVER_THRESHOLD
     ]);
     const DeterministicSequence = DrowsinessSequence;
 
@@ -74,7 +104,7 @@
             }
             const sequence = observationType === 'INCAPACITATION'
                 ? IncapacitationSequence
-                : DrowsinessSequence;
+                : (observationType === 'ALCOHOL_LEVEL' ? AlcoholObservationStates : DrowsinessSequence);
             if (!sequence.includes(sequenceState)) {
                 throw new RangeError(`Unsupported deterministic sequence state: ${sequenceState}`);
             }
@@ -99,9 +129,46 @@
                 vehicleMoving: true,
                 qualityValid: sequenceState !== DeterministicSequenceState.NORMAL
             };
+            const alcoholRule = global.DriverStateConfig.alcohol;
+            const alcoholHighStates = [
+                DeterministicSequenceState.VALID_OVER_THRESHOLD,
+                DeterministicSequenceState.NEW,
+                DeterministicSequenceState.ACTIVE,
+                DeterministicSequenceState.ACKNOWLEDGED
+            ];
+            const alcoholStatus = [
+                DeterministicSequenceState.VALID_OVER_THRESHOLD,
+                DeterministicSequenceState.NEW,
+                DeterministicSequenceState.ACTIVE,
+                DeterministicSequenceState.ACKNOWLEDGED,
+                DeterministicSequenceState.VALID_CLEAR,
+                DeterministicSequenceState.CLEARED,
+                DeterministicSequenceState.IDENTITY_UNVERIFIED,
+                DeterministicSequenceState.BYPASS_SUSPECTED,
+                DeterministicSequenceState.IN_OPERATION_OVER_THRESHOLD
+            ].includes(sequenceState) ? 'VALID' : sequenceState;
+            const alcoholValue = {
+                rawValue: alcoholHighStates.includes(sequenceState) || sequenceState === DeterministicSequenceState.IN_OPERATION_OVER_THRESHOLD
+                    ? alcoholRule.entryThreshold
+                    : 0,
+                unit: alcoholRule.unit,
+                measurementMode: sequenceState === DeterministicSequenceState.IN_OPERATION_OVER_THRESHOLD
+                    ? 'IN_OPERATION'
+                    : 'PRE_START',
+                measurementStatus: alcoholStatus,
+                sampleId: `deterministic-alcohol-${runId || 'standalone'}-${sequenceIndex}`,
+                attemptNumber: 1,
+                retryCount: 0,
+                identityVerified: sequenceState !== DeterministicSequenceState.IDENTITY_UNVERIFIED,
+                sampleQuality: 1,
+                calibrationStatus: 'VALID',
+                bypassSuspected: sequenceState === DeterministicSequenceState.BYPASS_SUSPECTED
+            };
             const value = observationType === 'DROWSINESS'
                 ? drowsinessState
-                : (observationType === 'INCAPACITATION' ? incapacitationValue : sequenceState);
+                : (observationType === 'INCAPACITATION'
+                    ? incapacitationValue
+                    : (observationType === 'ALCOHOL_LEVEL' ? alcoholValue : sequenceState));
             return createDriverObservation({
                 context,
                 observationType,
@@ -118,10 +185,19 @@
                     source: 'deterministic-test',
                     simulation: true,
                     sensorConnected: false,
-                    measurementStatus: sequenceState,
+                    measurementStatus: observationType === 'ALCOHOL_LEVEL' ? alcoholStatus : sequenceState,
+                    measurementMode: observationType === 'ALCOHOL_LEVEL' ? alcoholValue.measurementMode : null,
+                    sampleId: observationType === 'ALCOHOL_LEVEL' ? alcoholValue.sampleId : null,
+                    attemptNumber: observationType === 'ALCOHOL_LEVEL' ? alcoholValue.attemptNumber : null,
+                    identityVerified: observationType === 'ALCOHOL_LEVEL' ? alcoholValue.identityVerified : null,
+                    sampleQuality: observationType === 'ALCOHOL_LEVEL' ? alcoholValue.sampleQuality : null,
+                    calibrationStatus: observationType === 'ALCOHOL_LEVEL' ? alcoholValue.calibrationStatus : null,
+                    bypassSuspected: observationType === 'ALCOHOL_LEVEL' ? alcoholValue.bypassSuspected : null,
                     sampleWindowMs: 0,
                     algorithmVersion: 'deterministic-sequence-v1',
                     configurationVersion: global.DriverStateConfig.configurationVersion,
+                    policyVersion: observationType === 'ALCOHOL_LEVEL' ? alcoholRule.policyVersion : null,
+                    operationalUseAllowed: false,
                     metrics: {
                         sequenceState,
                         sequenceIndex,
@@ -146,8 +222,9 @@
             const interval = global.DriverStateConfig.simulation.sequenceIntervalMs;
             const sequence = observationType === 'INCAPACITATION'
                 ? IncapacitationSequence
-                : DrowsinessSequence;
+                : (observationType === 'ALCOHOL_LEVEL' ? AlcoholSequence : DrowsinessSequence);
             const incapacitationOffsets = [0, 250, 500, 1000, 1250, 1500, 1750, 2250];
+            const alcoholOffsets = [0, 100, 200, 300, 600, 750, 900, 1050, 1350];
             return sequence.map((sequenceState, index) => this.createObservation({
                 context,
                 observationType,
@@ -155,10 +232,25 @@
                 observedAt: new Date(startedAt + (
                     observationType === 'INCAPACITATION'
                         ? incapacitationOffsets[index]
-                        : (index * interval)
+                        : (observationType === 'ALCOHOL_LEVEL' ? alcoholOffsets[index] : (index * interval))
                 )),
                 runId
             }));
+        }
+    }
+
+    class DeterministicAlcoholTestAdapter extends DeterministicDriverTestAdapter {
+        constructor() {
+            super();
+            this.adapterId = 'deterministic-alcohol-test';
+            this.sensorType = 'DETERMINISTIC_ALCOHOL_TEST';
+        }
+
+        createObservation(input) {
+            if (input.observationType !== 'ALCOHOL_LEVEL') {
+                throw new RangeError('DeterministicAlcoholTestAdapter only supports ALCOHOL_LEVEL');
+            }
+            return super.createObservation(input);
         }
     }
 
@@ -167,9 +259,12 @@
         AlcoholSensorAdapter,
         VehicleControlInputAdapter,
         DeterministicDriverTestAdapter,
+        DeterministicAlcoholTestAdapter,
         DeterministicSequenceState,
         DeterministicSequence,
         DrowsinessSequence,
-        IncapacitationSequence
+        IncapacitationSequence,
+        AlcoholSequence,
+        AlcoholObservationStates
     });
 }(window));

@@ -146,8 +146,9 @@
           'INCAPACITATION must not clear a coexisting DROWSINESS event');
 
         const alcohol = adapter.createObservation({ context: ctx, observationType: O.ALCOHOL_LEVEL,
-          sequenceState: A.DeterministicSequenceState.NORMAL, observedAt: new Date(6000) });
-        assert(R.observationToRiskSignal(alcohol).reason === 'NO_RISK_RULE_CONFIGURED', 'Alcohol must remain unconfigured');
+          sequenceState: A.DeterministicSequenceState.READY, observedAt: new Date(6000) });
+        assert(R.observationToRiskSignal(alcohol).reason === 'ALCOHOL_READY_NO_DECISION',
+          'Alcohol READY observation must not create risk');
         assert(eventId !== history[0].eventId, 'Separate runs must not reuse eventId');
         result.textContent = 'PASS'; document.title = 'PASS';
       } catch (error) {

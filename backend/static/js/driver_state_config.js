@@ -11,7 +11,7 @@
     });
 
     global.DriverStateConfig = Object.freeze({
-        configurationVersion: 'driver-state-simulation-v3',
+        configurationVersion: 'driver-state-simulation-v4',
         drowsiness: Object.freeze({
             enterState: 'DROWSY',
             clearState: 'NORMAL',
@@ -30,10 +30,25 @@
             status: 'UNVALIDATED_DETERMINISTIC_SIMULATION_CANDIDATE'
         }),
         alcohol: Object.freeze({
-            ...candidateRule,
+            configurationVersion: 'driver-state-simulation-v4',
+            policyVersion: 'alcohol-deterministic-policy-v1',
+            unit: 'simulation-level',
+            entryThreshold: 0.05,
+            clearThreshold: 0.02,
+            sustainMs: 300,
+            clearSustainMs: 300,
+            modePolicies: Object.freeze({
+                PRE_START: 'BLOCK_START',
+                IN_OPERATION: 'SAFE_STOP_REQUEST'
+            }),
+            minimumSampleQuality: 0.8,
+            requireIdentityVerified: true,
+            requireCalibrationValid: true,
+            maximumRetryCount: 2,
+            jurisdiction: 'UNSPECIFIED_SIMULATION',
+            operationalUseAllowed: false,
             legalThresholdConfigured: false,
-            jurisdiction: null,
-            measurementUnit: null
+            status: 'UNVALIDATED_DETERMINISTIC_SIMULATION_CANDIDATE'
         }),
         quality: Object.freeze({
             minimumConfidence: null,
