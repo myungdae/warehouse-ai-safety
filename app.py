@@ -5,7 +5,7 @@ Real-time sensor monitoring dashboard + Drone Inventory Intelligence
 + Agentic AI Orchestrator (완전 자동화 재고 파이프라인)
 """
 
-from flask import Flask, render_template, send_from_directory, request, jsonify, send_file
+from flask import Flask, render_template, send_from_directory, request, jsonify, send_file, redirect, url_for
 import os
 import smtplib
 import json
@@ -226,6 +226,22 @@ REPORT_TO     = os.getenv('REPORT_TO',     '')
 @app.route('/')
 def index():
     return render_template('warehouse_digital_twin.html')
+
+@app.route('/warehouse')
+def warehouse():
+    return redirect(url_for('index'))
+
+@app.route('/driver-safety')
+def driver_safety():
+    return render_template('driver_safety.html')
+
+@app.route('/driver-safety.html')
+def driver_safety_legacy():
+    return redirect(url_for('driver_safety'))
+
+@app.route('/truck-ontology')
+def truck_ontology():
+    return redirect(url_for('landing', _anchor='truck-ontology'))
 
 @app.route('/drone')
 def drone_inventory():

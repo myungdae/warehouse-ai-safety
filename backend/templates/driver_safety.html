@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="data:,">
+  <title>Driver Safety · IMC Agentic AI</title>
+  <style>
+    :root {
+      --bg: #070b14;
+      --panel: #0d1424;
+      --panel-soft: #111a2d;
+      --line: rgba(148, 163, 184, 0.18);
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --cyan: #00d4ff;
+      --orange: #f97316;
+      --green: #22c55e;
+      --yellow: #facc15;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 15% 0%, rgba(0, 212, 255, 0.10), transparent 32%),
+        radial-gradient(circle at 90% 15%, rgba(249, 115, 22, 0.08), transparent 28%),
+        var(--bg);
+      font-family: Inter, Pretendard, "Segoe UI", sans-serif;
+    }
+    a { color: inherit; text-decoration: none; }
+    .shell { width: min(1120px, calc(100% - 40px)); margin: 0 auto; padding-bottom: 64px; }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 22px 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .brand { display: flex; align-items: center; gap: 12px; font-weight: 800; letter-spacing: .02em; }
+    .brand-mark {
+      display: grid;
+      width: 38px;
+      height: 38px;
+      place-items: center;
+      border: 1px solid rgba(0, 212, 255, .35);
+      border-radius: 10px;
+      color: var(--cyan);
+      background: rgba(0, 212, 255, .08);
+    }
+    .nav-link { color: var(--muted); font-size: 14px; }
+    .nav-link:hover { color: var(--cyan); }
+    .hero { padding: 68px 0 38px; }
+    .eyebrow { color: var(--cyan); font-size: 12px; font-weight: 800; letter-spacing: .16em; }
+    h1 { margin: 15px 0 16px; font-size: clamp(36px, 6vw, 64px); line-height: 1.05; }
+    .lead { max-width: 760px; color: #aab6c5; font-size: 17px; line-height: 1.8; }
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      margin-top: 22px;
+      padding: 9px 13px;
+      border: 1px solid rgba(250, 204, 21, .28);
+      border-radius: 999px;
+      color: #fde68a;
+      background: rgba(250, 204, 21, .07);
+      font-size: 13px;
+    }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--yellow); }
+    .tabs { display: flex; gap: 8px; margin: 24px 0 18px; flex-wrap: wrap; }
+    .tab-button {
+      padding: 10px 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--muted);
+      background: var(--panel);
+      font: inherit;
+      cursor: pointer;
+    }
+    .tab-button:hover, .tab-button.active {
+      border-color: rgba(0, 212, 255, .45);
+      color: var(--cyan);
+      background: rgba(0, 212, 255, .08);
+    }
+    .tab-panel {
+      display: none;
+      min-height: 330px;
+      padding: 30px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: linear-gradient(145deg, rgba(17, 26, 45, .96), rgba(10, 16, 29, .96));
+    }
+    .tab-panel.active { display: block; }
+    .panel-title { margin: 0 0 8px; font-size: 22px; }
+    .panel-copy { margin: 0 0 24px; color: var(--muted); line-height: 1.7; }
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    .card { padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: rgba(7, 11, 20, .55); }
+    .card-label { color: var(--cyan); font-size: 11px; font-weight: 800; letter-spacing: .1em; }
+    .card h3 { margin: 10px 0 8px; font-size: 16px; }
+    .card p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.65; }
+    .flow { display: flex; align-items: stretch; gap: 10px; overflow-x: auto; padding-bottom: 8px; }
+    .flow-step { min-width: 155px; flex: 1; padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: rgba(7, 11, 20, .55); }
+    .flow-arrow { display: grid; place-items: center; color: var(--cyan); }
+    .flow-step strong { display: block; margin-bottom: 7px; font-size: 13px; }
+    .flow-step span { color: var(--muted); font-size: 12px; line-height: 1.5; }
+    .checklist { display: grid; gap: 10px; }
+    .check {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: rgba(7, 11, 20, .5);
+    }
+    .check-state { flex: 0 0 auto; color: #fca5a5; font-size: 13px; }
+    .actions { display: flex; gap: 12px; margin-top: 24px; flex-wrap: wrap; }
+    .button { padding: 12px 18px; border-radius: 9px; font-weight: 700; font-size: 14px; }
+    .button-primary { color: #061018; background: linear-gradient(135deg, var(--cyan), #38bdf8); }
+    .button-secondary { border: 1px solid var(--line); color: #bdc7d5; background: var(--panel-soft); }
+    .note { margin-top: 18px; color: #718096; font-size: 12px; line-height: 1.6; }
+    @media (max-width: 760px) {
+      .shell { width: min(100% - 24px, 1120px); }
+      .hero { padding-top: 44px; }
+      .grid { grid-template-columns: 1fr; }
+      .flow { flex-direction: column; }
+      .flow-arrow { transform: rotate(90deg); }
+      .tab-panel { padding: 20px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="header">
+      <a class="brand" href="{{ url_for('landing') }}">
+        <span class="brand-mark">⚡</span>
+        <span>IMC Agentic AI</span>
+      </a>
+      <a class="nav-link" href="{{ url_for('landing') }}">← 모듈 목록</a>
+    </header>
+
+    <section class="hero">
+      <div class="eyebrow">MODULE 02 · DRIVER SAFETY</div>
+      <h1>졸음·졸도 감지<br>Operational Ontology</h1>
+      <p class="lead">
+        이 페이지는 저장소에 정의된 Driver Safety 개념과 현재 구현 준비 상태를 분리해 보여줍니다.
+        카메라 입력, 얼굴 랜드마크, 졸음 판정 모델은 현재 저장소에 없으며 실제 감지 기능으로 표시하지 않습니다.
+      </p>
+      <div class="status"><span class="status-dot"></span> 설계 문서 단계 · 감지 런타임 미구현</div>
+    </section>
+
+    <nav class="tabs" aria-label="Driver Safety 정보">
+      <button class="tab-button active" type="button" data-tab="overview">구현 현황</button>
+      <button class="tab-button" type="button" data-tab="ontology">Ontology 흐름</button>
+      <button class="tab-button" type="button" data-tab="integration">연동 준비</button>
+    </nav>
+
+    <section id="overview" class="tab-panel active">
+      <h2 class="panel-title">현재 저장소에서 확인된 범위</h2>
+      <p class="panel-copy">랜딩 페이지의 개념 정의와 기존 창고 위험 이벤트 상태 머신을 기준으로 정리했습니다.</p>
+      <div class="grid">
+        <article class="card">
+          <div class="card-label">AVAILABLE</div>
+          <h3>이벤트 상태 모델</h3>
+          <p>NEW, ACTIVE, ACKNOWLEDGED, CLEARED 상태와 JSON 직렬화 구조가 창고 안전 콘솔에 구현되어 있습니다.</p>
+        </article>
+        <article class="card">
+          <div class="card-label">AVAILABLE</div>
+          <h3>브라우저 음성 경고</h3>
+          <p>Web Speech API 기반 한국어 경고가 창고 위험 이벤트에 연결되어 있습니다.</p>
+        </article>
+        <article class="card">
+          <div class="card-label">NOT IMPLEMENTED</div>
+          <h3>졸음·졸도 판정</h3>
+          <p>카메라, MediaPipe, EAR/PERCLOS, 얼굴 자세 및 졸도 분류 알고리즘은 아직 없습니다.</p>
+        </article>
+      </div>
+      <div class="actions">
+        <a class="button button-primary" href="{{ url_for('index') }}">기존 창고 안전 콘솔 열기</a>
+        <a class="button button-secondary" href="{{ url_for('landing') }}">모듈 목록으로 돌아가기</a>
+      </div>
+    </section>
+
+    <section id="ontology" class="tab-panel">
+      <h2 class="panel-title">랜딩 페이지에 정의된 의미 흐름</h2>
+      <p class="panel-copy">아래 흐름은 현재 설계 개념이며 실행 중인 졸음 판정 파이프라인이 아닙니다.</p>
+      <div class="flow">
+        <div class="flow-step"><strong>Observation</strong><span>EyeClosureObservation</span></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step"><strong>Event</strong><span>EyeClosureEvent</span></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step"><strong>State</strong><span>DrowsinessSuspectedState</span></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step"><strong>Risk</strong><span>RiskLevel2_Warn</span></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step"><strong>Action</strong><span>SpeakerWarningAction</span></div>
+      </div>
+      <p class="note">실제 적용 전에는 관측 품질, 시간 누적, 오탐 억제, 운전자 확인 및 센서 장애 정책이 추가되어야 합니다.</p>
+    </section>
+
+    <section id="integration" class="tab-panel">
+      <h2 class="panel-title">실제 기능 연결에 필요한 미구현 항목</h2>
+      <p class="panel-copy">현재 코드에 없는 항목을 구현 완료처럼 표시하지 않습니다.</p>
+      <div class="checklist">
+        <div class="check"><span>카메라 또는 RTSP 프레임 입력</span><span class="check-state">미구현</span></div>
+        <div class="check"><span>얼굴·눈 랜드마크 및 입력 품질 판단</span><span class="check-state">미구현</span></div>
+        <div class="check"><span>EAR/PERCLOS 또는 학습 모델 기반 졸음 판정</span><span class="check-state">미구현</span></div>
+        <div class="check"><span>졸음과 졸도 상태 구분</span><span class="check-state">미구현</span></div>
+        <div class="check"><span>Driver Safety 이벤트 API 및 영속 저장</span><span class="check-state">미구현</span></div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const tabButtons = document.querySelectorAll('.tab-button');
+    const tabPanels = document.querySelectorAll('.tab-panel');
+
+    tabButtons.forEach(button => {
+      button.addEventListener('click', () => {
+        const targetId = button.dataset.tab;
+        tabButtons.forEach(item => item.classList.toggle('active', item === button));
+        tabPanels.forEach(panel => panel.classList.toggle('active', panel.id === targetId));
+      });
+    });
+  </script>
+</body>
+</html>
