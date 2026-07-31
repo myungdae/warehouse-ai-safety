@@ -239,6 +239,7 @@ function showDigitalTwin() {
                         <button class="btn-control btn-imu" onclick="triggerScenario4()">📍 시나리오 4</button>
                         <button class="btn-control btn-imu" onclick="triggerAccelerationTest()">⚡ 급가속 테스트</button>
                         <button class="btn-control btn-danger" onclick="triggerBrakingTest()">🛑 급제동 테스트</button>
+                        <button class="btn-control btn-info" onclick="triggerTurnRateTest()">🔄 급회전 테스트</button>
                     </div>
                 </div>
                 <div class="map-canvas-large" id="digitalTwinMap">
@@ -665,9 +666,17 @@ const BRAKING_RISK_RULE = Object.freeze({
     MINIMUM_DURATION_MS: 150
 });
 
+const TURN_RATE_RISK_RULE = Object.freeze({
+    ENTRY_THRESHOLD_DPS: 45,
+    CLEAR_THRESHOLD_DPS: 30,
+    MINIMUM_DURATION_MS: 150,
+    MINIMUM_SPEED: 0.5
+});
+
 const tiltRiskStates = new Map();
 const accelerationRiskStates = new Map();
 const brakingRiskStates = new Map();
+const turnRateRiskStates = new Map();
 
 function observationToRiskSignal(observation) {
     if (!(observation instanceof SensorObservation)) {
@@ -692,12 +701,103 @@ function observationToRiskSignal(observation) {
         return brakingObservationToRiskSignal(observation);
     }
 
+    if (observation.observationType === ObservationType.TURN_RATE) {
+        return turnRateObservationToRiskSignal(observation);
+    }
+
     return {
         shouldCreateRisk: false,
         shouldClearRisk: false,
         eventInput: null,
         observation: observation.toJSON(),
         reason: 'NO_RISK_RULE_CONFIGURED'
+    };
+}
+
+function turnRateObservationToRiskSignal(observation) {
+    const turnRateDps = Number(observation.value);
+    const speed = Number(observation.metadata.speed);
+    if (!Number.isFinite(turnRateDps) || !Number.isFinite(speed)) {
+        return {
+            shouldCreateRisk: false,
+            shouldClearRisk: false,
+            eventInput: null,
+            observation: observation.toJSON(),
+            reason: 'INVALID_TURN_RATE_VALUE'
+        };
+    }
+
+    const observedAtMs = Date.parse(observation.observedAt);
+    const absoluteTurnRate = Math.abs(turnRateDps);
+    const targetState = turnRateRiskStates.get(observation.targetId) || {
+        thresholdEnteredAt: null,
+        riskActive: false
+    };
+
+    if (targetState.riskActive) {
+        if (
+            absoluteTurnRate <= TURN_RATE_RISK_RULE.CLEAR_THRESHOLD_DPS ||
+            speed < TURN_RATE_RISK_RULE.MINIMUM_SPEED
+        ) {
+            turnRateRiskStates.delete(observation.targetId);
+            return {
+                shouldCreateRisk: false,
+                shouldClearRisk: true,
+                eventInput: null,
+                observation: observation.toJSON(),
+                reason: 'TURN_RATE_CLEARED'
+            };
+        }
+
+        turnRateRiskStates.set(observation.targetId, targetState);
+        return createTurnRateRiskSignal(observation, 'TURN_RATE_RISK_MAINTAINED');
+    }
+
+    if (
+        absoluteTurnRate >= TURN_RATE_RISK_RULE.ENTRY_THRESHOLD_DPS &&
+        speed >= TURN_RATE_RISK_RULE.MINIMUM_SPEED
+    ) {
+        if (targetState.thresholdEnteredAt === null || observedAtMs < targetState.thresholdEnteredAt) {
+            targetState.thresholdEnteredAt = observedAtMs;
+        }
+
+        if (observedAtMs - targetState.thresholdEnteredAt >= TURN_RATE_RISK_RULE.MINIMUM_DURATION_MS) {
+            targetState.riskActive = true;
+            turnRateRiskStates.set(observation.targetId, targetState);
+            return createTurnRateRiskSignal(observation, 'TURN_RATE_RISK_CONFIRMED');
+        }
+
+        turnRateRiskStates.set(observation.targetId, targetState);
+        return {
+            shouldCreateRisk: false,
+            shouldClearRisk: false,
+            eventInput: null,
+            observation: observation.toJSON(),
+            reason: 'TURN_RATE_MINIMUM_DURATION_PENDING'
+        };
+    }
+
+    turnRateRiskStates.delete(observation.targetId);
+    return {
+        shouldCreateRisk: false,
+        shouldClearRisk: false,
+        eventInput: null,
+        observation: observation.toJSON(),
+        reason: 'TURN_RATE_BELOW_ENTRY_THRESHOLD'
+    };
+}
+
+function createTurnRateRiskSignal(observation, reason) {
+    return {
+        shouldCreateRisk: true,
+        shouldClearRisk: false,
+        eventInput: {
+            eventType: 'SHARP_TURN',
+            targetId: observation.targetId,
+            severity: 'MEDIUM'
+        },
+        observation: observation.toJSON(),
+        reason
     };
 }
 
@@ -2050,7 +2150,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // IMU Detection Thresholds
 const IMU_THRESHOLDS = {
-    SHARP_TURN: 45,       // °/s - 급회전
     TILT_WARNING: 15      // ° - 기울기 경고
 };
 
@@ -2061,6 +2160,10 @@ const ACCELERATION_TEST_VALUE_MPS2 = 3.5;
 const brakingTestStates = new Map();
 const BRAKING_TEST_DURATION_MS = 300;
 const BRAKING_TEST_VALUE_MPS2 = -3.5;
+const turnRateTestStates = new Map();
+const TURN_RATE_TEST_DURATION_MS = 300;
+const TURN_RATE_TEST_VALUE_DPS = 60;
+const TURN_RATE_TEST_MINIMUM_SPEED = 1.2;
 
 // Update IMU Data for Forklifts
 function updateIMUData() {
@@ -2092,8 +2195,7 @@ function updateIMUData() {
         f.prevSpeed = f.speed;
         f.lastAccelTime = now;
         
-        // Calculate gyro (angular velocity) - simplified
-        f.gyro = Math.abs(deltaSpeed) * 10; // Simplified rotation rate
+        calculateTurnRate(f, now);
         
         // Simulate tilt based on speed (higher speed = more tilt in turns)
         f.tilt = Math.min(Math.abs(f.speed) * 2, 20);
@@ -2101,10 +2203,47 @@ function updateIMUData() {
         const tiltObservation = createTiltObservation(f, now);
         const accelerationObservation = createAccelerationObservation(f, now);
         const brakingObservation = createBrakingObservation(f, now);
+        const turnRateObservation = createTurnRateObservation(f, now);
+        f.gyro = turnRateObservation.value;
 
         // Detect anomalies
-        detectIMUAnomalies(f, tiltObservation, accelerationObservation, brakingObservation);
+        detectIMUAnomalies(
+            f,
+            tiltObservation,
+            accelerationObservation,
+            brakingObservation,
+            turnRateObservation
+        );
     });
+}
+
+function calculateTurnRate(forklift, observedAtMs = Date.now()) {
+    const currentDirection = Number(forklift.direction);
+    const previousDirection = Number(forklift.previousDirection);
+    const previousTimestamp = Number(forklift.previousTurnTimestamp);
+
+    forklift.turnRatePreviousDirection = Number.isFinite(previousDirection)
+        ? previousDirection
+        : currentDirection;
+
+    if (
+        !Number.isFinite(currentDirection) ||
+        !Number.isFinite(previousDirection) ||
+        !Number.isFinite(previousTimestamp)
+    ) {
+        forklift.calculatedTurnRate = 0;
+    } else {
+        const elapsedSeconds = (observedAtMs - previousTimestamp) / 1000;
+        const rawDelta = currentDirection - previousDirection;
+        const normalizedDelta = ((rawDelta + 540) % 360) - 180;
+        forklift.calculatedTurnRate = elapsedSeconds >= 0.001
+            ? normalizedDelta / elapsedSeconds
+            : 0;
+    }
+
+    forklift.previousDirection = currentDirection;
+    forklift.previousTurnTimestamp = observedAtMs;
+    return forklift.calculatedTurnRate;
 }
 
 function createTiltObservation(forklift, observedAtMs = Date.now()) {
@@ -2158,8 +2297,46 @@ function createBrakingObservation(forklift, observedAtMs = Date.now()) {
     });
 }
 
+function createTurnRateObservation(forklift, observedAtMs = Date.now()) {
+    imuObservationSequence += 1;
+    const imuSensor = sensorData.imu.find(sensor => sensor.forklift === forklift.id);
+    const testState = turnRateTestStates.get(forklift.id);
+    const testElapsedMs = testState ? observedAtMs - testState.startedAt : 0;
+    const turnRate = testState
+        ? (testElapsedMs < TURN_RATE_TEST_DURATION_MS ? TURN_RATE_TEST_VALUE_DPS : 0)
+        : forklift.calculatedTurnRate;
+    const evaluationSpeed = testState && forklift.speed < TURN_RATE_RISK_RULE.MINIMUM_SPEED
+        ? TURN_RATE_TEST_MINIMUM_SPEED
+        : forklift.speed;
+    const turnDirection = turnRate > 0 ? 'RIGHT' : turnRate < 0 ? 'LEFT' : 'STRAIGHT';
+
+    return new SensorObservation({
+        observationId: `turn-rate-${forklift.id}-${observedAtMs}-${imuObservationSequence}`,
+        observationType: ObservationType.TURN_RATE,
+        sensorId: imuSensor ? imuSensor.id : `imu-sim-${forklift.id}`,
+        targetId: forklift.id,
+        value: turnRate,
+        unit: 'degree/second',
+        confidence: 1,
+        observedAt: new Date(observedAtMs).toISOString(),
+        metadata: {
+            source: 'imu-simulation',
+            speed: evaluationSpeed,
+            direction: forklift.direction,
+            previousDirection: forklift.turnRatePreviousDirection,
+            turnDirection
+        }
+    });
+}
+
 // Detect IMU Anomalies
-function detectIMUAnomalies(forklift, tiltObservation, accelerationObservation, brakingObservation) {
+function detectIMUAnomalies(
+    forklift,
+    tiltObservation,
+    accelerationObservation,
+    brakingObservation,
+    turnRateObservation
+) {
     // Hard Acceleration Observation
     const accelerationRiskSignal = observationToRiskSignal(accelerationObservation);
     if (accelerationRiskSignal.shouldCreateRisk) {
@@ -2180,11 +2357,14 @@ function detectIMUAnomalies(forklift, tiltObservation, accelerationObservation, 
         finishBrakingTest(forklift.id, clearedEvent);
     }
     
-    // Sharp Turn
-    if (forklift.gyro > IMU_THRESHOLDS.SHARP_TURN) {
-        handleSharpTurn(forklift);
-    } else {
-        riskEventStateMachine.clear('SHARP_TURN', forklift.id);
+    // Sharp Turn Observation
+    const turnRateRiskSignal = observationToRiskSignal(turnRateObservation);
+    if (turnRateRiskSignal.shouldCreateRisk) {
+        const result = handleSharpTurn(forklift, turnRateRiskSignal.eventInput);
+        notifyTurnRateTestActive(forklift.id, result);
+    } else if (turnRateRiskSignal.shouldClearRisk) {
+        const clearedEvent = riskEventStateMachine.clear('SHARP_TURN', forklift.id);
+        finishTurnRateTest(forklift.id, clearedEvent);
     }
     
     // Dangerous Tilt Observation
@@ -2311,18 +2491,57 @@ function handleHardBraking(forklift, eventInput = {}) {
     return result;
 }
 
+function triggerTurnRateTest() {
+    const forklift = animationState.forklifts.find(item => item.id === 'F-12');
+    if (!forklift) {
+        showNotificationPopup('급회전 테스트 대상 F-12를 찾을 수 없습니다.', 'error');
+        return;
+    }
+
+    if (turnRateTestStates.has(forklift.id)) {
+        showNotificationPopup('급회전 테스트가 이미 실행 중입니다.', 'warning');
+        return;
+    }
+
+    turnRateTestStates.set(forklift.id, {
+        startedAt: Date.now(),
+        activeNotified: false
+    });
+    showNotificationPopup('F-12 급회전 테스트 시작 (+60°/s, 300ms)', 'info');
+    startAnimation();
+}
+
+function notifyTurnRateTestActive(targetId, result) {
+    const testState = turnRateTestStates.get(targetId);
+    if (!testState || testState.activeNotified || !result || result.event.state !== EventState.ACTIVE) {
+        return;
+    }
+
+    testState.activeNotified = true;
+    showNotificationPopup(`SHARP_TURN ACTIVE · ${result.event.eventId}`, 'warning');
+}
+
+function finishTurnRateTest(targetId, clearedEvent) {
+    if (!turnRateTestStates.has(targetId) || !clearedEvent) return;
+
+    turnRateTestStates.delete(targetId);
+    showNotificationPopup(`SHARP_TURN CLEARED · ${clearedEvent.eventId}`, 'success');
+}
+
 // Handle Sharp Turn
-function handleSharpTurn(forklift) {
+function handleSharpTurn(forklift, eventInput = {}) {
     const name = formatForkliftIdForSpeech(forklift.id);
     const result = riskEventStateMachine.observe({
-        eventType: 'SHARP_TURN',
-        targetId: forklift.id,
-        severity: 'MEDIUM',
+        eventType: eventInput.eventType || 'SHARP_TURN',
+        targetId: eventInput.targetId || forklift.id,
+        severity: eventInput.severity || 'MEDIUM',
         speechMessage: `${name} 급회전 주의!`,
         speechPriority: 'normal'
     });
-    if (!result.didSpeak) return;
-    showWarningIndicator(forklift, '🔄 급회전', '#3b82f6');
+    if (result.didSpeak) {
+        showWarningIndicator(forklift, '🔄 급회전', '#3b82f6');
+    }
+    return result;
 }
 
 // Handle Dangerous Tilt
