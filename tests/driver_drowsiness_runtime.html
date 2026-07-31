@@ -17,7 +17,9 @@
   <pre id="lastDriverObservation"></pre><pre id="driverSequenceStatus"></pre>
   <pre id="driverAdapterStatus"></pre><pre id="lastDriverRiskSignal"></pre>
   <pre id="driverRiskEventHistory"></pre><pre id="driverCurrentEventId"></pre>
-  <pre id="driverCurrentEventState"></pre><pre id="result">RUNNING</pre>
+  <pre id="driverCurrentEventState"></pre><pre id="driverCompositeSignalCount"></pre>
+  <pre id="driverQualityValid"></pre><pre id="driverVehicleMoving"></pre>
+  <pre id="result">RUNNING</pre>
   <script src="../backend/static/js/sensor_observation.js"></script>
   <script src="../backend/static/js/driver_state_config.js"></script>
   <script src="../backend/static/js/driver_state.js"></script>
@@ -154,8 +156,11 @@
             sequenceState: A.DeterministicSequenceState.NORMAL, observedAt: new Date(5000)
           });
           const signal = R.observationToRiskSignal(observation);
-          assert(signal.reason === 'NO_RISK_RULE_CONFIGURED' && !signal.shouldCreateRisk,
-            `${type} must not create a RiskEvent`);
+          const expectedReason = type === 'ALCOHOL_LEVEL'
+            ? 'NO_RISK_RULE_CONFIGURED'
+            : 'INCAPACITATION_NO_DECISION_QUALITY_INVALID';
+          assert(signal.reason === expectedReason && !signal.shouldCreateRisk,
+            `${type} NORMAL observation must not create a RiskEvent`);
         });
 
         output.textContent = 'PASS\nNormal, completed restart, interrupted restart, stale callback, assignment isolation, unsupported types';

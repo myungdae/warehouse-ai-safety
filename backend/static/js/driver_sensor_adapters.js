@@ -8,13 +8,35 @@
     const { createDriverObservation, DriverObservationTypes } = global.DriverState;
     const DeterministicSequenceState = Object.freeze({
         NORMAL: 'NORMAL',
+        QUALITY_VALID: 'QUALITY_VALID',
+        COMPOSITE_PENDING: 'COMPOSITE_PENDING',
         ENTRY_PENDING: 'ENTRY_PENDING',
         RISK_CONFIRMED: 'RISK_CONFIRMED',
         RISK_MAINTAINED: 'RISK_MAINTAINED',
+        ACKNOWLEDGED: 'ACKNOWLEDGED',
+        RECOVERY_PENDING: 'RECOVERY_PENDING',
         CLEAR_PENDING: 'CLEAR_PENDING',
         CLEAR: 'CLEAR'
     });
-    const DeterministicSequence = Object.freeze(Object.values(DeterministicSequenceState));
+    const DrowsinessSequence = Object.freeze([
+        DeterministicSequenceState.NORMAL,
+        DeterministicSequenceState.ENTRY_PENDING,
+        DeterministicSequenceState.RISK_CONFIRMED,
+        DeterministicSequenceState.RISK_MAINTAINED,
+        DeterministicSequenceState.CLEAR_PENDING,
+        DeterministicSequenceState.CLEAR
+    ]);
+    const IncapacitationSequence = Object.freeze([
+        DeterministicSequenceState.NORMAL,
+        DeterministicSequenceState.QUALITY_VALID,
+        DeterministicSequenceState.COMPOSITE_PENDING,
+        DeterministicSequenceState.RISK_CONFIRMED,
+        DeterministicSequenceState.RISK_MAINTAINED,
+        DeterministicSequenceState.ACKNOWLEDGED,
+        DeterministicSequenceState.RECOVERY_PENDING,
+        DeterministicSequenceState.CLEAR
+    ]);
+    const DeterministicSequence = DrowsinessSequence;
 
     class DisconnectedDriverAdapter {
         constructor({ adapterId, sensorType }) {
@@ -50,20 +72,43 @@
             if (!DriverObservationTypes.includes(observationType)) {
                 throw new RangeError(`Unsupported deterministic observationType: ${observationType}`);
             }
-            if (!this.sequence.includes(sequenceState)) {
+            const sequence = observationType === 'INCAPACITATION'
+                ? IncapacitationSequence
+                : DrowsinessSequence;
+            if (!sequence.includes(sequenceState)) {
                 throw new RangeError(`Unsupported deterministic sequence state: ${sequenceState}`);
             }
-            const sequenceIndex = this.sequence.indexOf(sequenceState);
+            const sequenceIndex = sequence.indexOf(sequenceState);
             const drowsinessState = (
                 sequenceState === DeterministicSequenceState.ENTRY_PENDING ||
                 sequenceState === DeterministicSequenceState.RISK_CONFIRMED ||
                 sequenceState === DeterministicSequenceState.RISK_MAINTAINED
             ) ? 'DROWSY' : 'NORMAL';
+            const incapacitationRiskState = [
+                DeterministicSequenceState.COMPOSITE_PENDING,
+                DeterministicSequenceState.RISK_CONFIRMED,
+                DeterministicSequenceState.RISK_MAINTAINED,
+                DeterministicSequenceState.ACKNOWLEDGED
+            ].includes(sequenceState);
+            const incapacitationValue = {
+                prolongedEyeClosure: incapacitationRiskState,
+                headDrop: incapacitationRiskState,
+                upperBodyCollapse: incapacitationRiskState,
+                noResponse: incapacitationRiskState,
+                noVehicleControlInput: false,
+                vehicleMoving: true,
+                qualityValid: sequenceState !== DeterministicSequenceState.NORMAL
+            };
+            const value = observationType === 'DROWSINESS'
+                ? drowsinessState
+                : (observationType === 'INCAPACITATION' ? incapacitationValue : sequenceState);
             return createDriverObservation({
                 context,
                 observationType,
-                value: observationType === 'DROWSINESS' ? drowsinessState : sequenceState,
-                unit: observationType === 'DROWSINESS' ? 'driver-state' : 'sequence-state',
+                value,
+                unit: observationType === 'INCAPACITATION' ? 'composite-driver-state' : (
+                    observationType === 'DROWSINESS' ? 'driver-state' : 'sequence-state'
+                ),
                 confidence: 1,
                 observedAt,
                 metadata: {
@@ -77,7 +122,17 @@
                     sampleWindowMs: 0,
                     algorithmVersion: 'deterministic-sequence-v1',
                     configurationVersion: global.DriverStateConfig.configurationVersion,
-                    metrics: { sequenceState, sequenceIndex, drowsinessState, runId },
+                    metrics: {
+                        sequenceState,
+                        sequenceIndex,
+                        drowsinessState,
+                        compositeSignalCount: observationType === 'INCAPACITATION'
+                            ? Object.keys(incapacitationValue).filter(key => (
+                                !['vehicleMoving', 'qualityValid'].includes(key) && incapacitationValue[key]
+                            )).length
+                            : null,
+                        runId
+                    },
                     quality: { deterministic: true },
                     policy: {
                         operationalUseAllowed: false,
@@ -89,11 +144,19 @@
 
         createSequence({ context, observationType, startedAt = Date.now(), runId = null }) {
             const interval = global.DriverStateConfig.simulation.sequenceIntervalMs;
-            return this.sequence.map((sequenceState, index) => this.createObservation({
+            const sequence = observationType === 'INCAPACITATION'
+                ? IncapacitationSequence
+                : DrowsinessSequence;
+            const incapacitationOffsets = [0, 250, 500, 1000, 1250, 1500, 1750, 2250];
+            return sequence.map((sequenceState, index) => this.createObservation({
                 context,
                 observationType,
                 sequenceState,
-                observedAt: new Date(startedAt + (index * interval)),
+                observedAt: new Date(startedAt + (
+                    observationType === 'INCAPACITATION'
+                        ? incapacitationOffsets[index]
+                        : (index * interval)
+                )),
                 runId
             }));
         }
@@ -105,6 +168,8 @@
         VehicleControlInputAdapter,
         DeterministicDriverTestAdapter,
         DeterministicSequenceState,
-        DeterministicSequence
+        DeterministicSequence,
+        DrowsinessSequence,
+        IncapacitationSequence
     });
 }(window));

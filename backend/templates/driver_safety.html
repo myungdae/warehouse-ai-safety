@@ -158,7 +158,7 @@
 
     <section class="driver-test-panel" aria-labelledby="driverTestTitle">
       <h2 id="driverTestTitle" class="panel-title">Common Driver State Observation</h2>
-      <p class="panel-copy">DROWSINESS는 Deterministic Test Observation을 표준 위험 신호와 RiskEvent 상태 머신에 연결합니다.</p>
+      <p class="panel-copy">DROWSINESS와 INCAPACITATION simulation candidate를 Deterministic Test Observation으로만 검증합니다. 운영 판정 기준이 아닙니다.</p>
       <form id="driverStateTestForm">
         <div class="driver-form-grid">
           <label class="driver-field">Vehicle Type
@@ -180,6 +180,7 @@
         <div class="actions">
           <button class="button button-primary" type="submit">Deterministic sequence 실행</button>
           <button id="drowsinessTestButton" class="button button-secondary" type="submit">DROWSINESS TEST</button>
+          <button id="incapacitationTestButton" class="button button-secondary" type="submit">INCAPACITATION TEST</button>
         </div>
       </form>
       <div id="driverSequenceStatus" class="driver-sequence">NORMAL → ENTRY_PENDING → RISK_CONFIRMED → RISK_MAINTAINED → CLEAR_PENDING → CLEAR</div>
@@ -191,6 +192,10 @@
         <article class="driver-output"><h3>RiskEvent History</h3><pre id="driverRiskEventHistory">[]</pre></article>
         <article class="driver-output"><h3>Current Event ID</h3><pre id="driverCurrentEventId">-</pre></article>
         <article class="driver-output"><h3>Current State</h3><pre id="driverCurrentEventState">NORMAL</pre></article>
+        <article class="driver-output"><h3>Composite Signal Count</h3><pre id="driverCompositeSignalCount">-</pre></article>
+        <article class="driver-output"><h3>Quality Valid</h3><pre id="driverQualityValid">-</pre></article>
+        <article class="driver-output"><h3>Vehicle Moving</h3><pre id="driverVehicleMoving">-</pre></article>
+        <article class="driver-output"><h3>Runtime Policy</h3><pre>SIMULATION · SENSOR DISCONNECTED · NOT FOR OPERATIONAL USE</pre></article>
       </div>
     </section>
 

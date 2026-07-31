@@ -179,6 +179,9 @@
         const eventOutput = document.getElementById('driverRiskEventHistory');
         const currentEventIdOutput = document.getElementById('driverCurrentEventId');
         const currentEventStateOutput = document.getElementById('driverCurrentEventState');
+        const compositeCountOutput = document.getElementById('driverCompositeSignalCount');
+        const qualityValidOutput = document.getElementById('driverQualityValid');
+        const vehicleMovingOutput = document.getElementById('driverVehicleMoving');
         const riskEventStateMachine = global.DriverRiskRuntime
             ? new global.DriverRiskRuntime.RiskEventStateMachine()
             : null;
@@ -236,24 +239,40 @@
             const submitter = event.submitter;
             const observationType = submitter && submitter.id === 'drowsinessTestButton'
                 ? ObservationType.DROWSINESS
-                : document.getElementById('driverObservationType').value;
+                : (submitter && submitter.id === 'incapacitationTestButton'
+                    ? ObservationType.INCAPACITATION
+                    : document.getElementById('driverObservationType').value);
+            const previousEventType = sequenceRunState.observationType === ObservationType.DROWSINESS
+                ? 'DROWSINESS'
+                : (sequenceRunState.observationType === ObservationType.INCAPACITATION
+                    ? 'DRIVER_INCAPACITATION'
+                    : null);
             if (
-                sequenceRunState.observationType === ObservationType.DROWSINESS &&
+                previousEventType &&
                 sequenceRunState.targetId &&
                 riskEventStateMachine
             ) {
-                riskEventStateMachine.clear('DROWSINESS', sequenceRunState.targetId, new Date());
-                global.DriverRiskRuntime.resetDrowsinessRiskState(sequenceRunState.targetId);
+                riskEventStateMachine.clear(previousEventType, sequenceRunState.targetId, new Date());
+                if (sequenceRunState.observationType === ObservationType.DROWSINESS) {
+                    global.DriverRiskRuntime.resetDrowsinessRiskState(sequenceRunState.targetId);
+                } else {
+                    global.DriverRiskRuntime.resetIncapacitationRiskState(sequenceRunState.targetId);
+                }
             }
             sequenceRunState.targetId = context.targetId;
             sequenceRunState.observationType = observationType;
             if (observationType === ObservationType.DROWSINESS && global.DriverRiskRuntime) {
                 global.DriverRiskRuntime.resetDrowsinessRiskState(context.targetId);
+            } else if (observationType === ObservationType.INCAPACITATION && global.DriverRiskRuntime) {
+                global.DriverRiskRuntime.resetIncapacitationRiskState(context.targetId);
             }
             riskOutput.textContent = '현재 실행의 RiskSignal 대기 중';
             eventOutput.textContent = '[]';
             currentEventIdOutput.textContent = '-';
             currentEventStateOutput.textContent = 'NORMAL';
+            compositeCountOutput.textContent = '-';
+            qualityValidOutput.textContent = '-';
+            vehicleMovingOutput.textContent = '-';
             sequenceOutput.textContent = 'STARTING';
             const observations = adapters.deterministic.createSequence({
                 context,
@@ -268,7 +287,15 @@
                 sequenceRunState.observationHistory.push(observationJson);
                 observationOutput.textContent = JSON.stringify(observationJson, null, 2);
                 sequenceOutput.textContent = observationJson.metadata.metrics.sequenceState;
-                if (observationType === ObservationType.DROWSINESS && riskEventStateMachine) {
+                if (observationType === ObservationType.INCAPACITATION) {
+                    compositeCountOutput.textContent = String(observationJson.metadata.metrics.compositeSignalCount);
+                    qualityValidOutput.textContent = String(observationJson.value.qualityValid);
+                    vehicleMovingOutput.textContent = String(observationJson.value.vehicleMoving);
+                }
+                if (
+                    [ObservationType.DROWSINESS, ObservationType.INCAPACITATION].includes(observationType) &&
+                    riskEventStateMachine
+                ) {
                     const riskSignal = global.DriverRiskRuntime.observationToRiskSignal(observations[index]);
                     riskOutput.textContent = JSON.stringify(riskSignal, null, 2);
                     let riskEvent = null;
@@ -279,7 +306,14 @@
                             riskEventStateMachine.acknowledge(riskEvent.eventId, observations[index].observedAt);
                         }
                     } else if (riskSignal.shouldClearRisk) {
-                        riskEvent = riskEventStateMachine.clear('DROWSINESS', observations[index].targetId, observations[index].observedAt);
+                        const eventType = observationType === ObservationType.DROWSINESS
+                            ? 'DROWSINESS'
+                            : 'DRIVER_INCAPACITATION';
+                        riskEvent = riskEventStateMachine.clear(
+                            eventType,
+                            observations[index].targetId,
+                            observations[index].observedAt
+                        );
                     }
                     if (riskEvent) {
                         currentEventIdOutput.textContent = riskEvent.eventId;

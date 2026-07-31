@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><title>Driver incapacitation runtime regression</title></head>
+<body>
+  <form id="driverStateTestForm">
+    <select id="driverVehicleType"><option>FORKLIFT</option></select>
+    <input id="driverVehicleId" value="F-03"><input id="driverId" value="DRIVER001">
+    <input id="driverAssignmentId" value="ASSIGNMENT001">
+    <select id="driverObservationType"><option>INCAPACITATION</option><option>ALCOHOL_LEVEL</option></select>
+    <button id="drowsinessTestButton" type="submit">DROWSINESS</button>
+    <button id="incapacitationTestButton" type="submit">INCAPACITATION</button>
+    <button id="genericTestButton" type="submit">GENERIC</button>
+  </form>
+  <span id="driverTargetId"></span><pre id="vehicleContextOutput"></pre>
+  <pre id="lastDriverObservation"></pre><pre id="driverSequenceStatus"></pre>
+  <pre id="driverAdapterStatus"></pre><pre id="lastDriverRiskSignal"></pre>
+  <pre id="driverRiskEventHistory"></pre><pre id="driverCurrentEventId"></pre>
+  <pre id="driverCurrentEventState"></pre><pre id="driverCompositeSignalCount"></pre>
+  <pre id="driverQualityValid"></pre><pre id="driverVehicleMoving"></pre>
+  <pre id="result">RUNNING</pre>
+  <script src="../backend/static/js/sensor_observation.js"></script>
+  <script src="../backend/static/js/driver_state_config.js"></script>
+  <script src="../backend/static/js/driver_state.js"></script>
+  <script src="../backend/static/js/driver_sensor_adapters.js"></script>
+  <script src="../backend/static/js/driver_risk_runtime.js"></script>
+  <script>
+    (function runRegression() {
+      'use strict';
+      const result = document.getElementById('result');
+      const assert = (condition, message) => { if (!condition) throw new Error(message); };
+      const timers = new Map();
+      let timerId = 0;
+      window.setTimeout = callback => {
+        timerId += 1;
+        timers.set(timerId, { callback, cleared: false });
+        return timerId;
+      };
+      window.clearTimeout = id => { if (timers.has(id)) timers.get(id).cleared = true; };
+      const runNext = () => {
+        const item = Array.from(timers.entries()).find(([, timer]) => !timer.cleared);
+        if (!item) throw new Error('Expected pending timer');
+        timers.delete(item[0]); item[1].callback(); return item[1];
+      };
+      const finish = () => { while (Array.from(timers.values()).some(timer => !timer.cleared)) runNext(); };
+      const submit = id => document.getElementById('driverStateTestForm').requestSubmit(document.getElementById(id));
+
+      try {
+        const D = window.DriverState;
+        const A = window.DriverSensorAdapters;
+        const R = window.DriverRiskRuntime;
+        const O = window.SafetyObservation.ObservationType;
+        const adapter = new A.DeterministicDriverTestAdapter();
+        const context = (assignment = 'ASSIGNMENT001', vehicle = 'F-03', driver = 'DRIVER001') =>
+          new D.VehicleContext({ vehicleType: 'FORKLIFT', vehicleId: vehicle, driverId: driver, driverAssignmentId: assignment });
+        const create = (ctx, value, observedAt) => D.createDriverObservation({
+          context: ctx, observationType: O.INCAPACITATION, value,
+          unit: 'composite-driver-state', confidence: 1, observedAt: new Date(observedAt),
+          metadata: {
+            cameraId: null, sensorId: 'deterministic-driver-test', sensorType: 'DETERMINISTIC_TEST',
+            source: 'deterministic-test', simulation: true, sensorConnected: false,
+            measurementStatus: 'TEST', sampleWindowMs: 0, algorithmVersion: 'deterministic-sequence-v1',
+            configurationVersion: window.DriverStateConfig.configurationVersion, metrics: {},
+            quality: { deterministic: true }, policy: { operationalUseAllowed: false }
+          }
+        });
+        const value = (count, overrides = {}) => ({
+          prolongedEyeClosure: count >= 1, headDrop: count >= 2, upperBodyCollapse: count >= 3,
+          noResponse: count >= 4, noVehicleControlInput: count >= 5,
+          vehicleMoving: true, qualityValid: true, ...overrides
+        });
+        const ctx = context();
+
+        [1, 2].forEach((count, index) => {
+          R.resetIncapacitationRiskState(ctx.targetId);
+          const signal = R.observationToRiskSignal(create(ctx, value(count), index * 1000));
+          assert(!signal.shouldCreateRisk, `${count} signal(s) must not create risk`);
+        });
+        R.resetIncapacitationRiskState(ctx.targetId);
+        assert(R.observationToRiskSignal(create(ctx, value(3), 2000)).reason === 'INCAPACITATION_COMPOSITE_PENDING',
+          'Three signals must enter pending');
+        const confirmed = R.observationToRiskSignal(create(ctx, value(3), 2500));
+        assert(confirmed.shouldCreateRisk && confirmed.eventInput.eventType === 'DRIVER_INCAPACITATION',
+          'Three sustained signals must confirm risk');
+        const machine = new R.RiskEventStateMachine();
+        let event = machine.observe(confirmed.eventInput, confirmed.observation.observedAt);
+        assert(event.state === 'NEW', 'Confirmed composite risk must create NEW event');
+        const eventId = event.eventId;
+        const maintained = R.observationToRiskSignal(create(ctx, value(3), 2750));
+        event = machine.observe(maintained.eventInput, maintained.observation.observedAt);
+        assert(event.state === 'ACTIVE', 'Next valid risk observation must activate event');
+        machine.acknowledge(event.eventId, new Date(2750));
+        const acknowledged = machine.observe(maintained.eventInput, new Date(3000));
+        assert(acknowledged.state === 'ACKNOWLEDGED', 'Maintained risk must not reactivate acknowledged event');
+        const unavailable = R.observationToRiskSignal(create(ctx, value(0, { qualityValid: false }), 3250));
+        assert(!unavailable.shouldClearRisk && machine.activeEvents.size === 1,
+          'Invalid quality must preserve active event');
+        assert(R.observationToRiskSignal(create(ctx, value(0), 3500)).reason === 'INCAPACITATION_RECOVERY_PENDING',
+          'Recovery must enter pending');
+        const clearedSignal = R.observationToRiskSignal(create(ctx, value(0), 4000));
+        assert(clearedSignal.shouldClearRisk, 'Recovery sustain must clear risk');
+        event = machine.clear('DRIVER_INCAPACITATION', ctx.targetId, clearedSignal.observation.observedAt);
+        assert(event.state === 'CLEARED', 'Acknowledged event must clear after recovery sustain');
+
+        R.resetIncapacitationRiskState(ctx.targetId);
+        assert(!R.observationToRiskSignal(create(ctx, value(5, { vehicleMoving: false }), 4500)).shouldCreateRisk,
+          'Stopped vehicle must not create a new event');
+
+        window.DriverStatePage = D.initializeDriverStatePage();
+        submit('incapacitationTestButton'); finish();
+        let history = JSON.parse(document.getElementById('driverRiskEventHistory').textContent);
+        assert(history.length === 1 && history[0].state === 'CLEARED', 'UI sequence must complete');
+        const completedId = history[0].eventId;
+        submit('incapacitationTestButton'); finish();
+        history = JSON.parse(document.getElementById('driverRiskEventHistory').textContent);
+        assert(history.length === 1 && history[0].eventId !== completedId, 'Completed rerun must use new eventId');
+
+        submit('incapacitationTestButton'); runNext(); runNext(); runNext();
+        const interruptedId = document.getElementById('driverCurrentEventId').textContent;
+        const stale = Array.from(timers.values()).find(timer => !timer.cleared);
+        submit('incapacitationTestButton');
+        assert(stale.cleared, 'Restart must cancel prior timer');
+        const before = window.DriverStatePage.getSequenceRunState().observationHistory.length;
+        stale.callback();
+        assert(window.DriverStatePage.getSequenceRunState().observationHistory.length === before,
+          'Stale callback must not affect new run');
+        finish();
+        history = JSON.parse(document.getElementById('driverRiskEventHistory').textContent);
+        assert(history.length === 1 && history[0].eventId !== interruptedId, 'Interrupted rerun must isolate UI and eventId');
+        const audit = window.DriverStatePage.getRiskEventHistory();
+        assert(audit.find(item => item.eventId === interruptedId).state === 'CLEARED', 'Interrupted event must be cleared');
+
+        const assignmentTwo = context('ASSIGNMENT002');
+        assert(ctx.targetId !== assignmentTwo.targetId, 'Assignments must be isolated');
+        const otherMachine = new R.RiskEventStateMachine();
+        const otherEvent = otherMachine.observe({ eventType: 'DRIVER_INCAPACITATION', targetId: assignmentTwo.targetId, severity: 'CRITICAL' }, new Date(5000));
+        otherMachine.clear('DRIVER_INCAPACITATION', ctx.targetId, new Date(5100));
+        assert(otherMachine.activeEvents.has(otherMachine.getEventKey('DRIVER_INCAPACITATION', assignmentTwo.targetId)),
+          'Restart clear must preserve other target');
+        assert(otherEvent.targetId === assignmentTwo.targetId, 'Other target event mismatch');
+
+        const coexistenceMachine = new R.RiskEventStateMachine();
+        coexistenceMachine.observe({ eventType: 'DROWSINESS', targetId: ctx.targetId, severity: 'HIGH' }, new Date(5200));
+        coexistenceMachine.observe({ eventType: 'DRIVER_INCAPACITATION', targetId: ctx.targetId, severity: 'CRITICAL' }, new Date(5300));
+        coexistenceMachine.clear('DRIVER_INCAPACITATION', ctx.targetId, new Date(5400));
+        assert(coexistenceMachine.activeEvents.has(coexistenceMachine.getEventKey('DROWSINESS', ctx.targetId)),
+          'INCAPACITATION must not clear a coexisting DROWSINESS event');
+
+        const alcohol = adapter.createObservation({ context: ctx, observationType: O.ALCOHOL_LEVEL,
+          sequenceState: A.DeterministicSequenceState.NORMAL, observedAt: new Date(6000) });
+        assert(R.observationToRiskSignal(alcohol).reason === 'NO_RISK_RULE_CONFIGURED', 'Alcohol must remain unconfigured');
+        assert(eventId !== history[0].eventId, 'Separate runs must not reuse eventId');
+        result.textContent = 'PASS'; document.title = 'PASS';
+      } catch (error) {
+        result.textContent = `FAIL\n${error.stack || error.message}`; document.title = 'FAIL';
+      }
+    }());
+  </script>
+</body>
+</html>
