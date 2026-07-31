@@ -237,6 +237,8 @@ function showDigitalTwin() {
                         <button class="btn-control btn-warning" onclick="triggerScenario2()">📍 시나리오 2</button>
                         <button class="btn-control btn-info" onclick="triggerScenario3()">📍 시나리오 3</button>
                         <button class="btn-control btn-imu" onclick="triggerScenario4()">📍 시나리오 4</button>
+                        <button class="btn-control btn-imu" onclick="triggerAccelerationTest()">⚡ 급가속 테스트</button>
+                        <button class="btn-control btn-danger" onclick="triggerBrakingTest()">🛑 급제동 테스트</button>
                     </div>
                 </div>
                 <div class="map-canvas-large" id="digitalTwinMap">
@@ -651,7 +653,21 @@ const TILT_RISK_RULE = Object.freeze({
     MINIMUM_DURATION_MS: 1500
 });
 
+const ACCELERATION_RISK_RULE = Object.freeze({
+    ENTRY_THRESHOLD_MPS2: 3,
+    CLEAR_THRESHOLD_MPS2: 1,
+    MINIMUM_DURATION_MS: 150
+});
+
+const BRAKING_RISK_RULE = Object.freeze({
+    ENTRY_THRESHOLD_MPS2: -3,
+    CLEAR_THRESHOLD_MPS2: -1,
+    MINIMUM_DURATION_MS: 150
+});
+
 const tiltRiskStates = new Map();
+const accelerationRiskStates = new Map();
+const brakingRiskStates = new Map();
 
 function observationToRiskSignal(observation) {
     if (!(observation instanceof SensorObservation)) {
@@ -668,12 +684,178 @@ function observationToRiskSignal(observation) {
         return tiltObservationToRiskSignal(observation);
     }
 
+    if (observation.observationType === ObservationType.ACCELERATION) {
+        return accelerationObservationToRiskSignal(observation);
+    }
+
+    if (observation.observationType === ObservationType.BRAKING) {
+        return brakingObservationToRiskSignal(observation);
+    }
+
     return {
         shouldCreateRisk: false,
         shouldClearRisk: false,
         eventInput: null,
         observation: observation.toJSON(),
         reason: 'NO_RISK_RULE_CONFIGURED'
+    };
+}
+
+function brakingObservationToRiskSignal(observation) {
+    const accelerationMps2 = Number(observation.value);
+    if (!Number.isFinite(accelerationMps2)) {
+        return {
+            shouldCreateRisk: false,
+            shouldClearRisk: false,
+            eventInput: null,
+            observation: observation.toJSON(),
+            reason: 'INVALID_BRAKING_VALUE'
+        };
+    }
+
+    const observedAtMs = Date.parse(observation.observedAt);
+    const targetState = brakingRiskStates.get(observation.targetId) || {
+        thresholdEnteredAt: null,
+        riskActive: false
+    };
+
+    if (targetState.riskActive) {
+        if (accelerationMps2 > BRAKING_RISK_RULE.CLEAR_THRESHOLD_MPS2) {
+            brakingRiskStates.delete(observation.targetId);
+            return {
+                shouldCreateRisk: false,
+                shouldClearRisk: true,
+                eventInput: null,
+                observation: observation.toJSON(),
+                reason: 'BRAKING_CLEARED'
+            };
+        }
+
+        brakingRiskStates.set(observation.targetId, targetState);
+        return createBrakingRiskSignal(observation, 'BRAKING_RISK_MAINTAINED');
+    }
+
+    if (accelerationMps2 <= BRAKING_RISK_RULE.ENTRY_THRESHOLD_MPS2) {
+        if (targetState.thresholdEnteredAt === null || observedAtMs < targetState.thresholdEnteredAt) {
+            targetState.thresholdEnteredAt = observedAtMs;
+        }
+
+        if (observedAtMs - targetState.thresholdEnteredAt >= BRAKING_RISK_RULE.MINIMUM_DURATION_MS) {
+            targetState.riskActive = true;
+            brakingRiskStates.set(observation.targetId, targetState);
+            return createBrakingRiskSignal(observation, 'BRAKING_RISK_CONFIRMED');
+        }
+
+        brakingRiskStates.set(observation.targetId, targetState);
+        return {
+            shouldCreateRisk: false,
+            shouldClearRisk: false,
+            eventInput: null,
+            observation: observation.toJSON(),
+            reason: 'BRAKING_MINIMUM_DURATION_PENDING'
+        };
+    }
+
+    brakingRiskStates.delete(observation.targetId);
+    return {
+        shouldCreateRisk: false,
+        shouldClearRisk: false,
+        eventInput: null,
+        observation: observation.toJSON(),
+        reason: 'BRAKING_BELOW_ENTRY_THRESHOLD'
+    };
+}
+
+function createBrakingRiskSignal(observation, reason) {
+    return {
+        shouldCreateRisk: true,
+        shouldClearRisk: false,
+        eventInput: {
+            eventType: 'HARD_BRAKING',
+            targetId: observation.targetId,
+            severity: 'HIGH'
+        },
+        observation: observation.toJSON(),
+        reason
+    };
+}
+
+function accelerationObservationToRiskSignal(observation) {
+    const accelerationMps2 = Number(observation.value);
+    if (!Number.isFinite(accelerationMps2)) {
+        return {
+            shouldCreateRisk: false,
+            shouldClearRisk: false,
+            eventInput: null,
+            observation: observation.toJSON(),
+            reason: 'INVALID_ACCELERATION_VALUE'
+        };
+    }
+
+    const observedAtMs = Date.parse(observation.observedAt);
+    const targetState = accelerationRiskStates.get(observation.targetId) || {
+        thresholdEnteredAt: null,
+        riskActive: false
+    };
+
+    if (targetState.riskActive) {
+        if (accelerationMps2 <= ACCELERATION_RISK_RULE.CLEAR_THRESHOLD_MPS2) {
+            accelerationRiskStates.delete(observation.targetId);
+            return {
+                shouldCreateRisk: false,
+                shouldClearRisk: true,
+                eventInput: null,
+                observation: observation.toJSON(),
+                reason: 'ACCELERATION_CLEARED'
+            };
+        }
+
+        accelerationRiskStates.set(observation.targetId, targetState);
+        return createAccelerationRiskSignal(observation, 'ACCELERATION_RISK_MAINTAINED');
+    }
+
+    if (accelerationMps2 >= ACCELERATION_RISK_RULE.ENTRY_THRESHOLD_MPS2) {
+        if (targetState.thresholdEnteredAt === null || observedAtMs < targetState.thresholdEnteredAt) {
+            targetState.thresholdEnteredAt = observedAtMs;
+        }
+
+        if (observedAtMs - targetState.thresholdEnteredAt >= ACCELERATION_RISK_RULE.MINIMUM_DURATION_MS) {
+            targetState.riskActive = true;
+            accelerationRiskStates.set(observation.targetId, targetState);
+            return createAccelerationRiskSignal(observation, 'ACCELERATION_RISK_CONFIRMED');
+        }
+
+        accelerationRiskStates.set(observation.targetId, targetState);
+        return {
+            shouldCreateRisk: false,
+            shouldClearRisk: false,
+            eventInput: null,
+            observation: observation.toJSON(),
+            reason: 'ACCELERATION_MINIMUM_DURATION_PENDING'
+        };
+    }
+
+    accelerationRiskStates.delete(observation.targetId);
+    return {
+        shouldCreateRisk: false,
+        shouldClearRisk: false,
+        eventInput: null,
+        observation: observation.toJSON(),
+        reason: 'ACCELERATION_BELOW_ENTRY_THRESHOLD'
+    };
+}
+
+function createAccelerationRiskSignal(observation, reason) {
+    return {
+        shouldCreateRisk: true,
+        shouldClearRisk: false,
+        eventInput: {
+            eventType: 'HARD_ACCELERATION',
+            targetId: observation.targetId,
+            severity: 'MEDIUM'
+        },
+        observation: observation.toJSON(),
+        reason
     };
 }
 
@@ -1868,13 +2050,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // IMU Detection Thresholds
 const IMU_THRESHOLDS = {
-    HARD_ACCEL: 3.0,      // m/s² - 급가속
-    HARD_BRAKE: -3.0,     // m/s² - 급감속
     SHARP_TURN: 45,       // °/s - 급회전
     TILT_WARNING: 15      // ° - 기울기 경고
 };
 
-let tiltObservationSequence = 0;
+let imuObservationSequence = 0;
+const accelerationTestStates = new Map();
+const ACCELERATION_TEST_DURATION_MS = 300;
+const ACCELERATION_TEST_VALUE_MPS2 = 3.5;
+const brakingTestStates = new Map();
+const BRAKING_TEST_DURATION_MS = 300;
+const BRAKING_TEST_VALUE_MPS2 = -3.5;
 
 // Update IMU Data for Forklifts
 function updateIMUData() {
@@ -1885,6 +2071,22 @@ function updateIMUData() {
         const deltaTime = (now - f.lastAccelTime) / 1000; // seconds
         const deltaSpeed = f.speed - f.prevSpeed;
         f.accel = deltaSpeed / (deltaTime || 0.05); // m/s²
+
+        const accelerationTestState = accelerationTestStates.get(f.id);
+        if (accelerationTestState) {
+            const elapsedMs = now - accelerationTestState.startedAt;
+            f.accel = elapsedMs < ACCELERATION_TEST_DURATION_MS
+                ? ACCELERATION_TEST_VALUE_MPS2
+                : 0;
+        }
+
+        const brakingTestState = brakingTestStates.get(f.id);
+        if (brakingTestState) {
+            const elapsedMs = now - brakingTestState.startedAt;
+            f.accel = elapsedMs < BRAKING_TEST_DURATION_MS
+                ? BRAKING_TEST_VALUE_MPS2
+                : 0;
+        }
         
         // Update previous values
         f.prevSpeed = f.speed;
@@ -1897,18 +2099,20 @@ function updateIMUData() {
         f.tilt = Math.min(Math.abs(f.speed) * 2, 20);
         
         const tiltObservation = createTiltObservation(f, now);
+        const accelerationObservation = createAccelerationObservation(f, now);
+        const brakingObservation = createBrakingObservation(f, now);
 
         // Detect anomalies
-        detectIMUAnomalies(f, tiltObservation);
+        detectIMUAnomalies(f, tiltObservation, accelerationObservation, brakingObservation);
     });
 }
 
 function createTiltObservation(forklift, observedAtMs = Date.now()) {
-    tiltObservationSequence += 1;
+    imuObservationSequence += 1;
     const imuSensor = sensorData.imu.find(sensor => sensor.forklift === forklift.id);
 
     return new SensorObservation({
-        observationId: `tilt-${forklift.id}-${observedAtMs}-${tiltObservationSequence}`,
+        observationId: `tilt-${forklift.id}-${observedAtMs}-${imuObservationSequence}`,
         observationType: ObservationType.TILT,
         sensorId: imuSensor ? imuSensor.id : `imu-sim-${forklift.id}`,
         targetId: forklift.id,
@@ -1920,20 +2124,60 @@ function createTiltObservation(forklift, observedAtMs = Date.now()) {
     });
 }
 
+function createAccelerationObservation(forklift, observedAtMs = Date.now()) {
+    imuObservationSequence += 1;
+    const imuSensor = sensorData.imu.find(sensor => sensor.forklift === forklift.id);
+
+    return new SensorObservation({
+        observationId: `acceleration-${forklift.id}-${observedAtMs}-${imuObservationSequence}`,
+        observationType: ObservationType.ACCELERATION,
+        sensorId: imuSensor ? imuSensor.id : `imu-sim-${forklift.id}`,
+        targetId: forklift.id,
+        value: forklift.accel,
+        unit: 'm/s²',
+        confidence: 1,
+        observedAt: new Date(observedAtMs).toISOString(),
+        metadata: { source: 'imu-simulation' }
+    });
+}
+
+function createBrakingObservation(forklift, observedAtMs = Date.now()) {
+    imuObservationSequence += 1;
+    const imuSensor = sensorData.imu.find(sensor => sensor.forklift === forklift.id);
+
+    return new SensorObservation({
+        observationId: `braking-${forklift.id}-${observedAtMs}-${imuObservationSequence}`,
+        observationType: ObservationType.BRAKING,
+        sensorId: imuSensor ? imuSensor.id : `imu-sim-${forklift.id}`,
+        targetId: forklift.id,
+        value: forklift.accel,
+        unit: 'm/s²',
+        confidence: 1,
+        observedAt: new Date(observedAtMs).toISOString(),
+        metadata: { source: 'imu-simulation' }
+    });
+}
+
 // Detect IMU Anomalies
-function detectIMUAnomalies(forklift, tiltObservation) {
-    // Hard Acceleration
-    if (forklift.accel > IMU_THRESHOLDS.HARD_ACCEL) {
-        handleHardAcceleration(forklift);
-    } else {
-        riskEventStateMachine.clear('HARD_ACCELERATION', forklift.id);
+function detectIMUAnomalies(forklift, tiltObservation, accelerationObservation, brakingObservation) {
+    // Hard Acceleration Observation
+    const accelerationRiskSignal = observationToRiskSignal(accelerationObservation);
+    if (accelerationRiskSignal.shouldCreateRisk) {
+        const result = handleHardAcceleration(forklift, accelerationRiskSignal.eventInput);
+        notifyAccelerationTestActive(forklift.id, result);
+    } else if (accelerationRiskSignal.shouldClearRisk) {
+        const clearedEvent = riskEventStateMachine.clear('HARD_ACCELERATION', forklift.id);
+        finishAccelerationTest(forklift.id, clearedEvent);
     }
     
-    // Hard Braking
-    if (forklift.accel < IMU_THRESHOLDS.HARD_BRAKE) {
-        handleHardBraking(forklift);
-    } else {
-        riskEventStateMachine.clear('HARD_BRAKING', forklift.id);
+    // Hard Braking Observation
+    const brakingRiskSignal = observationToRiskSignal(brakingObservation);
+    if (brakingRiskSignal.shouldCreateRisk) {
+        const result = handleHardBraking(forklift, brakingRiskSignal.eventInput);
+        notifyBrakingTestActive(forklift.id, result);
+    } else if (brakingRiskSignal.shouldClearRisk) {
+        const clearedEvent = riskEventStateMachine.clear('HARD_BRAKING', forklift.id);
+        finishBrakingTest(forklift.id, clearedEvent);
     }
     
     // Sharp Turn
@@ -1953,31 +2197,118 @@ function detectIMUAnomalies(forklift, tiltObservation) {
 }
 
 // Handle Hard Acceleration
-function handleHardAcceleration(forklift) {
+function handleHardAcceleration(forklift, eventInput = {}) {
     const name = formatForkliftIdForSpeech(forklift.id);
     const result = riskEventStateMachine.observe({
-        eventType: 'HARD_ACCELERATION',
-        targetId: forklift.id,
-        severity: 'MEDIUM',
+        eventType: eventInput.eventType || 'HARD_ACCELERATION',
+        targetId: eventInput.targetId || forklift.id,
+        severity: eventInput.severity || 'MEDIUM',
         speechMessage: `${name} 급가속 감지! 속도를 조절하세요!`,
         speechPriority: 'high'
     });
-    if (!result.didSpeak) return;
-    showWarningIndicator(forklift, '⚡ 급가속', '#FF9800');
+    if (result.didSpeak) {
+        showWarningIndicator(forklift, '⚡ 급가속', '#FF9800');
+    }
+    return result;
+}
+
+function triggerAccelerationTest() {
+    const forklift = animationState.forklifts.find(item => item.id === 'F-07');
+    if (!forklift) {
+        showNotificationPopup('급가속 테스트 대상 F-07을 찾을 수 없습니다.', 'error');
+        return;
+    }
+
+    if (accelerationTestStates.has(forklift.id)) {
+        showNotificationPopup('급가속 테스트가 이미 실행 중입니다.', 'warning');
+        return;
+    }
+
+    accelerationTestStates.set(forklift.id, {
+        startedAt: Date.now(),
+        activeNotified: false
+    });
+    showNotificationPopup('F-07 급가속 테스트 시작 (3.5m/s², 300ms)', 'info');
+    startAnimation();
+}
+
+function notifyAccelerationTestActive(targetId, result) {
+    const testState = accelerationTestStates.get(targetId);
+    if (!testState || testState.activeNotified || !result || result.event.state !== EventState.ACTIVE) {
+        return;
+    }
+
+    testState.activeNotified = true;
+    showNotificationPopup(`HARD_ACCELERATION ACTIVE · ${result.event.eventId}`, 'warning');
+}
+
+function finishAccelerationTest(targetId, clearedEvent) {
+    if (!accelerationTestStates.has(targetId) || !clearedEvent) return;
+
+    accelerationTestStates.delete(targetId);
+    showNotificationPopup(`HARD_ACCELERATION CLEARED · ${clearedEvent.eventId}`, 'success');
+}
+
+function triggerBrakingTest() {
+    const forklift = animationState.forklifts.find(item => item.id === 'F-07');
+    if (!forklift) {
+        showNotificationPopup('급제동 테스트 대상 F-07을 찾을 수 없습니다.', 'error');
+        return;
+    }
+
+    startBrakingTest(forklift, true);
+}
+
+function startBrakingTest(forklift, showStartNotification) {
+    if (brakingTestStates.has(forklift.id)) {
+        if (showStartNotification) {
+            showNotificationPopup('급제동 테스트가 이미 실행 중입니다.', 'warning');
+        }
+        return false;
+    }
+
+    brakingTestStates.set(forklift.id, {
+        startedAt: Date.now(),
+        activeNotified: false
+    });
+    if (showStartNotification) {
+        showNotificationPopup('F-07 급제동 테스트 시작 (-3.5m/s², 300ms)', 'info');
+    }
+    startAnimation();
+    return true;
+}
+
+function notifyBrakingTestActive(targetId, result) {
+    const testState = brakingTestStates.get(targetId);
+    if (!testState || testState.activeNotified || !result || result.event.state !== EventState.ACTIVE) {
+        return;
+    }
+
+    testState.activeNotified = true;
+    showNotificationPopup(`HARD_BRAKING ACTIVE · ${result.event.eventId}`, 'warning');
+}
+
+function finishBrakingTest(targetId, clearedEvent) {
+    if (!brakingTestStates.has(targetId) || !clearedEvent) return;
+
+    brakingTestStates.delete(targetId);
+    showNotificationPopup(`HARD_BRAKING CLEARED · ${clearedEvent.eventId}`, 'success');
 }
 
 // Handle Hard Braking
-function handleHardBraking(forklift) {
+function handleHardBraking(forklift, eventInput = {}) {
     const name = formatForkliftIdForSpeech(forklift.id);
     const result = riskEventStateMachine.observe({
-        eventType: 'HARD_BRAKING',
-        targetId: forklift.id,
-        severity: 'HIGH',
+        eventType: eventInput.eventType || 'HARD_BRAKING',
+        targetId: eventInput.targetId || forklift.id,
+        severity: eventInput.severity || 'HIGH',
         speechMessage: `${name} 급브레이크! 충격 감지!`,
         speechPriority: 'high'
     });
-    if (!result.didSpeak) return;
-    showWarningIndicator(forklift, '🛑 급정지', '#ef4444');
+    if (result.didSpeak) {
+        showWarningIndicator(forklift, '🛑 급정지', '#ef4444');
+    }
+    return result;
 }
 
 // Handle Sharp Turn
@@ -2079,7 +2410,7 @@ function triggerScenario4() {
     setTimeout(() => {
         if (f07) {
             f07.speed = 0; // Emergency stop
-            handleHardBraking(f07);
+            startBrakingTest(f07, false);
         }
     }, 2000);
     
