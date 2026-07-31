@@ -240,6 +240,7 @@ function showDigitalTwin() {
                         <button class="btn-control btn-imu" onclick="triggerAccelerationTest()">⚡ 급가속 테스트</button>
                         <button class="btn-control btn-danger" onclick="triggerBrakingTest()">🛑 급제동 테스트</button>
                         <button class="btn-control btn-info" onclick="triggerTurnRateTest()">🔄 급회전 테스트</button>
+                        <button class="btn-control btn-warning" onclick="triggerHumanProximityTest()">HUMAN_PROXIMITY TEST</button>
                     </div>
                 </div>
                 <div class="map-canvas-large" id="digitalTwinMap">
@@ -557,6 +558,7 @@ const ObservationType = Object.freeze({
     BRAKING: 'BRAKING',
     TURN_RATE: 'TURN_RATE',
     TILT: 'TILT',
+    HUMAN_PROXIMITY: 'HUMAN_PROXIMITY',
     PEDESTRIAN_DISTANCE: 'PEDESTRIAN_DISTANCE',
     COLLISION_DISTANCE: 'COLLISION_DISTANCE',
     DROWSINESS: 'DROWSINESS',
@@ -673,10 +675,17 @@ const TURN_RATE_RISK_RULE = Object.freeze({
     MINIMUM_SPEED: 0.5
 });
 
+const HUMAN_PROXIMITY_RISK_RULE = Object.freeze({
+    ENTRY_THRESHOLD_MAP_UNITS: 100,
+    CLEAR_THRESHOLD_MAP_UNITS: 120,
+    MINIMUM_DURATION_MS: 150
+});
+
 const tiltRiskStates = new Map();
 const accelerationRiskStates = new Map();
 const brakingRiskStates = new Map();
 const turnRateRiskStates = new Map();
+const humanProximityRiskStates = new Map();
 
 function observationToRiskSignal(observation) {
     if (!(observation instanceof SensorObservation)) {
@@ -705,12 +714,95 @@ function observationToRiskSignal(observation) {
         return turnRateObservationToRiskSignal(observation);
     }
 
+    if (observation.observationType === ObservationType.HUMAN_PROXIMITY) {
+        return humanProximityObservationToRiskSignal(observation);
+    }
+
     return {
         shouldCreateRisk: false,
         shouldClearRisk: false,
         eventInput: null,
         observation: observation.toJSON(),
         reason: 'NO_RISK_RULE_CONFIGURED'
+    };
+}
+
+function humanProximityObservationToRiskSignal(observation) {
+    const distance = Number(observation.value);
+    if (!Number.isFinite(distance) || distance < 0) {
+        return {
+            shouldCreateRisk: false,
+            shouldClearRisk: false,
+            eventInput: null,
+            observation: observation.toJSON(),
+            reason: 'INVALID_HUMAN_PROXIMITY_DISTANCE'
+        };
+    }
+
+    const observedAtMs = Date.parse(observation.observedAt);
+    const targetState = humanProximityRiskStates.get(observation.targetId) || {
+        thresholdEnteredAt: null,
+        riskActive: false
+    };
+
+    if (targetState.riskActive) {
+        if (distance >= HUMAN_PROXIMITY_RISK_RULE.CLEAR_THRESHOLD_MAP_UNITS) {
+            humanProximityRiskStates.delete(observation.targetId);
+            return {
+                shouldCreateRisk: false,
+                shouldClearRisk: true,
+                eventInput: null,
+                observation: observation.toJSON(),
+                reason: 'HUMAN_PROXIMITY_CLEARED'
+            };
+        }
+
+        humanProximityRiskStates.set(observation.targetId, targetState);
+        return createHumanProximityRiskSignal(observation, 'HUMAN_PROXIMITY_RISK_MAINTAINED');
+    }
+
+    if (distance <= HUMAN_PROXIMITY_RISK_RULE.ENTRY_THRESHOLD_MAP_UNITS) {
+        if (targetState.thresholdEnteredAt === null || observedAtMs < targetState.thresholdEnteredAt) {
+            targetState.thresholdEnteredAt = observedAtMs;
+        }
+
+        if (observedAtMs - targetState.thresholdEnteredAt >= HUMAN_PROXIMITY_RISK_RULE.MINIMUM_DURATION_MS) {
+            targetState.riskActive = true;
+            humanProximityRiskStates.set(observation.targetId, targetState);
+            return createHumanProximityRiskSignal(observation, 'HUMAN_PROXIMITY_RISK_CONFIRMED');
+        }
+
+        humanProximityRiskStates.set(observation.targetId, targetState);
+        return {
+            shouldCreateRisk: false,
+            shouldClearRisk: false,
+            eventInput: null,
+            observation: observation.toJSON(),
+            reason: 'HUMAN_PROXIMITY_MINIMUM_DURATION_PENDING'
+        };
+    }
+
+    humanProximityRiskStates.delete(observation.targetId);
+    return {
+        shouldCreateRisk: false,
+        shouldClearRisk: false,
+        eventInput: null,
+        observation: observation.toJSON(),
+        reason: 'HUMAN_PROXIMITY_OUTSIDE_ENTRY_THRESHOLD'
+    };
+}
+
+function createHumanProximityRiskSignal(observation, reason) {
+    return {
+        shouldCreateRisk: true,
+        shouldClearRisk: false,
+        eventInput: {
+            eventType: 'HUMAN_PROXIMITY',
+            targetId: observation.targetId,
+            severity: 'CRITICAL'
+        },
+        observation: observation.toJSON(),
+        reason
     };
 }
 
@@ -1459,6 +1551,57 @@ function moveForklifts() {
     detectCollisions();
 }
 
+let humanProximityObservationSequence = 0;
+const humanProximityTestStates = new Map();
+const HUMAN_PROXIMITY_TEST_DURATION_MS = 300;
+const HUMAN_PROXIMITY_TEST_DISTANCE = 60;
+const HUMAN_PROXIMITY_TEST_CLEAR_DISTANCE = 140;
+const HUMAN_PROXIMITY_SENSOR_ID = 'CCTV-07';
+const HUMAN_POSITIONS = Object.freeze([
+    Object.freeze({ x: 520, y: 230, id: 'P02' })
+]);
+
+function getHumanProximityTargetId(forkliftId, personId) {
+    const normalizedForkliftId = String(forkliftId).replace(/[^a-zA-Z0-9]/g, '');
+    const normalizedPersonId = String(personId).replace(/[^a-zA-Z0-9]/g, '');
+    return `${normalizedForkliftId}|${normalizedPersonId}`;
+}
+
+function createHumanProximityObservation(forklift, humanPosition, observedAtMs = Date.now()) {
+    humanProximityObservationSequence += 1;
+    const pedestrianDetected = Boolean(document.getElementById(`pedestrian-${humanPosition.id}`));
+    const targetId = getHumanProximityTargetId(forklift.id, humanPosition.id);
+    const calculatedDistance = pedestrianDetected
+        ? Math.hypot(forklift.x - humanPosition.x, forklift.y - humanPosition.y)
+        : HUMAN_PROXIMITY_TEST_CLEAR_DISTANCE;
+    const testState = humanProximityTestStates.get(targetId);
+    const testElapsedMs = testState ? observedAtMs - testState.startedAt : 0;
+    const distance = testState
+        ? (testElapsedMs < HUMAN_PROXIMITY_TEST_DURATION_MS
+            ? HUMAN_PROXIMITY_TEST_DISTANCE
+            : HUMAN_PROXIMITY_TEST_CLEAR_DISTANCE)
+        : calculatedDistance;
+
+    return new SensorObservation({
+        observationId: `human-proximity-${forklift.id}-${observedAtMs}-${humanProximityObservationSequence}`,
+        observationType: ObservationType.HUMAN_PROXIMITY,
+        sensorId: HUMAN_PROXIMITY_SENSOR_ID,
+        targetId,
+        value: distance,
+        unit: 'map-unit',
+        confidence: pedestrianDetected || testState ? 1 : 0,
+        observedAt: new Date(observedAtMs).toISOString(),
+        metadata: {
+            source: testState ? 'human-proximity-test' : 'cctv-simulation',
+            forkliftId: forklift.id,
+            personId: humanPosition.id,
+            humanDetected: pedestrianDetected || Boolean(testState),
+            forkliftPosition: { x: forklift.x, y: forklift.y },
+            humanPosition: { x: humanPosition.x, y: humanPosition.y }
+        }
+    });
+}
+
 // Detect Collisions
 function detectCollisions() {
     const observedCollisions = new Set();
@@ -1484,19 +1627,21 @@ function detectCollisions() {
     }
     riskEventStateMachine.clearUnobserved('COLLISION_RISK', observedCollisions);
     
-    // Check pedestrian proximity
-    const pedestrian = document.getElementById('pedestrian-P02');
-    const observedPedestrianRisks = new Set();
-    if (pedestrian) {
-        animationState.forklifts.forEach(f => {
-            const dist = Math.sqrt(Math.pow(f.x - 520, 2) + Math.pow(f.y - 230, 2));
-            if (dist < 100) {
-                observedPedestrianRisks.add(f.id);
-                speakPedestrianWarning(f.id);
+    // Human Proximity Observations
+    const observedAtMs = Date.now();
+    animationState.forklifts.forEach(f => {
+        HUMAN_POSITIONS.forEach(humanPosition => {
+            const observation = createHumanProximityObservation(f, humanPosition, observedAtMs);
+            const riskSignal = observationToRiskSignal(observation);
+            if (riskSignal.shouldCreateRisk) {
+                const result = handleHumanProximity(f, riskSignal.eventInput);
+                notifyHumanProximityTestActive(observation.targetId, result);
+            } else if (riskSignal.shouldClearRisk) {
+                const clearedEvent = riskEventStateMachine.clear('HUMAN_PROXIMITY', observation.targetId);
+                finishHumanProximityTest(observation.targetId, clearedEvent);
             }
         });
-    }
-    riskEventStateMachine.clearUnobserved('PEDESTRIAN_PROXIMITY', observedPedestrianRisks);
+    });
     
     // Check speed violations in pedestrian zone
     const observedSpeedRisks = new Set();
@@ -2075,18 +2220,59 @@ function speakCollisionWarning(forklift1, forklift2) {
     return result.didSpeak;
 }
 
-// Pedestrian Warning Voice
-function speakPedestrianWarning(forkliftId) {
-    const forkliftName = formatForkliftIdForSpeech(forkliftId);
+// Human Proximity Warning
+function handleHumanProximity(forklift, eventInput = {}) {
+    const forkliftName = formatForkliftIdForSpeech(forklift.id);
     const message = `${forkliftName} 정지! 보행자 접근 중입니다!`;
     const result = riskEventStateMachine.observe({
-        eventType: 'PEDESTRIAN_PROXIMITY',
-        targetId: forkliftId,
-        severity: 'CRITICAL',
+        eventType: eventInput.eventType || 'HUMAN_PROXIMITY',
+        targetId: eventInput.targetId || getHumanProximityTargetId(forklift.id, HUMAN_POSITIONS[0].id),
+        severity: eventInput.severity || 'CRITICAL',
         speechMessage: message,
         speechPriority: 'high'
     });
-    return result.didSpeak;
+    if (result.didSpeak) {
+        showWarningIndicator(forklift, 'HUMAN PROXIMITY', '#ef4444');
+    }
+    return result;
+}
+
+function triggerHumanProximityTest() {
+    const forklift = animationState.forklifts.find(item => item.id === 'F-03');
+    if (!forklift) {
+        showNotificationPopup('HUMAN_PROXIMITY test target F-03 was not found.', 'error');
+        return;
+    }
+
+    const targetId = getHumanProximityTargetId(forklift.id, HUMAN_POSITIONS[0].id);
+    if (humanProximityTestStates.has(targetId)) {
+        showNotificationPopup('HUMAN_PROXIMITY test is already running.', 'warning');
+        return;
+    }
+
+    humanProximityTestStates.set(targetId, {
+        startedAt: Date.now(),
+        activeNotified: false
+    });
+    showNotificationPopup('F-03 HUMAN_PROXIMITY TEST started (60 map-unit, 300ms)', 'info');
+    startAnimation();
+}
+
+function notifyHumanProximityTestActive(targetId, result) {
+    const testState = humanProximityTestStates.get(targetId);
+    if (!testState || testState.activeNotified || !result || result.event.state !== EventState.ACTIVE) {
+        return;
+    }
+
+    testState.activeNotified = true;
+    showNotificationPopup(`HUMAN_PROXIMITY ACTIVE · ${result.event.eventId}`, 'warning');
+}
+
+function finishHumanProximityTest(targetId, clearedEvent) {
+    if (!humanProximityTestStates.has(targetId) || !clearedEvent) return;
+
+    humanProximityTestStates.delete(targetId);
+    showNotificationPopup(`HUMAN_PROXIMITY CLEARED · ${clearedEvent.eventId}`, 'success');
 }
 
 // Speed Violation Warning Voice
