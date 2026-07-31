@@ -208,6 +208,36 @@
       </div>
     </section>
 
+    <section id="driverPolicySimulation" class="driver-test-panel policy-simulation" aria-labelledby="driverPolicyTitle">
+      <h2 id="driverPolicyTitle" class="panel-title">Driver Runtime Policy Simulation</h2>
+      <p class="panel-copy">RiskEvent 기반 단계적 정책과 ActionRequest JSON만 생성합니다. 실제 차량 제어 또는 외부 통신을 수행하지 않습니다.</p>
+      <div class="simulation-banner">
+        <strong>SIMULATION · ACTUATOR NOT CONNECTED</strong>
+        EXTERNAL NOTIFICATION NOT CONNECTED · NOT FOR OPERATIONAL USE · UNVALIDATED DETERMINISTIC SIMULATION CANDIDATE
+      </div>
+      <div class="actions">
+        <button id="runDrowsinessPolicyTest" class="button button-secondary" type="button">RUN DROWSINESS POLICY TEST</button>
+        <button id="runIncapacitationPolicyTest" class="button button-secondary" type="button">RUN INCAPACITATION POLICY TEST</button>
+        <button id="runAlcoholPolicyTest" class="button button-secondary" type="button">RUN ALCOHOL POLICY TEST</button>
+        <button id="acknowledgeCurrentDriverAction" class="button button-secondary" type="button">ACKNOWLEDGE CURRENT ACTION</button>
+        <button id="completeCurrentDriverAction" class="button button-secondary" type="button">COMPLETE CURRENT ACTION</button>
+        <button id="resetDriverPolicySimulation" class="button button-secondary" type="button">RESET POLICY SIMULATION</button>
+      </div>
+      <div class="driver-output-grid policy-output-grid">
+        <article class="driver-output"><h3>Active Risk Events / Policies</h3><pre id="driverPolicyActiveEvents">[]</pre></article>
+        <article class="driver-output"><h3>Current Highest Priority Risk</h3><pre id="driverPolicyHighestRisk">null</pre></article>
+        <article class="driver-output"><h3>Current Policy Decision</h3><pre id="driverPolicyCurrentDecision">{}</pre></article>
+        <article class="driver-output"><h3>Policy Stage</h3><pre id="driverPolicyStage">-</pre></article>
+        <article class="driver-output"><h3>Recommended Actions</h3><pre id="driverPolicyRecommendedActions">NONE</pre></article>
+        <article class="driver-output"><h3>Pending Action Requests</h3><pre id="driverPolicyPendingActions">[]</pre></article>
+        <article class="driver-output"><h3>Action State</h3><pre id="driverPolicyActionState">NONE</pre></article>
+        <article class="driver-output"><h3>Source Event ID</h3><pre id="driverPolicySourceEventId">-</pre></article>
+        <article class="driver-output"><h3>Decision ID</h3><pre id="driverPolicyDecisionId">-</pre></article>
+        <article class="driver-output"><h3>Action ID</h3><pre id="driverPolicyActionId">-</pre></article>
+        <article class="driver-output policy-audit"><h3>Policy Audit History</h3><pre id="driverPolicyAuditHistory">[]</pre></article>
+      </div>
+    </section>
+
     <nav class="tabs" aria-label="Driver Safety 정보">
       <button class="tab-button active" type="button" data-tab="overview">구현 현황</button>
       <button class="tab-button" type="button" data-tab="ontology">Ontology 흐름</button>
@@ -275,8 +305,11 @@
   <script src="/static/js/driver_state.js"></script>
   <script src="/static/js/driver_sensor_adapters.js"></script>
   <script src="/static/js/driver_risk_runtime.js"></script>
+  <script src="/static/js/driver_policy_config.js"></script>
+  <script src="/static/js/driver_policy_engine.js"></script>
   <script>
     window.DriverStatePage = window.DriverState.initializeDriverStatePage();
+    window.DriverPolicyPage = window.DriverPolicy.initializeDriverPolicyPage();
     const tabButtons = document.querySelectorAll('.tab-button');
     const tabPanels = document.querySelectorAll('.tab-panel');
 

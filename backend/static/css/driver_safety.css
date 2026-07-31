@@ -31,6 +31,10 @@
 .driver-output pre { margin: 0; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; color: #aab6c5; font-size: 11px; }
 .driver-target { color: #22c55e; overflow-wrap: anywhere; }
 .driver-sequence { margin-top: 14px; color: #aab6c5; font-size: 12px; }
+.policy-simulation { border-color: rgba(249, 115, 22, .38); }
+.policy-simulation .driver-output h3 { color: #fb923c; }
+.policy-audit { grid-column: 1 / -1; }
+.policy-output-grid pre { max-height: 260px; }
 @media (max-width: 760px) {
   .driver-form-grid, .driver-output-grid { grid-template-columns: 1fr; }
 }
