@@ -238,6 +238,38 @@
       </div>
     </section>
 
+    <section id="driverActionSimulation" class="driver-test-panel action-simulation" aria-labelledby="driverActionTitle">
+      <h2 id="driverActionTitle" class="panel-title">Driver Action Dispatcher Simulation</h2>
+      <p class="panel-copy">Policy ActionRequest를 deterministic adapter에 전달하고 execution feedback JSON만 생성합니다. 실제 장치나 외부 시스템은 호출하지 않습니다.</p>
+      <div class="simulation-banner">
+        <strong>SIMULATION · ACTUATOR NOT CONNECTED</strong>
+        EXTERNAL SYSTEM NOT CONNECTED · VEHICLE CONTROL NOT CONNECTED · NOT FOR OPERATIONAL USE
+      </div>
+      <div class="actions">
+        <button id="generateDriverPolicyActions" class="button button-secondary" type="button">GENERATE POLICY ACTIONS</button>
+        <button id="dispatchPendingDriverActions" class="button button-secondary" type="button">DISPATCH PENDING ACTIONS</button>
+        <button id="acknowledgeCurrentExecution" class="button button-secondary" type="button">ACKNOWLEDGE CURRENT EXECUTION</button>
+        <button id="completeCurrentExecution" class="button button-secondary" type="button">COMPLETE CURRENT EXECUTION</button>
+        <button id="failCurrentExecution" class="button button-secondary" type="button">FAIL CURRENT EXECUTION</button>
+        <button id="cancelCurrentExecution" class="button button-secondary" type="button">CANCEL CURRENT EXECUTION</button>
+        <button id="resetDriverActionSimulation" class="button button-secondary" type="button">RESET ACTION SIMULATION</button>
+      </div>
+      <div class="driver-output-grid action-output-grid">
+        <article class="driver-output"><h3>Pending Action Requests</h3><pre id="driverDispatcherPendingPolicyActions">[]</pre></article>
+        <article class="driver-output"><h3>Dispatch Queue</h3><pre id="driverDispatchQueue">[]</pre></article>
+        <article class="driver-output"><h3>Selected Adapter</h3><pre id="driverSelectedAdapter">-</pre></article>
+        <article class="driver-output"><h3>Current Execution ID</h3><pre id="driverCurrentExecutionId">-</pre></article>
+        <article class="driver-output"><h3>Current Action ID</h3><pre id="driverCurrentDispatchActionId">-</pre></article>
+        <article class="driver-output"><h3>Execution State / Result</h3><pre><span id="driverExecutionState">NONE</span> / <span id="driverExecutionResult">NONE</span></pre></article>
+        <article class="driver-output"><h3>Priority / Attempt</h3><pre><span id="driverExecutionPriority">-</span> / <span id="driverExecutionAttempt">-</span></pre></article>
+        <article class="driver-output"><h3>Active Executions</h3><pre id="driverActiveExecutions">[]</pre></article>
+        <article class="driver-output"><h3>Completed Executions</h3><pre id="driverCompletedExecutions">[]</pre></article>
+        <article class="driver-output"><h3>Failed Executions</h3><pre id="driverFailedExecutions">[]</pre></article>
+        <article class="driver-output action-audit"><h3>Action Audit History</h3><pre id="driverActionAuditHistory">[]</pre></article>
+      </div>
+      <p class="note">표시는 Request generated · Simulation dispatched · Execution simulated 범위로 제한됩니다.</p>
+    </section>
+
     <nav class="tabs" aria-label="Driver Safety 정보">
       <button class="tab-button active" type="button" data-tab="overview">구현 현황</button>
       <button class="tab-button" type="button" data-tab="ontology">Ontology 흐름</button>
@@ -307,9 +339,12 @@
   <script src="/static/js/driver_risk_runtime.js"></script>
   <script src="/static/js/driver_policy_config.js"></script>
   <script src="/static/js/driver_policy_engine.js"></script>
+  <script src="/static/js/driver_action_config.js"></script>
+  <script src="/static/js/driver_action_dispatcher.js"></script>
   <script>
     window.DriverStatePage = window.DriverState.initializeDriverStatePage();
     window.DriverPolicyPage = window.DriverPolicy.initializeDriverPolicyPage();
+    window.DriverActionPage = window.DriverActions.initializeDriverActionPage();
     const tabButtons = document.querySelectorAll('.tab-button');
     const tabPanels = document.querySelectorAll('.tab-panel');
 

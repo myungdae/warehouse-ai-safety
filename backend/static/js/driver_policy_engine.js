@@ -180,6 +180,7 @@
                 message: `${actionType} requested by deterministic driver policy simulation`,
                 requiresAcknowledgement: true, acknowledgedTime: null, completedTime: null, cancelledTime: null,
                 metadata: this.metadata(context, { actuatorExecuted: false, externalNotificationSent: false,
+                    policyReasonCodes: [...decision.reasonCodes],
                     relationships: { policyDecisionRequestedActionRequest: decision.decisionId,
                         appliesToVehicleContext: context, concernsDriver: context && context.driverId,
                         actionRequestHasState: ActionState.REQUESTED } })

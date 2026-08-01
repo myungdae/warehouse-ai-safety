@@ -35,6 +35,10 @@
 .policy-simulation .driver-output h3 { color: #fb923c; }
 .policy-audit { grid-column: 1 / -1; }
 .policy-output-grid pre { max-height: 260px; }
+.action-simulation { border-color: rgba(168, 85, 247, .4); }
+.action-simulation .driver-output h3 { color: #c084fc; }
+.action-audit { grid-column: 1 / -1; }
+.action-output-grid pre { max-height: 260px; }
 @media (max-width: 760px) {
   .driver-form-grid, .driver-output-grid { grid-template-columns: 1fr; }
 }
