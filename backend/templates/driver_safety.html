@@ -270,6 +270,17 @@
       <p class="note">표시는 Request generated · Simulation dispatched · Execution simulated 범위로 제한됩니다.</p>
     </section>
 
+    <section id="runtimeEventGraphViewer" class="driver-test-panel runtime-graph" aria-labelledby="runtimeGraphTitle">
+      <h2 id="runtimeGraphTitle" class="panel-title">Runtime Graph</h2>
+      <p class="panel-copy">Runtime artifacts are observed and connected in memory for simulation and inspection only.</p>
+      <div class="driver-output-grid runtime-graph-grid">
+        <article class="driver-output"><h3>Nodes</h3><pre id="runtimeGraphNodes">[]</pre></article>
+        <article class="driver-output"><h3>Edges</h3><pre id="runtimeGraphEdges">[]</pre></article>
+        <article class="driver-output runtime-graph-wide"><h3>Current Runtime Path</h3><pre id="runtimeGraphPath">Observation → RiskEvent → PolicyDecision → ActionRequest → ActionExecution</pre></article>
+        <article class="driver-output runtime-graph-wide"><h3>JSON</h3><pre id="runtimeGraphJSON">{"nodes":[],"edges":[]}</pre></article>
+      </div>
+    </section>
+
     <nav class="tabs" aria-label="Driver Safety 정보">
       <button class="tab-button active" type="button" data-tab="overview">구현 현황</button>
       <button class="tab-button" type="button" data-tab="ontology">Ontology 흐름</button>
@@ -341,10 +352,12 @@
   <script src="/static/js/driver_policy_engine.js"></script>
   <script src="/static/js/driver_action_config.js"></script>
   <script src="/static/js/driver_action_dispatcher.js"></script>
+  <script src="/static/js/runtime_event_graph.js"></script>
   <script>
     window.DriverStatePage = window.DriverState.initializeDriverStatePage();
     window.DriverPolicyPage = window.DriverPolicy.initializeDriverPolicyPage();
     window.DriverActionPage = window.DriverActions.initializeDriverActionPage();
+    window.RuntimeGraphViewer = window.RuntimeEventGraph.initializeRuntimeGraphViewer();
     const tabButtons = document.querySelectorAll('.tab-button');
     const tabPanels = document.querySelectorAll('.tab-panel');
 
