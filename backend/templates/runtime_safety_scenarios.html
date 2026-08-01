@@ -1,20 +1,90 @@
 <!doctype html>
-<html lang="en">
+<html lang="ko">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Runtime Safety Validation Suite</title>
-  <style>
-    :root{color-scheme:dark;background:#07111f;color:#dcecff;font:15px/1.5 system-ui,sans-serif}body{margin:0;padding:32px}main{max-width:1400px;margin:auto}
-    h1{margin-bottom:4px}.copy{color:#91a7c2}.controls{display:flex;gap:10px;flex-wrap:wrap;margin:24px 0}button,select{border:1px solid #315274;border-radius:7px;background:#10243a;color:#fff;padding:10px 14px}
-    button{cursor:pointer;background:#1266a5}.secondary{background:#172c42}.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}section{background:#0b1929;border:1px solid #203b57;border-radius:10px;padding:18px}pre{overflow:auto;max-height:65vh;white-space:pre-wrap;color:#bce0ff}@media(max-width:900px){.grid{grid-template-columns:1fr}}
-  </style>
+  <link rel="stylesheet" href="/static/css/runtime_safety_scenarios.css">
 </head>
-<body><main id="scenarioViewer">
-  <h1>Runtime Safety Validation Suite</h1>
-  <p class="copy">Deterministic simulation only · Sensors disconnected · Operational use prohibited</p>
-  <div class="controls"><select id="scenarioSelect" aria-label="Scenario"></select><button id="runScenario">RUN SCENARIO</button><button id="runAllScenarios">RUN ALL</button><button id="clearScenarioHistory" class="secondary">CLEAR HISTORY</button></div>
-  <div class="grid"><section><h2>PASS / FAIL Report</h2><pre id="scenarioReport">Select a scenario and run validation.</pre></section><section><h2>Scenario History</h2><pre id="scenarioHistory">[]</pre></section></div>
+<body>
+<main id="scenarioViewer" class="suite-shell">
+  <header class="hero">
+    <div>
+      <p class="eyebrow">OPERATIONAL SCENARIO LIBRARY</p>
+      <h1>Runtime Safety Validation Suite</h1>
+      <p class="hero-copy">실제 센서 연결 전, 고정 관측 시퀀스로 Runtime Operational Ontology 전체 경로를 검증합니다.</p>
+    </div>
+    <div class="safety-labels" aria-label="Simulation safety status">
+      <span>◆ DETERMINISTIC SIMULATION</span><span>⊘ SENSORS DISCONNECTED</span>
+      <span>⊘ ACTUATORS DISCONNECTED</span><span>! NOT FOR OPERATIONAL USE</span>
+    </div>
+  </header>
+
+  <section class="metrics" aria-label="검증 요약">
+    <article class="metric-card"><span>전체 Scenario</span><strong id="metricTotal">8</strong><small>고정 검증 라이브러리</small></article>
+    <article class="metric-card metric-pass"><span>PASS</span><strong id="metricPass">0</strong><small>최근 실행 기준</small></article>
+    <article class="metric-card metric-fail"><span>FAIL</span><strong id="metricFail">0</strong><small>검토 필요</small></article>
+    <article class="metric-card"><span>현재 선택</span><strong id="metricSelected">DROWSINESS</strong><small id="metricLastRun">아직 실행되지 않음</small></article>
+    <article class="metric-card"><span>Runtime Triple</span><strong id="metricTriples">—</strong><small>선택 결과 기준</small></article>
+  </section>
+
+  <section class="control-panel" aria-labelledby="controlTitle">
+    <div><p class="section-kicker">VALIDATION CONTROL</p><h2 id="controlTitle">Scenario 실행</h2><p id="scenarioDescription" class="muted"></p></div>
+    <div class="controls">
+      <label for="scenarioSelect">Scenario 선택</label>
+      <select id="scenarioSelect"></select>
+      <button id="runScenario" type="button">▶ RUN SELECTED</button>
+      <button id="runAllScenarios" type="button" class="button-accent">▶ RUN ALL</button>
+      <button id="clearScenarioHistory" type="button" class="button-quiet">CLEAR HISTORY</button>
+    </div>
+    <p id="runStatus" class="run-status" aria-live="polite">실행 대기 중</p>
+  </section>
+
+  <section class="panel" aria-labelledby="timelineTitle">
+    <div class="section-heading"><div><p class="section-kicker">STATE VALIDATION</p><h2 id="timelineTitle">상태 전이 Lifecycle</h2></div><span id="timelineRunId" class="mono muted">No run selected</span></div>
+    <div id="lifecycleTimeline" class="timeline empty-state">Scenario를 실행하면 실제 단계별 결과가 표시됩니다.</div>
+  </section>
+
+  <section class="panel" aria-labelledby="pathTitle">
+    <div class="section-heading"><div><p class="section-kicker">OPERATIONAL TRACE</p><h2 id="pathTitle">Runtime Path</h2></div><span class="legend-dot">실제 생성 artifact 기준</span></div>
+    <div id="runtimePath" class="runtime-path empty-state">아직 생성된 Runtime Path가 없습니다.</div>
+  </section>
+
+  <div class="two-column">
+    <section class="panel report-panel" aria-labelledby="reportTitle">
+      <div class="section-heading"><div><p class="section-kicker">VALIDATION REPORT</p><h2 id="reportTitle">PASS / FAIL Report</h2></div><span id="reportBadge" class="status-badge status-pending">PENDING</span></div>
+      <div id="reportSummary" class="empty-state">Scenario를 선택하고 실행하세요.</div>
+    </section>
+    <section class="panel" aria-labelledby="tripleTitle">
+      <div class="section-heading"><div><p class="section-kicker">ONTOLOGY SUMMARY</p><h2 id="tripleTitle">Runtime Operational Triple</h2></div><strong id="tripleCount" class="triple-count">0</strong></div>
+      <p class="muted">이 계보는 하나의 모의 관측이 위험, 정책 결정, 행동 요청, 모의 실행으로 이어진 과정을 기록합니다.</p>
+      <div id="tripleSummary" class="triple-list empty-state">생성된 Triple이 없습니다.</div>
+    </section>
+  </div>
+
+  <section class="panel" aria-labelledby="matrixTitle">
+    <div class="section-heading"><div><p class="section-kicker">SCENARIO COVERAGE</p><h2 id="matrixTitle">Scenario Matrix</h2></div><strong id="matrixHeadline">0 / 8 실행</strong></div>
+    <div id="scenarioMatrix" class="scenario-matrix"></div>
+  </section>
+
+  <section class="panel" aria-labelledby="historyTitle">
+    <div class="section-heading"><div><p class="section-kicker">LOCAL AUDIT TRAIL</p><h2 id="historyTitle">Scenario History</h2></div><span class="muted">최근 실행이 위에 표시됩니다</span></div>
+    <div class="table-wrap"><table><thead><tr><th>실행 시각</th><th>Scenario</th><th>결과</th><th>Duration</th><th>Lifecycle</th><th>Triple</th><th>Run ID</th><th>Details</th></tr></thead><tbody id="scenarioHistory"></tbody></table></div>
+    <p id="emptyHistory" class="empty-state">저장된 Scenario 실행 기록이 없습니다.</p>
+  </section>
+
+  <details class="panel developer-panel">
+    <summary>개발자 상세 Developer Details</summary>
+    <p class="muted">선택 실행의 lifecycle, report, Runtime Path, 원본 JSON을 확인합니다.</p>
+    <pre id="scenarioRawJson">{}</pre>
+  </details>
 </main>
-<script src="/static/js/sensor_observation.js"></script><script src="/static/js/driver_state_config.js"></script><script src="/static/js/driver_risk_runtime.js"></script>
-<script src="/static/js/runtime_event_graph.js"></script><script src="/static/js/runtime_triple_engine.js"></script><script src="/static/js/runtime_safety_scenarios.js"></script>
-<script>window.ScenarioViewer = window.RuntimeSafetyScenarios.initializeScenarioViewer();</script></body></html>
+<script src="/static/js/sensor_observation.js"></script>
+<script src="/static/js/driver_state_config.js"></script>
+<script src="/static/js/driver_risk_runtime.js"></script>
+<script src="/static/js/runtime_event_graph.js"></script>
+<script src="/static/js/runtime_triple_engine.js"></script>
+<script src="/static/js/runtime_safety_scenarios.js"></script>
+<script>window.ScenarioViewer = window.RuntimeSafetyScenarios.initializeScenarioViewer();</script>
+</body>
+</html>
