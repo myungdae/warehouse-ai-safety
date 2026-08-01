@@ -171,18 +171,39 @@
         <button type="button" data-camera-start>Start Camera</button>
         <button type="button" data-camera-stop disabled>Stop Camera</button>
       </div>
-      <video class="driver-perception__video" data-camera-video autoplay muted playsinline aria-label="Browser-local driver camera preview"></video>
+      <div class="driver-perception__preview">
+        <video class="driver-perception__video" data-camera-video autoplay muted playsinline aria-label="Browser-local driver camera preview"></video>
+        <canvas class="driver-perception__overlay" data-camera-overlay aria-hidden="true"></canvas>
+      </div>
       <div class="driver-perception__status" aria-live="polite">
         <div class="driver-perception__metric"><span>Camera permission</span><strong data-perception-permission>UNKNOWN</strong></div>
         <div class="driver-perception__metric"><span>Runtime state</span><strong data-perception-state>IDLE</strong></div>
         <div class="driver-perception__metric"><span>Face</span><strong data-perception-face>NOT EVALUATED</strong></div>
         <div class="driver-perception__metric"><span>Frame processing</span><strong data-perception-frame>IDLE</strong></div>
+        <div class="driver-perception__metric"><span>Last frame</span><strong data-perception-last-frame>-</strong></div>
       </div>
+      <div class="driver-perception__metric-groups">
+        <section class="driver-perception__group"><h3>Calibration</h3>
+          <div class="driver-perception__controls"><button type="button" data-calibration-start>Start Calibration</button><button type="button" data-calibration-reset>Reset Calibration</button></div>
+          <dl><div><dt>State</dt><dd data-perception-calibration-state>NOT_STARTED</dd></div><div><dt>Samples</dt><dd data-perception-calibration-samples>0</dd></div><div><dt>Progress</dt><dd data-perception-calibration-progress>0%</dd></div><div><dt>Baseline</dt><dd data-perception-baseline>-</dd></div><div><dt>Threshold</dt><dd data-perception-threshold>-</dd></div></dl>
+          <small>DEVELOPMENT / UNVALIDATED. Calibration does not enable a risk decision.</small>
+        </section>
+        <section class="driver-perception__group"><h3>Eye Metrics</h3>
+          <dl><div><dt>Left EAR</dt><dd data-perception-left-ear>-</dd></div><div><dt>Right EAR</dt><dd data-perception-right-ear>-</dd></div><div><dt>EAR</dt><dd data-perception-ear>-</dd></div><div><dt>EAR valid</dt><dd data-perception-ear-valid>false</dd></div><div><dt>Eye state</dt><dd data-perception-eye-state>RAW ONLY</dd></div><div><dt>Closure ms</dt><dd data-perception-closure>0</dd></div><div><dt>Blink count</dt><dd data-perception-blink-count>0</dd></div><div><dt>Blink rate</dt><dd data-perception-blink-rate>0</dd></div><div><dt>PERCLOS</dt><dd data-perception-perclos>-</dd></div></dl>
+        </section>
+        <section class="driver-perception__group"><h3>Head Pose <small>HEURISTIC</small></h3>
+          <dl><div><dt>Pitch scale</dt><dd data-perception-pitch>-</dd></div><div><dt>Roll °</dt><dd data-perception-roll>-</dd></div><div><dt>Yaw scale</dt><dd data-perception-yaw>-</dd></div><div><dt>State</dt><dd data-perception-pose-state>UNKNOWN</dd></div></dl>
+        </section>
+      </div>
+      <details class="driver-perception__snapshot"><summary>Latest DriverMetricSnapshot · <span data-perception-snapshot-time>-</span></summary><pre data-perception-snapshot-json>{}</pre></details>
       <div class="driver-perception__notices">
+        <span class="driver-perception__notice">LIVE CAMERA INPUT</span>
         <span class="driver-perception__notice">BROWSER-LOCAL PROCESSING</span>
         <span class="driver-perception__notice">NO IMAGE STORAGE</span>
         <span class="driver-perception__notice">NO IMAGE TRANSMISSION</span>
+        <span class="driver-perception__notice">METRICS ONLY</span>
         <span class="driver-perception__notice">NOT FOR OPERATIONAL USE</span>
+        <span class="driver-perception__notice">NOT CONNECTED TO RISK RUNTIME YET</span>
       </div>
     </section>
 
@@ -394,6 +415,9 @@
   <script src="/static/js/driver_perception/driver_perception_config.js"></script>
   <script src="/static/js/driver_perception/camera_manager.js"></script>
   <script src="/static/js/driver_perception/face_landmark_adapter.js"></script>
+  <script src="/static/js/driver_perception/driver_calibration.js"></script>
+  <script src="/static/js/driver_perception/driver_metric_calculator.js"></script>
+  <script src="/static/js/driver_perception/driver_metric_snapshot.js"></script>
   <script src="/static/js/driver_perception/driver_perception_runtime.js"></script>
   <script src="/static/js/sensor_observation.js"></script>
   <script src="/static/js/driver_state_config.js"></script>

@@ -18,11 +18,24 @@
 .driver-perception button { padding: 10px 14px; border: 1px solid rgba(148,163,184,.25); border-radius: 8px; color: #e6edf3; background: #111a2d; }
 .driver-perception button { cursor: pointer; font-weight: 700; }
 .driver-perception button:disabled { cursor: not-allowed; opacity: .45; }
-.driver-perception__video { display: block; width: min(100%, 640px); aspect-ratio: 4 / 3; border-radius: 12px; background: #020409; object-fit: cover; }
+.driver-perception__preview { position: relative; width: min(100%, 640px); aspect-ratio: 4 / 3; }
+.driver-perception__video { display: block; width: 100%; height: 100%; border-radius: 12px; background: #020409; object-fit: cover; }
+.driver-perception__overlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .driver-perception__status { margin-top: 16px; }
 .driver-perception__metric { min-width: 145px; padding: 12px; border: 1px solid rgba(148,163,184,.18); border-radius: 9px; }
 .driver-perception__metric span { display: block; margin-bottom: 5px; color: #8b949e; font-size: 11px; }
 .driver-perception__metric strong { color: #00d4ff; font-size: 13px; }
 .driver-perception__notices { margin-top: 18px; }
+.driver-perception__metric-groups { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 18px; }
+.driver-perception__group { padding: 16px; border: 1px solid rgba(148,163,184,.18); border-radius: 10px; background: rgba(2,4,9,.45); }
+.driver-perception__group h3 { margin: 0 0 12px; font-size: 15px; }
+.driver-perception__group h3 small, .driver-perception__group > small { color: #facc15; font-size: 10px; }
+.driver-perception__group dl { display: grid; gap: 7px; margin: 0; }
+.driver-perception__group dl div { display: flex; justify-content: space-between; gap: 12px; }
+.driver-perception__group dt { color: #8b949e; font-size: 12px; }
+.driver-perception__group dd { margin: 0; color: #00d4ff; font: 12px ui-monospace, monospace; }
+.driver-perception__snapshot { margin-top: 16px; color: #aab6c5; }
+.driver-perception__snapshot pre { max-height: 320px; overflow: auto; padding: 12px; color: #9feaf9; background: #020409; }
 .driver-perception__notice { padding: 7px 10px; border: 1px solid rgba(250,204,21,.3); border-radius: 999px; color: #fde68a; font-size: 11px; font-weight: 800; }
+@media (max-width: 900px) { .driver-perception__metric-groups { grid-template-columns: 1fr; } }
 @media (max-width: 760px) { .driver-perception { padding: 18px; } .driver-perception__field { min-width: 100%; } }
