@@ -235,6 +235,10 @@ def warehouse():
 def driver_safety():
     return render_template('driver_safety.html')
 
+@app.route('/runtime-safety-scenarios')
+def runtime_safety_scenarios():
+    return render_template('runtime_safety_scenarios.html')
+
 @app.route('/driver-safety.html')
 def driver_safety_legacy():
     return redirect(url_for('driver_safety'))

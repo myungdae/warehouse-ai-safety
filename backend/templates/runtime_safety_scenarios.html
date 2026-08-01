@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Runtime Safety Validation Suite</title>
+  <style>
+    :root{color-scheme:dark;background:#07111f;color:#dcecff;font:15px/1.5 system-ui,sans-serif}body{margin:0;padding:32px}main{max-width:1400px;margin:auto}
+    h1{margin-bottom:4px}.copy{color:#91a7c2}.controls{display:flex;gap:10px;flex-wrap:wrap;margin:24px 0}button,select{border:1px solid #315274;border-radius:7px;background:#10243a;color:#fff;padding:10px 14px}
+    button{cursor:pointer;background:#1266a5}.secondary{background:#172c42}.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}section{background:#0b1929;border:1px solid #203b57;border-radius:10px;padding:18px}pre{overflow:auto;max-height:65vh;white-space:pre-wrap;color:#bce0ff}@media(max-width:900px){.grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body><main id="scenarioViewer">
+  <h1>Runtime Safety Validation Suite</h1>
+  <p class="copy">Deterministic simulation only · Sensors disconnected · Operational use prohibited</p>
+  <div class="controls"><select id="scenarioSelect" aria-label="Scenario"></select><button id="runScenario">RUN SCENARIO</button><button id="runAllScenarios">RUN ALL</button><button id="clearScenarioHistory" class="secondary">CLEAR HISTORY</button></div>
+  <div class="grid"><section><h2>PASS / FAIL Report</h2><pre id="scenarioReport">Select a scenario and run validation.</pre></section><section><h2>Scenario History</h2><pre id="scenarioHistory">[]</pre></section></div>
+</main>
+<script src="/static/js/sensor_observation.js"></script><script src="/static/js/driver_state_config.js"></script><script src="/static/js/driver_risk_runtime.js"></script>
+<script src="/static/js/runtime_event_graph.js"></script><script src="/static/js/runtime_triple_engine.js"></script><script src="/static/js/runtime_safety_scenarios.js"></script>
+<script>window.ScenarioViewer = window.RuntimeSafetyScenarios.initializeScenarioViewer();</script></body></html>
