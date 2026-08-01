@@ -281,6 +281,24 @@
       </div>
     </section>
 
+    <section id="runtimeTripleViewer" class="driver-test-panel runtime-triple" aria-labelledby="runtimeTripleTitle">
+      <h2 id="runtimeTripleTitle" class="panel-title">Runtime Triple Viewer</h2>
+      <div class="simulation-banner"><strong>SIMULATION</strong>NOT FOR OPERATIONAL USE</div>
+      <div class="actions">
+        <button id="exportRuntimeTriplesJSON" class="button button-secondary" type="button">EXPORT JSON</button>
+        <button id="exportRuntimeTriplesTTL" class="button button-secondary" type="button">EXPORT TURTLE</button>
+        <button id="traceCurrentExecution" class="button button-secondary" type="button">TRACE CURRENT EXECUTION</button>
+        <button id="resetRuntimeTripleStore" class="button button-secondary" type="button">RESET TRIPLE STORE</button>
+      </div>
+      <div class="driver-output-grid runtime-triple-grid">
+        <article class="driver-output"><h3>Triple Count</h3><pre id="runtimeTripleCount">0</pre></article>
+        <article class="driver-output"><h3>Current Runtime Triple</h3><pre id="runtimeCurrentTriples">[]</pre></article>
+        <article class="driver-output runtime-triple-wide"><h3>Current Runtime Lineage</h3><pre id="runtimeCurrentLineage">{}</pre></article>
+        <article class="driver-output runtime-triple-wide"><h3>Current Turtle</h3><pre id="runtimeTripleTTL"></pre></article>
+        <article class="driver-output runtime-triple-wide"><h3>Current JSON</h3><pre id="runtimeTripleJSON">[]</pre></article>
+      </div>
+    </section>
+
     <nav class="tabs" aria-label="Driver Safety 정보">
       <button class="tab-button active" type="button" data-tab="overview">구현 현황</button>
       <button class="tab-button" type="button" data-tab="ontology">Ontology 흐름</button>
@@ -353,11 +371,13 @@
   <script src="/static/js/driver_action_config.js"></script>
   <script src="/static/js/driver_action_dispatcher.js"></script>
   <script src="/static/js/runtime_event_graph.js"></script>
+  <script src="/static/js/runtime_triple_engine.js"></script>
   <script>
     window.DriverStatePage = window.DriverState.initializeDriverStatePage();
     window.DriverPolicyPage = window.DriverPolicy.initializeDriverPolicyPage();
     window.DriverActionPage = window.DriverActions.initializeDriverActionPage();
     window.RuntimeGraphViewer = window.RuntimeEventGraph.initializeRuntimeGraphViewer();
+    window.RuntimeTripleViewer = window.RuntimeTripleEngine.initializeRuntimeTripleViewer();
     const tabButtons = document.querySelectorAll('.tab-button');
     const tabPanels = document.querySelectorAll('.tab-panel');
 

@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Runtime Triple Engine Regression</title></head>
+<body><pre id="results">RUNNING</pre>
+<script src="../backend/static/js/runtime_event_graph.js"></script>
+<script src="../backend/static/js/runtime_triple_engine.js"></script>
+<script>
+(function run() {
+    'use strict';
+    const output = document.getElementById('results'); const checks = [];
+    const assert = (condition, message) => { if (!condition) throw new Error(message); checks.push(message); };
+    try {
+        const graph = new RuntimeEventGraph.RuntimeGraph();
+        const targetId = 'F03|DRIVER001|ASSIGNMENT001';
+        const context = { vehicleId: 'F03', driverId: 'DRIVER001', driverAssignmentId: 'ASSIGNMENT001', targetId };
+        const observation = { observationId: 'OBS-TRIPLE-001', observationType: 'DROWSINESS', targetId,
+            observedAt: '2026-08-01T00:00:00.000Z', metadata: context };
+        const riskEvent = { eventId: 'RISK-TRIPLE-001', targetId, state: 'ACTIVE', severity: 'HIGH',
+            createdTime: '2026-08-01T00:00:01.000Z', updatedTime: '2026-08-01T00:00:01.000Z' };
+        const policyDecision = { decisionId: 'POLICY-TRIPLE-001', sourceEventId: riskEvent.eventId, targetId,
+            priority: 'HIGH', createdTime: '2026-08-01T00:00:02.000Z' };
+        const actionRequest = { actionId: 'ACTION-TRIPLE-001', sourceDecisionId: policyDecision.decisionId,
+            sourceEventId: riskEvent.eventId, targetId, priority: 'HIGH', createdTime: '2026-08-01T00:00:03.000Z' };
+        const execution = { executionId: 'EXEC-TRIPLE-001', actionId: actionRequest.actionId,
+            sourceDecisionId: policyDecision.decisionId, sourceEventId: riskEvent.eventId, targetId,
+            state: 'COMPLETED', requestedTime: '2026-08-01T00:00:04.000Z',
+            completedTime: '2026-08-01T00:00:05.000Z', simulation: true, actuatorConnected: false,
+            metadata: { selectedAdapterType: 'DETERMINISTIC_SIMULATION', relationships: {
+                actionExecutionAppliesToVehicleContext: context } } };
+        graph.ingestRuntimeChain({ observation, riskEvent, policyDecision, actionRequest, actionExecution: execution });
+
+        const store = new RuntimeTripleEngine.TripleStore();
+        const builder = new RuntimeTripleEngine.TripleBuilder(store);
+        builder.buildFromGraph(graph.getRuntimeGraph());
+        const triples = store.getRuntimeTriples();
+        const has = predicate => triples.some(item => item.predicate === predicate);
+        ['generatedRisk', 'triggeredPolicy', 'requestedAction', 'dispatchedAction', 'executedAction', 'usesAdapter',
+            'generatedExecution', 'appliesTo', 'concernsDriver', 'derivedFromPolicy', 'hasState',
+            'derivedFromRisk', 'derivedFromObservation', 'completedBy', 'hasSeverity', 'hasPriority',
+            'hasVehicle', 'hasDriver', 'hasAssignment', 'hasExecution']
+            .forEach(predicate => assert(has(predicate), `predicate ${predicate}`));
+        const count = triples.length; builder.buildFromGraph(graph.getRuntimeGraph());
+        assert(store.getRuntimeTriples().length === count, 'subject predicate object deduplication');
+        assert(store.findSubject('Observation:OBS-TRIPLE-001').length > 0, 'findSubject');
+        assert(store.findObject('RiskEvent:RISK-TRIPLE-001').length > 0, 'findObject');
+        assert(store.findPredicate('generatedRisk').length === 1, 'findPredicate');
+        assert(store.findTriples({ subject: 'RiskEvent:RISK-TRIPLE-001', predicate: 'triggeredPolicy' }).length === 1,
+            'findTriples');
+        assert(JSON.parse(store.exportTriplesJSON()).length === count, 'JSON export');
+        assert(store.exportTriplesTTL().includes('<urn:runtime:vocabulary:generatedRisk>'), 'Turtle export');
+
+        RuntimeTripleEngine.tripleStore.clear();
+        RuntimeTripleEngine.syncFromRuntimeGraph(graph.getRuntimeGraph());
+        const path = RuntimeTripleEngine.traceRuntimePath('Observation:OBS-TRIPLE-001', 'ActionExecution:EXEC-TRIPLE-001');
+        assert(path.length === 5, 'lineage trace complete');
+        assert(RuntimeTripleEngine.getObservationLineage('Observation:OBS-TRIPLE-001').length > 0, 'observation lineage');
+        assert(RuntimeTripleEngine.getRiskLineage('RiskEvent:RISK-TRIPLE-001').length > 0, 'risk lineage');
+        assert(RuntimeTripleEngine.getPolicyLineage('PolicyDecision:POLICY-TRIPLE-001').length > 0, 'policy lineage');
+        assert(RuntimeTripleEngine.getActionLineage('ActionRequest:ACTION-TRIPLE-001').length > 0, 'action lineage');
+        assert(RuntimeTripleEngine.getExecutionLineage('ActionExecution:EXEC-TRIPLE-001').length > 0, 'execution lineage');
+
+        const outOfOrder = new RuntimeEventGraph.RuntimeGraph(); outOfOrder.recordObservation(observation);
+        outOfOrder.recordPolicyDecision({ ...policyDecision, decisionId: 'POLICY-LATE', sourceEventId: 'RISK-LATE' });
+        const lateStore = new RuntimeTripleEngine.TripleStore();
+        new RuntimeTripleEngine.TripleBuilder(lateStore).buildFromGraph(outOfOrder.getRuntimeGraph());
+        assert(lateStore.findPredicate('generatedRisk').length === 1 && lateStore.findPredicate('triggeredPolicy').length === 1,
+            'placeholder graph conversion');
+        output.textContent = `PASS (${checks.length} checks)\n${checks.join('\n')}`;
+        document.title = 'PASS - Runtime Triple Engine Regression';
+    } catch (error) {
+        output.textContent = `FAIL\n${error.stack || error.message}`;
+        document.title = 'FAIL - Runtime Triple Engine Regression'; throw error;
+    }
+}());
+</script></body></html>
