@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Driver Camera Foundation Tests</title></head>
+<body><pre id="results"></pre>
+<script src="../backend/static/js/driver_perception/driver_perception_config.js"></script>
+<script src="../backend/static/js/driver_perception/camera_manager.js"></script>
+<script src="../backend/static/js/driver_perception/face_landmark_adapter.js"></script>
+<script src="../backend/static/js/driver_perception/driver_perception_runtime.js"></script>
+<script>
+(async function run() {
+  'use strict';
+  const results = [];
+  const test = async (name, fn) => { try { await fn(); results.push({name, pass:true}); } catch (e) { results.push({name, pass:false, error:e.message}); } };
+  const assert = (value, message) => { if (!value) throw new Error(message); };
+  const track = () => ({readyState:'live', stopped:0, stop(){this.stopped++;this.readyState='ended';}, addEventListener(){}});
+  const stream = tracks => ({getTracks:()=>tracks, getVideoTracks:()=>tracks});
+
+  await test('CameraManager creation', () => {
+    const manager = new DriverPerception.CameraManager({mediaDevices:{}});
+    assert(manager.getState().activeRoles.length === 0, 'new manager must be inactive');
+  });
+  await test('enumerateDevices failure', async () => {
+    const manager = new DriverPerception.CameraManager({mediaDevices:{enumerateDevices:async()=>{throw new Error('failed');}}});
+    let rejected=false; try{await manager.enumerateDevices();}catch(_){rejected=true;} assert(rejected, 'must reject');
+  });
+  await test('permission denial', async () => {
+    const denied=Object.assign(new Error('denied'),{name:'NotAllowedError'});
+    const manager=new DriverPerception.CameraManager({mediaDevices:{getUserMedia:async()=>{throw denied;}}});
+    try{await manager.start();}catch(_){} assert(manager.permissionState === 'DENIED','must record denial');
+  });
+  await test('duplicate start blocked', async () => {
+    let calls=0; const source=stream([track()]);
+    const manager=new DriverPerception.CameraManager({mediaDevices:{getUserMedia:async()=>{calls++;return source;}}});
+    await Promise.all([manager.start(),manager.start()]); assert(calls===1,'duplicate getUserMedia'); await manager.stop();
+  });
+  await test('stop ends every track', async () => {
+    const tracks=[track(),track()]; const manager=new DriverPerception.CameraManager({mediaDevices:{getUserMedia:async()=>stream(tracks)}});
+    await manager.start(); const count=await manager.stop(); assert(count===2 && tracks.every(t=>t.stopped===1),'tracks not stopped');
+  });
+  await test('same device cannot serve conflicting roles', async () => {
+    const makeStream=()=>{const t=track();t.getSettings=()=>({deviceId:'camera-1'});return stream([t]);};
+    const manager=new DriverPerception.CameraManager({mediaDevices:{getUserMedia:async()=>makeStream()}});
+    await manager.start({role:'primary',deviceId:'camera-1'}); let rejected=false;
+    try{await manager.start({role:'secondary',deviceId:'camera-1'});}catch(_){rejected=true;}
+    assert(rejected,'conflicting role must reject'); await manager.stopAll();
+  });
+  await test('faceDetected false preserved', async () => {
+    let handler, delivered; const mesh={setOptions(){},onResults(fn){handler=fn;},async initialize(){},async send(){handler({multiFaceLandmarks:[]});}};
+    const adapter=new DriverPerception.FaceLandmarkAdapter({faceMeshFactory:()=>mesh});
+    await adapter.initialize(); adapter.start({cameraId:'cam',onLandmarkFrame:f=>{delivered=f;}}); await adapter.process({});
+    assert(delivered.faceDetected===false && delivered.landmarks===null,'false face created data');
+  });
+  await test('landmark callback delivered', async () => {
+    let handler, delivered; const points=[{x:.1,y:.2,z:0}];
+    const mesh={setOptions(){},onResults(fn){handler=fn;},async initialize(){},async send(){handler({multiFaceLandmarks:[points]});}};
+    const adapter=new DriverPerception.FaceLandmarkAdapter({faceMeshFactory:()=>mesh});
+    await adapter.initialize(); adapter.start({cameraId:'cam-1',imageWidth:640,imageHeight:480,onLandmarkFrame:f=>{delivered=f;}}); await adapter.process({});
+    assert(delivered.faceDetected && delivered.landmarks===points && delivered.cameraId==='cam-1','callback mismatch');
+  });
+  await test('stale callback invalidated', async () => {
+    let handler,count=0; const mesh={setOptions(){},onResults(fn){handler=fn;},async initialize(){},async send(){}};
+    const adapter=new DriverPerception.FaceLandmarkAdapter({faceMeshFactory:()=>mesh});
+    await adapter.initialize(); adapter.start({onLandmarkFrame:()=>count++}); adapter.process({}); adapter.stop(); handler({multiFaceLandmarks:[[]]});
+    assert(count===0,'stale callback delivered');
+  });
+  await test('start stop repeats', async () => {
+    const tracks=[]; const manager=new DriverPerception.CameraManager({mediaDevices:{getUserMedia:async()=>{const t=track();tracks.push(t);return stream([t]);}}});
+    await manager.start();await manager.stop();await manager.start();await manager.stop(); assert(tracks.length===2&&tracks.every(t=>t.stopped===1),'repeat failed');
+  });
+  await test('privacy configuration', () => {
+    assert(DriverPerception.Config.imageStorageAllowed===false,'storage enabled');
+    assert(DriverPerception.Config.imageTransmissionAllowed===false,'transmission enabled');
+  });
+  const passCount=results.filter(r=>r.pass).length;
+  document.getElementById('results').textContent=JSON.stringify({pass:passCount===results.length,passCount,total:results.length,results},null,2);
+  document.title=`${passCount}/${results.length} Driver Camera Foundation Tests`;
+})();
+</script></body></html>

@@ -1,0 +1,28 @@
+.driver-perception {
+    margin: 26px 0;
+    padding: 24px;
+    border: 1px solid rgba(0, 212, 255, .28);
+    border-radius: 16px;
+    background: rgba(7, 11, 20, .72);
+}
+.driver-perception__header,
+.driver-perception__controls,
+.driver-perception__status,
+.driver-perception__notices { display: flex; gap: 12px; flex-wrap: wrap; }
+.driver-perception__header { justify-content: space-between; align-items: start; }
+.driver-perception__title { margin: 0 0 8px; }
+.driver-perception__copy { margin: 0; color: #8b949e; line-height: 1.6; }
+.driver-perception__controls { margin: 20px 0; align-items: end; }
+.driver-perception__field { display: grid; gap: 7px; min-width: 260px; color: #aab6c5; font-size: 13px; }
+.driver-perception select,
+.driver-perception button { padding: 10px 14px; border: 1px solid rgba(148,163,184,.25); border-radius: 8px; color: #e6edf3; background: #111a2d; }
+.driver-perception button { cursor: pointer; font-weight: 700; }
+.driver-perception button:disabled { cursor: not-allowed; opacity: .45; }
+.driver-perception__video { display: block; width: min(100%, 640px); aspect-ratio: 4 / 3; border-radius: 12px; background: #020409; object-fit: cover; }
+.driver-perception__status { margin-top: 16px; }
+.driver-perception__metric { min-width: 145px; padding: 12px; border: 1px solid rgba(148,163,184,.18); border-radius: 9px; }
+.driver-perception__metric span { display: block; margin-bottom: 5px; color: #8b949e; font-size: 11px; }
+.driver-perception__metric strong { color: #00d4ff; font-size: 13px; }
+.driver-perception__notices { margin-top: 18px; }
+.driver-perception__notice { padding: 7px 10px; border: 1px solid rgba(250,204,21,.3); border-radius: 999px; color: #fde68a; font-size: 11px; font-weight: 800; }
+@media (max-width: 760px) { .driver-perception { padding: 18px; } .driver-perception__field { min-width: 100%; } }

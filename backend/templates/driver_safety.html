@@ -6,6 +6,7 @@
   <link rel="icon" href="data:,">
   <title>Driver Safety · IMC Agentic AI</title>
   <link rel="stylesheet" href="/static/css/driver_safety.css">
+  <link rel="stylesheet" href="/static/css/driver_perception.css">
   <style>
     :root {
       --bg: #070b14;
@@ -155,6 +156,35 @@
       <strong>SIMULATION · 실제 센서 미연결</strong>
       Deterministic Test Observation 전용이며 운영 판정에 사용 금지입니다.
     </div>
+
+    <section class="driver-perception" data-driver-perception-root aria-labelledby="liveCameraFoundationTitle">
+      <header class="driver-perception__header">
+        <div>
+          <h2 id="liveCameraFoundationTitle" class="driver-perception__title">Live Camera Foundation</h2>
+          <p class="driver-perception__copy">Camera and FaceMesh landmark lifecycle only. Live frames are not connected to the deterministic Runtime or any risk decision.</p>
+        </div>
+      </header>
+      <div class="driver-perception__controls">
+        <label class="driver-perception__field">Primary camera
+          <select data-camera-select aria-label="Primary camera"><option value="">Checking cameras…</option></select>
+        </label>
+        <button type="button" data-camera-start>Start Camera</button>
+        <button type="button" data-camera-stop disabled>Stop Camera</button>
+      </div>
+      <video class="driver-perception__video" data-camera-video autoplay muted playsinline aria-label="Browser-local driver camera preview"></video>
+      <div class="driver-perception__status" aria-live="polite">
+        <div class="driver-perception__metric"><span>Camera permission</span><strong data-perception-permission>UNKNOWN</strong></div>
+        <div class="driver-perception__metric"><span>Runtime state</span><strong data-perception-state>IDLE</strong></div>
+        <div class="driver-perception__metric"><span>Face</span><strong data-perception-face>NOT EVALUATED</strong></div>
+        <div class="driver-perception__metric"><span>Frame processing</span><strong data-perception-frame>IDLE</strong></div>
+      </div>
+      <div class="driver-perception__notices">
+        <span class="driver-perception__notice">BROWSER-LOCAL PROCESSING</span>
+        <span class="driver-perception__notice">NO IMAGE STORAGE</span>
+        <span class="driver-perception__notice">NO IMAGE TRANSMISSION</span>
+        <span class="driver-perception__notice">NOT FOR OPERATIONAL USE</span>
+      </div>
+    </section>
 
     <section class="driver-test-panel" aria-labelledby="driverTestTitle">
       <h2 id="driverTestTitle" class="panel-title">Common Driver State Observation</h2>
@@ -361,6 +391,10 @@
     </section>
   </main>
 
+  <script src="/static/js/driver_perception/driver_perception_config.js"></script>
+  <script src="/static/js/driver_perception/camera_manager.js"></script>
+  <script src="/static/js/driver_perception/face_landmark_adapter.js"></script>
+  <script src="/static/js/driver_perception/driver_perception_runtime.js"></script>
   <script src="/static/js/sensor_observation.js"></script>
   <script src="/static/js/driver_state_config.js"></script>
   <script src="/static/js/driver_state.js"></script>
