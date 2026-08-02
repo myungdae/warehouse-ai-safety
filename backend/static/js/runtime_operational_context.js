@@ -12,6 +12,7 @@
         return value.trim();
     };
     const freezeRecord = instance => Object.freeze(instance);
+    const ConditionType = Object.freeze({ RIGHT_TURN_ACTIVE: 'RIGHT_TURN_ACTIVE' });
 
     class ContextCondition {
         constructor(input) {
@@ -90,6 +91,6 @@
     }
 
     global.RuntimeOperationalContext = Object.freeze({
-        ContextCondition, OperationalContext, CompositeRisk, PriorityDecision
+        ConditionType, ContextCondition, OperationalContext, CompositeRisk, PriorityDecision
     });
 })(window);
