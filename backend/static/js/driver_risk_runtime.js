@@ -17,6 +17,12 @@
     const incapacitationRiskStates = new Map();
     const alcoholRiskStates = new Map();
     const pedestrianProximityRiskStates = new Map();
+    const vehicleProximityRiskStates = new Map();
+    const VEHICLE_PROXIMITY_RULE = Object.freeze({
+        configurationVersion: 'DEVELOPMENT_UNVALIDATED_VEHICLE_PROXIMITY_CANDIDATE-v1',
+        entryDistanceMeters: 10, closeDistanceMeters: 4, clearDistanceMeters: 12,
+        highClosingSpeedMps: 1, lowTtcSeconds: 8, entrySustainMs: 500, clearSustainMs: 500
+    });
     const INCAPACITATION_COMPOSITE_SIGNALS = Object.freeze([
         'prolongedEyeClosure',
         'headDrop',
@@ -500,6 +506,27 @@
             if(state.active&&motion==='MOVING_AWAY'&&distance>=4){pedestrianProximityRiskStates.delete(observation.targetId);return{shouldCreateRisk:false,shouldClearRisk:true,clearEventType:'HUMAN_PROXIMITY',eventInput:null,observation:observation.toJSON(),reason:'PEDESTRIAN_PROXIMITY_CLEARED'};}
             return noRisk(observation,state.active?'PEDESTRIAN_PROXIMITY_RISK_RETAINED':'PEDESTRIAN_PROXIMITY_OUTSIDE_THRESHOLD');
         }
+        if (observation.observationType === ObservationType.VEHICLE_PROXIMITY) {
+            const metadata=observation.metadata||{},quality=metadata.quality||{},distance=observation.value,motion=metadata.relativeMotion,closing=metadata.closingSpeedMps,ttc=metadata.timeToCollisionSeconds,at=Date.parse(observation.observedAt);
+            const state=vehicleProximityRiskStates.get(observation.targetId)||{entryStartedAt:null,clearStartedAt:null,riskActive:false};
+            if(!metadata.sensorConnected||!quality.detectionValid||!quality.distanceValid||!Number.isFinite(distance)){
+                vehicleProximityRiskStates.set(observation.targetId,state);
+                return {...noRisk(observation,'VEHICLE_TRACKING_DEGRADED'),phase:'QUALITY_DEGRADED',reasonCodes:['VEHICLE_DISTANCE_UNKNOWN','VEHICLE_TRACKING_DEGRADED'],configurationVersion:VEHICLE_PROXIMITY_RULE.configurationVersion};
+            }
+            const reasons=[];if(motion==='MOVING_TOWARD')reasons.push('VEHICLE_APPROACH_DETECTED');if(distance<=VEHICLE_PROXIMITY_RULE.closeDistanceMeters)reasons.push('VEHICLE_CLOSE_RANGE');if(Number.isFinite(closing)&&closing>=VEHICLE_PROXIMITY_RULE.highClosingSpeedMps)reasons.push('VEHICLE_HIGH_CLOSING_SPEED');if(Number.isFinite(ttc)&&ttc<=VEHICLE_PROXIMITY_RULE.lowTtcSeconds)reasons.push('VEHICLE_LOW_TTC');if(metadata.relativeDirection==='REAR'||metadata.relativeDirection==='REAR_LEFT'||metadata.relativeDirection==='REAR_RIGHT')reasons.push('VEHICLE_REAR_APPROACH');if(['LEFT','RIGHT','FRONT_LEFT','FRONT_RIGHT'].includes(metadata.relativeDirection))reasons.push('VEHICLE_SIDE_APPROACH');if(String(motion).startsWith('CROSSING_'))reasons.push('VEHICLE_CROSSING_PATH');
+            const candidate=motion==='MOVING_TOWARD'&&distance<=VEHICLE_PROXIMITY_RULE.entryDistanceMeters&&(distance<=VEHICLE_PROXIMITY_RULE.closeDistanceMeters||(Number.isFinite(closing)&&closing>=VEHICLE_PROXIMITY_RULE.highClosingSpeedMps)||(Number.isFinite(ttc)&&ttc<=VEHICLE_PROXIMITY_RULE.lowTtcSeconds));
+            if(state.riskActive){
+                const clearing=motion==='MOVING_AWAY'||distance>=VEHICLE_PROXIMITY_RULE.clearDistanceMeters;
+                if(!clearing){state.clearStartedAt=null;vehicleProximityRiskStates.set(observation.targetId,state);return{shouldCreateRisk:true,shouldClearRisk:false,eventInput:{eventType:'VEHICLE_PROXIMITY',targetId:observation.targetId,severity:distance<=2||ttc!==null&&ttc<=3?'CRITICAL':'HIGH'},observation:observation.toJSON(),reason:'VEHICLE_PROXIMITY_ACTIVE',reasonCodes:reasons,phase:'ACTIVE',configurationVersion:VEHICLE_PROXIMITY_RULE.configurationVersion}}
+                if(state.clearStartedAt===null||at<state.clearStartedAt)state.clearStartedAt=at;
+                if(at-state.clearStartedAt<VEHICLE_PROXIMITY_RULE.clearSustainMs){vehicleProximityRiskStates.set(observation.targetId,state);return{...noRisk(observation,'VEHICLE_PROXIMITY_CLEAR_PENDING'),phase:'CLEAR_PENDING',reasonCodes:reasons,configurationVersion:VEHICLE_PROXIMITY_RULE.configurationVersion}}
+                vehicleProximityRiskStates.delete(observation.targetId);return{shouldCreateRisk:false,shouldClearRisk:true,clearEventType:'VEHICLE_PROXIMITY',eventInput:null,observation:observation.toJSON(),reason:'VEHICLE_PROXIMITY_CLEARED',reasonCodes:reasons,phase:'CLEARED',configurationVersion:VEHICLE_PROXIMITY_RULE.configurationVersion};
+            }
+            if(!candidate){state.entryStartedAt=null;vehicleProximityRiskStates.set(observation.targetId,state);return{...noRisk(observation,'VEHICLE_PROXIMITY_NORMAL'),phase:'NORMAL',reasonCodes:reasons,configurationVersion:VEHICLE_PROXIMITY_RULE.configurationVersion}}
+            if(state.entryStartedAt===null||at<state.entryStartedAt)state.entryStartedAt=at;
+            if(at-state.entryStartedAt<VEHICLE_PROXIMITY_RULE.entrySustainMs){vehicleProximityRiskStates.set(observation.targetId,state);return{...noRisk(observation,'VEHICLE_PROXIMITY_ENTRY_PENDING'),phase:'ENTRY_PENDING',reasonCodes:reasons,configurationVersion:VEHICLE_PROXIMITY_RULE.configurationVersion}}
+            state.riskActive=true;state.clearStartedAt=null;vehicleProximityRiskStates.set(observation.targetId,state);return{shouldCreateRisk:true,shouldClearRisk:false,eventInput:{eventType:'VEHICLE_PROXIMITY',targetId:observation.targetId,severity:distance<=2||ttc!==null&&ttc<=3?'CRITICAL':'HIGH'},observation:observation.toJSON(),reason:'VEHICLE_PROXIMITY_RISK_CONFIRMED',reasonCodes:reasons,phase:'ACTIVATED',configurationVersion:VEHICLE_PROXIMITY_RULE.configurationVersion};
+        }
         return noRisk(observation, 'NO_RISK_RULE_CONFIGURED');
     }
 
@@ -523,6 +550,11 @@
         else pedestrianProximityRiskStates.clear();
     }
 
+    function resetVehicleProximityRiskState(targetId) {
+        if (targetId) vehicleProximityRiskStates.delete(targetId);
+        else vehicleProximityRiskStates.clear();
+    }
+
     global.DriverRiskRuntime = Object.freeze({
         EventState,
         RiskEvent,
@@ -531,6 +563,8 @@
         resetDrowsinessRiskState,
         resetIncapacitationRiskState,
         resetAlcoholRiskState,
-        resetPedestrianProximityRiskState
+        resetPedestrianProximityRiskState,
+        resetVehicleProximityRiskState,
+        vehicleProximityRule: VEHICLE_PROXIMITY_RULE
     });
 }(window));

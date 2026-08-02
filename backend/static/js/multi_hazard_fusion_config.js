@@ -11,7 +11,7 @@
         baseScores: Object.freeze({
             DROWSINESS: 42, DRIVER_INCAPACITATION: 78, ALCOHOL_POLICY_VIOLATION: 58,
             HUMAN_PROXIMITY: 55, DANGEROUS_TILT: 65, HARD_ACCELERATION: 38,
-            HARD_BRAKING: 48, SHARP_TURN: 50, TURN_RATE: 50
+            HARD_BRAKING: 48, SHARP_TURN: 50, TURN_RATE: 50, VEHICLE_PROXIMITY: 62
         }),
         severityRank: Object.freeze({ LOW:1, MEDIUM:2, HIGH:3, CRITICAL:4 }),
         conditionMultipliers: Object.freeze({ VEHICLE_MOVING:1.20, REVERSING:1.15, CRITICAL_DISTANCE:1.15, SENSOR_QUALITY_DEGRADED:0.85 }),
@@ -23,6 +23,11 @@
             Object.freeze({ id:'SYNERGY-BRAKE-PERSON', risks:['HARD_BRAKING','HUMAN_PROXIMITY'], conditions:[], bonus:12, minimumBand:'HIGH' }),
             Object.freeze({ id:'SYNERGY-TURN-PERSON', risks:['SHARP_TURN','HUMAN_PROXIMITY'], conditions:[], bonus:20, minimumBand:'CRITICAL' }),
             Object.freeze({ id:'SYNERGY-TURNRATE-PERSON', risks:['TURN_RATE','HUMAN_PROXIMITY'], conditions:[], bonus:20, minimumBand:'CRITICAL' })
+            ,Object.freeze({ id:'SYNERGY-DROWSY-VEHICLE', risks:['DROWSINESS','VEHICLE_PROXIMITY'], conditions:[], bonus:16, minimumBand:'HIGH' })
+            ,Object.freeze({ id:'SYNERGY-INCAP-VEHICLE', risks:['DRIVER_INCAPACITATION','VEHICLE_PROXIMITY'], conditions:[], bonus:20, minimumBand:'CRITICAL' })
+            ,Object.freeze({ id:'SYNERGY-BRAKE-VEHICLE', risks:['HARD_BRAKING','VEHICLE_PROXIMITY'], conditions:[], bonus:12, minimumBand:'HIGH' })
+            ,Object.freeze({ id:'SYNERGY-TURN-VEHICLE', risks:['SHARP_TURN','VEHICLE_PROXIMITY'], conditions:['VEHICLE_PROXIMITY_RELATED'], bonus:14, minimumBand:'HIGH' })
+            ,Object.freeze({ id:'SYNERGY-HUMAN-VEHICLE-RELATED', risks:['HUMAN_PROXIMITY','VEHICLE_PROXIMITY'], conditions:['RELATED_HAZARD_FIXTURE'], bonus:10, minimumBand:'HIGH' })
         ]),
         overrideRules: Object.freeze([
             Object.freeze({ id:'OVERRIDE-INCAP-MOVING', risks:['DRIVER_INCAPACITATION'], conditions:['VEHICLE_MOVING'], score:100, policy:'EMERGENCY_RESPONSE_REQUEST', actions:['EMERGENCY_RESPONSE_REQUEST','SAFE_STOP_REQUEST'] }),
