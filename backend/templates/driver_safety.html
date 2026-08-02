@@ -196,6 +196,22 @@
         </section>
       </div>
       <details class="driver-perception__snapshot"><summary>Latest DriverMetricSnapshot · <span data-perception-snapshot-time>-</span></summary><pre data-perception-snapshot-json>{}</pre></details>
+      <section class="driver-perception__recorder" data-recorder-panel>
+        <h3>Perception Dataset Recorder <small>DEVELOPMENT / RESEARCH</small></h3>
+        <div class="driver-perception__notices"><span class="driver-perception__notice">RESEARCH METRICS ONLY</span><span class="driver-perception__notice">NO VIDEO RECORDING</span><span class="driver-perception__notice">NO IMAGE STORAGE</span><span class="driver-perception__notice">NO RAW LANDMARK STORAGE</span><span class="driver-perception__notice">LOCAL BROWSER MEMORY ONLY</span><span class="driver-perception__notice">USER-INITIATED EXPORT</span><span class="driver-perception__notice">NOT FOR OPERATIONAL USE</span></div>
+        <div class="driver-perception__controls"><button type="button" data-recorder-start>START RECORDING</button><button type="button" data-recorder-pause>PAUSE</button><button type="button" data-recorder-resume>RESUME</button><button type="button" data-recorder-stop>STOP</button><button type="button" data-recorder-reset>RESET SESSION</button><button type="button" data-recorder-csv>EXPORT CSV</button><button type="button" data-recorder-json>EXPORT JSON</button></div>
+        <div class="driver-perception__recorder-fields">
+          <label>Participant code<input data-recorder-participant maxlength="16" pattern="[A-Za-z0-9_-]{0,16}"></label>
+          <label>Glasses<select data-recorder-glasses><option>UNKNOWN</option><option>WITH_GLASSES</option><option>WITHOUT_GLASSES</option></select></label>
+          <label>Lighting<select data-recorder-lighting><option>UNKNOWN</option><option>BRIGHT</option><option>NORMAL</option><option>DIM</option><option>NIGHT</option></select></label>
+          <label>Posture<select data-recorder-posture><option>UNKNOWN</option><option>CENTER</option><option>SLIGHT_DOWN</option><option>SLIGHT_UP</option><option>LEFT</option><option>RIGHT</option></select></label>
+          <label>Scenario<select data-recorder-scenario><option>BASELINE</option><option>NATURAL_BLINK</option><option>EYE_CLOSURE</option><option>TALKING</option><option>SHORT_MOUTH_OPEN</option><option>YAWN_SIMULATION</option><option>NATURAL_YAWN</option><option>HEAD_POSE</option><option>FREE_OBSERVATION</option></select></label>
+        </div>
+        <div class="driver-perception__status"><div class="driver-perception__metric"><span>Session ID</span><strong data-recorder-session>-</strong></div><div class="driver-perception__metric"><span>State</span><strong data-recorder-state>IDLE</strong></div><div class="driver-perception__metric"><span>Started time</span><strong data-recorder-started>-</strong></div><div class="driver-perception__metric"><span>Duration</span><strong data-recorder-duration>0</strong></div><div class="driver-perception__metric"><span>Sampling mode</span><strong data-recorder-sampling>-</strong></div><div class="driver-perception__metric"><span>Rows / Metrics / Markers</span><strong data-recorder-counts>0 / 0 / 0</strong></div><div class="driver-perception__metric"><span>Memory estimate</span><strong data-recorder-memory>0</strong></div><div class="driver-perception__metric"><span>Last record</span><strong data-recorder-last>-</strong></div><div class="driver-perception__metric"><span>Stop reason</span><strong data-recorder-reason>-</strong></div></div>
+        <div class="driver-perception__markers"><span>User annotation, not ground truth:</span><button type="button" data-marker="NORMAL">NORMAL</button><button type="button" data-marker="BLINK">BLINK</button><button type="button" data-marker="EYE_CLOSURE">EYE CLOSURE</button><button type="button" data-marker="TALKING">TALKING</button><button type="button" data-marker="SHORT_MOUTH_OPEN">SHORT MOUTH OPEN</button><button type="button" data-marker="YAWN">YAWN</button><button type="button" data-marker="HEAD_DOWN">HEAD DOWN</button><button type="button" data-marker="QUALITY_ISSUE">QUALITY ISSUE</button></div>
+        <div class="driver-perception__status"><div class="driver-perception__metric"><span>Current EAR</span><strong data-recorder-ear>-</strong></div><div class="driver-perception__metric"><span>Current MAR</span><strong data-recorder-mar>-</strong></div><div class="driver-perception__metric"><span>Pitch / Roll / Yaw</span><strong data-recorder-pose>- / - / -</strong></div><div class="driver-perception__metric"><span>Blink / Yawn state</span><strong data-recorder-episodes>- / -</strong></div><div class="driver-perception__metric"><span>Current reject reason</span><strong data-recorder-reject>-</strong></div></div>
+        <details class="driver-perception__snapshot"><summary>Last metric-only row</summary><pre data-recorder-preview>{}</pre></details>
+      </section>
       <section class="driver-perception__bridge" data-live-bridge-panel>
         <h3>Live Runtime Bridge</h3>
         <p class="driver-perception__copy">Published metrics use the public Runtime facade. Quality loss never clears an active risk.</p>
@@ -461,6 +477,7 @@
   <script src="/static/js/driver_perception/driver_calibration.js"></script>
   <script src="/static/js/driver_perception/driver_metric_calculator.js"></script>
   <script src="/static/js/driver_perception/driver_metric_snapshot.js"></script>
+  <script src="/static/js/driver_perception/perception_dataset_recorder.js"></script>
   <script src="/static/js/driver_perception/driver_perception_runtime.js"></script>
   <script src="/static/js/driver_perception/driver_camera_observation_bridge.js"></script>
   <script src="/static/js/runtime_event_graph.js"></script>
@@ -516,6 +533,36 @@
       }, true);
       panel.querySelector('[data-live-bridge-simulation]').addEventListener('click', () => { document.getElementById('drowsinessTestButton').click(); render(); });
       runtime.onMetricSnapshot(render); render();
+      const recorderPanel = root.querySelector('[data-recorder-panel]');
+      const recorder = new window.DriverPerception.PerceptionDatasetRecorder({ runtime, runtimeStateProvider: () => {
+        const bridgeState = bridge.getState(); const targetId = bridgeState.targetId;
+        const state = targetId ? window.DriverRuntimePage.getRuntimeSnapshot(targetId) : null;
+        return { bridgeStatus: bridgeState.status, inputMode: state?.inputMode || 'STOPPED', riskSignal: bridgeState.lastResult?.riskSignal?.reason || null,
+          riskState: bridgeState.lastResult?.riskEvent?.state || null, policyStage: bridgeState.lastResult?.policyDecision?.stage || null,
+          latestActionType: bridgeState.lastResult?.actionRequests?.at(-1)?.actionType || null,
+          observationSimulation: bridgeState.lastObservation?.metadata?.simulation ?? null,
+          actionExecutionSimulation: bridgeState.lastResult?.actionExecutions?.at(-1)?.simulation ?? null };
+      }});
+      window.PerceptionDatasetRecorderPage = recorder;
+      const recorderOut = name => recorderPanel.querySelector(`[data-recorder-${name}]`);
+      const renderRecorder = () => { const state = recorder.getState(), summary = recorder.getSessionSummary(), rows = recorder.getRows();
+        recorderOut('session').textContent = state.sessionId || '-'; recorderOut('state').textContent = state.state; recorderOut('started').textContent = summary.startedAt || '-'; recorderOut('sampling').textContent = summary.samplingMode || '-';
+        recorderOut('duration').textContent = String(summary.durationMs || 0); recorderOut('counts').textContent = `${summary.rowCount || 0} / ${summary.metricRowCount || 0} / ${summary.markerCount || 0}`;
+        recorderOut('memory').textContent = `${summary.memoryUsageEstimateBytes || 0} bytes`; recorderOut('last').textContent = state.lastRecordTimestamp || '-'; recorderOut('reason').textContent = state.stopReason || state.error || '-';
+        const metric = rows.findLast?.(row => row.recordType === 'METRIC') || [...rows].reverse().find(row => row.recordType === 'METRIC') || {};
+        recorderOut('ear').textContent = metric.earSmoothed ?? '-'; recorderOut('mar').textContent = metric.marSmoothed ?? '-'; recorderOut('pose').textContent = `${metric.pitch ?? '-'} / ${metric.roll ?? '-'} / ${metric.yaw ?? '-'}`; recorderOut('episodes').textContent = `${metric.eyeState ?? (metric.eyeClosed === true ? 'CLOSED' : metric.eyeClosed === false ? 'OPEN' : '-')} / ${metric.yawnState ?? '-'}`; recorderOut('reject').textContent = metric.rejectionReason || '-'; recorderOut('preview').textContent = JSON.stringify(rows.at(-1) || {}, null, 2);
+      };
+      recorderPanel.querySelector('[data-recorder-start]').addEventListener('click', () => { try { recorder.start({ participantCode: recorderOut('participant').value,
+        glassesMode: recorderOut('glasses').value, lightingMode: recorderOut('lighting').value, postureMode: recorderOut('posture').value,
+        scenarioLabel: recorderOut('scenario').value }); } catch (_) {} renderRecorder(); });
+      recorderPanel.querySelector('[data-recorder-pause]').addEventListener('click', () => { try { recorder.pause(); } catch (_) {} renderRecorder(); });
+      recorderPanel.querySelector('[data-recorder-resume]').addEventListener('click', () => { try { recorder.resume(); } catch (_) {} renderRecorder(); });
+      recorderPanel.querySelector('[data-recorder-stop]').addEventListener('click', () => { try { recorder.stop(); } catch (_) {} renderRecorder(); });
+      recorderPanel.querySelector('[data-recorder-reset]').addEventListener('click', () => { recorder.reset(); renderRecorder(); });
+      recorderPanel.querySelector('[data-recorder-csv]').addEventListener('click', () => { try { recorder.exportCSV(); } catch (_) {} renderRecorder(); });
+      recorderPanel.querySelector('[data-recorder-json]').addEventListener('click', () => { try { recorder.exportJSON(); } catch (_) {} renderRecorder(); });
+      recorderPanel.querySelectorAll('[data-marker]').forEach(button => button.addEventListener('click', () => { try { recorder.addMarker(button.dataset.marker); } catch (_) {} renderRecorder(); }));
+      runtime.onMetricSnapshot(renderRecorder); renderRecorder();
     });
     const tabButtons = document.querySelectorAll('.tab-button');
     const tabPanels = document.querySelectorAll('.tab-panel');

@@ -53,6 +53,13 @@
             maximumSampleAgeMs: 1000,
             perclosEntryPercent: 40,
             prolongedEyeClosureMs: 1200
+        }),
+        recorder: Object.freeze({
+            validationStatus: 'DEVELOPMENT_RESEARCH_CANDIDATE',
+            schemaVersion: 'perception-dataset-v1', recorderVersion: '1.0.0',
+            defaultSamplingMode: 'HYBRID', baseSamplingIntervalMs: 200,
+            activeEpisodeIntervalMs: 50, maximumRowsPerSession: 20000,
+            maximumSessionDurationMs: 1800000
         })
     });
 })(window);

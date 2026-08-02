@@ -38,6 +38,13 @@
 .driver-perception__snapshot pre { max-height: 320px; overflow: auto; padding: 12px; color: #9feaf9; background: #020409; }
 .driver-perception__bridge { margin-top: 20px; padding: 18px; border: 1px solid rgba(34,197,94,.35); border-radius: 12px; background: rgba(5,46,22,.16); }
 .driver-perception__bridge h3 { margin: 0 0 8px; color: #4ade80; }
+.driver-perception__recorder { margin-top: 20px; padding: 18px; border: 1px solid rgba(168,85,247,.4); border-radius: 12px; background: rgba(59,7,100,.12); }
+.driver-perception__recorder h3 { color: #c084fc; }.driver-perception__recorder h3 small { color: #facc15; }
+.driver-perception__recorder-fields { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 10px; }
+.driver-perception__recorder-fields label { display: grid; gap: 5px; color: #aab6c5; font-size: 11px; }
+.driver-perception__recorder-fields input,.driver-perception__recorder-fields select { min-width: 0; padding: 8px; color: #e6edf3; background: #111a2d; border: 1px solid rgba(148,163,184,.25); }
+.driver-perception__markers { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; align-items: center; }.driver-perception__markers span { color: #facc15; font-size: 11px; }
+@media (max-width: 900px) { .driver-perception__recorder-fields { grid-template-columns: 1fr 1fr; } }
 .driver-perception__notice { padding: 7px 10px; border: 1px solid rgba(250,204,21,.3); border-radius: 999px; color: #fde68a; font-size: 11px; font-weight: 800; }
 @media (max-width: 900px) { .driver-perception__metric-groups { grid-template-columns: 1fr; } }
 @media (max-width: 760px) { .driver-perception { padding: 18px; } .driver-perception__field { min-width: 100%; } }
