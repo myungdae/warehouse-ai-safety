@@ -16,6 +16,7 @@
   <link rel="stylesheet" href="/static/css/runtime_calibration.css">
   <link rel="stylesheet" href="/static/css/alcohol_sensor.css">
   <link rel="stylesheet" href="/static/css/driver_attention.css">
+  <link rel="stylesheet" href="/static/css/distraction_evidence.css">
   <style>
     :root {
       --bg: #070b14;
@@ -469,6 +470,14 @@
       <details><summary>Administrator / Developer Details</summary><div class="attention-details"><article><h3>Direction / Duration</h3><dl><div><dt>Gaze Direction / Source</dt><dd data-attention-gaze>UNKNOWN</dd></div><div><dt>Head Direction</dt><dd data-attention-head>UNKNOWN</dd></div><div><dt>Attention Zone</dt><dd data-attention-zone>UNKNOWN</dd></div><div><dt>Glance / Off-road</dt><dd data-attention-duration>0 / 0 ms</dd></div><div><dt>Forward Recovery</dt><dd data-attention-forward>0 ms</dd></div></dl></article><article><h3>Measurement / Identity</h3><dl><div><dt>Face / Landmark</dt><dd data-attention-face>false / false</dd></div><div><dt>Gaze / Head Pose Valid</dt><dd data-attention-valid>false / false</dd></div><div><dt>Measurement Confidence</dt><dd data-attention-confidence>UNKNOWN</dd></div><div><dt>Quality / Reasons</dt><dd data-attention-quality>UNKNOWN</dd></div><div><dt>Canonical Target</dt><dd data-attention-target>-</dd></div></dl></article><article><h3>Runtime</h3><dl><div><dt>Observation ID</dt><dd data-attention-observation>-</dd></div><div><dt>Risk Event ID</dt><dd data-attention-risk>-</dd></div><div><dt>Fusion Result</dt><dd data-attention-fusion>NORMAL</dd></div><div><dt>Runtime Confidence</dt><dd data-attention-runtime-confidence>UNKNOWN</dd></div><div><dt>Recommendation</dt><dd data-attention-detail-recommendation>VERIFY FIRST</dd></div></dl></article></div><pre data-attention-detail>{}</pre></details>
     </section>
 
+    <section id="distractionEvidencePanel" class="driver-test-panel distraction-evidence" aria-labelledby="distractionEvidenceTitle">
+      <h2 id="distractionEvidenceTitle" class="panel-title">Distraction Source Evidence Adapter</h2>
+      <div class="distraction-evidence__badges"><span>DETECTOR ADAPTER FIXTURE</span><span>PHONE DETECTION NOT CONNECTED</span><span>SIMULATION ONLY</span><span>NO ACTUATOR CONTROL</span><span>NOT FOR OPERATIONAL USE</span></div>
+      <div class="distraction-evidence__summary"><article><span>Source</span><strong data-distraction-source>UNKNOWN</strong></article><article><span>Confidence</span><strong data-distraction-confidence>UNKNOWN</strong></article><article><span>Duration</span><strong data-distraction-duration>0 ms</strong></article><article><span>Quality</span><strong data-distraction-quality>UNKNOWN</strong></article><article><span>Evidence Count</span><strong data-distraction-count>0</strong></article><article><span>Runtime State</span><strong data-distraction-state>NORMAL</strong></article><article><span>Recommendation</span><strong data-distraction-recommendation>MONITOR</strong></article></div>
+      <div class="actions"><button type="button" data-distraction-run>RUN FIXTURE</button><button type="button" data-distraction-ack>ACK</button><button type="button" data-distraction-reset>RESET</button><button type="button" data-distraction-export>EXPORT JSON</button></div>
+      <details><summary>Evidence / Observation / Risk / Fusion / Confidence</summary><pre data-distraction-detail>{}</pre></details>
+    </section>
+
     <section id="runtimeEventGraphViewer" class="driver-test-panel runtime-graph" aria-labelledby="runtimeGraphTitle">
       <h2 id="runtimeGraphTitle" class="panel-title">Runtime Graph</h2>
       <p class="panel-copy">Runtime artifacts are observed and connected in memory for simulation and inspection only.</p>
@@ -580,6 +589,7 @@
   <script src="/static/js/multi_hazard_fusion_config.js"></script>
   <script src="/static/js/multi_hazard_fusion_engine.js"></script>
   <script src="/static/js/driver_attention_runtime.js"></script>
+  <script src="/static/js/distraction_evidence_adapter.js"></script>
   <script src="/static/js/driver_input_mode_controller.js"></script>
   <script src="/static/js/driver_runtime_page.js"></script>
   <script src="/static/js/vehicle_proximity_runtime.js"></script>
@@ -597,6 +607,7 @@
   <script src="/static/js/runtime_event_graph.js"></script>
   <script src="/static/js/runtime_triple_engine.js"></script>
   <script>
+    (()=>{const panel=document.getElementById('distractionEvidencePanel'),field=name=>panel.querySelector(`[data-distraction-${name}]`);if(!panel)return;let targetId=null,latest=null,sequence=0;const runtime=new window.DistractionEvidenceAdapter.Runtime({identityRegistry:window.RuntimeIdentityRegistryPage.registry,fusionEngine:window.MultiHazardFusionPage,confidenceEngine:window.RuntimeConfidencePage.engine});const render=result=>{latest=result||latest;const e=latest?.evidence;field('source').textContent=e?.distractionSource||'UNKNOWN';field('confidence').textContent=e?.detectionConfidence==null?'UNKNOWN':e.detectionConfidence.toFixed(2);field('duration').textContent=`${e?.durationMs||0} ms`;field('quality').textContent=JSON.stringify(e?.quality||{});field('count').textContent=latest?.evidenceCount||0;field('state').textContent=latest?.runtimeState||'NORMAL';field('recommendation').textContent=latest?.recommendation||'MONITOR';field('detail').textContent=JSON.stringify(latest||{},null,2)};const run=()=>{let identity=window.RuntimeIdentityRegistryPage.getActiveIdentity()||window.RuntimeIdentityRegistryPage.register(),sensorId='DISTRACTION-FIXTURE';const attached=window.RuntimeIdentityRegistryPage.adapter.adapt({runtimeSource:'DRIVER_CAMERA',vehicleId:identity.vehicleId,sensorId,sourceTargetId:`distraction:${identity.canonicalTargetId}`,ownershipToken:identity.ownershipToken});identity=attached.identity||identity;targetId=identity.canonicalTargetId;const base=Date.now(),input=(timestamp,duration)=>({evidenceId:`distraction-fixture-${++sequence}`,timestamp:new Date(timestamp).toISOString(),sensorId,sourceType:'FIXTURE_CONTRACT',targetId,canonicalTargetId:targetId,distractionSource:'PHONE',detectionConfidence:.88,bboxAvailable:true,bbox:{discarded:true},trackingId:'fixture-track',durationMs:duration,quality:{score:.9,fixture:true},sampleAgeMs:0,simulation:true});runtime.ingest(input(base,0),{vehicleMotion:'MOVING'});latest=runtime.ingest(input(base+1600,1600),{vehicleMotion:'MOVING'});render(latest);return latest};field('run').addEventListener('click',run);field('ack').addEventListener('click',()=>{if(targetId)runtime.acknowledge(targetId)});field('reset').addEventListener('click',()=>{if(targetId)runtime.reset(targetId);latest=null;render(null)});field('export').addEventListener('click',()=>{if(!targetId)return;const blob=new Blob([runtime.exportJSON(targetId)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='distraction-evidence.json';a.click();URL.revokeObjectURL(url)});window.DistractionEvidencePage=Object.freeze({runtime,run,getLatest:()=>latest});render(null)})();
     window.DriverStatePage = window.DriverState.initializeDriverStatePage();
     window.DriverPolicyPage = window.DriverPolicy.initializeDriverPolicyPage();
     window.DriverActionPage = window.DriverActions.initializeDriverActionPage();
