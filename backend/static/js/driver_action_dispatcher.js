@@ -206,9 +206,13 @@
             if (!item || terminalExecutionStates.includes(item.state)) return item || null;
             item.transition(ExecutionState.CANCELLED, ExecutionResult.CANCELLED_BY_POLICY, reasonCode, now);
             this.audit('EXECUTION_CANCELLED', item, now); this.notify(item); return item; }
-        cancelBySourceEvent(sourceEventId, now = new Date()) { return this.executions.filter(item =>
+        cancelBySourceEvent(sourceEventId, reasonOrNow = 'SOURCE_POLICY_CLOSED', now = new Date()) {
+            const legacyDate = reasonOrNow instanceof Date;
+            const reason = legacyDate ? 'SOURCE_POLICY_CLOSED' : reasonOrNow;
+            const timestamp = legacyDate ? reasonOrNow : now;
+            return this.executions.filter(item =>
             item.sourceEventId === sourceEventId && !terminalExecutionStates.includes(item.state))
-            .map(item => this.cancel(item.executionId, 'SOURCE_POLICY_CLOSED', now)); }
+            .map(item => this.cancel(item.executionId, reason, timestamp)); }
         resetTarget(targetId, now = new Date()) { const state = this.runStates.get(targetId);
             if (state) { if (state.timerHandle !== null) global.clearTimeout(state.timerHandle); state.generation += 1; state.timerHandle = null; }
             return this.executions.filter(item => item.targetId === targetId && !terminalExecutionStates.includes(item.state))

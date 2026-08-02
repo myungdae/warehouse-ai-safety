@@ -328,7 +328,7 @@
             engine.resetTarget(context.targetId, new Date());
             render(null, { eventId: run.sourceEventId });
         });
-        return Object.freeze({ engine, start, getRunState: () => ({ generation: run.generation,
+        return Object.freeze({ engine, start, render, getRunState: () => ({ generation: run.generation,
             timerHandle: run.timerHandle, sourceEventId: run.sourceEventId, targetId: run.targetId }) });
     }
 

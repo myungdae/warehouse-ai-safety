@@ -412,13 +412,6 @@
     </section>
   </main>
 
-  <script src="/static/js/driver_perception/driver_perception_config.js"></script>
-  <script src="/static/js/driver_perception/camera_manager.js"></script>
-  <script src="/static/js/driver_perception/face_landmark_adapter.js"></script>
-  <script src="/static/js/driver_perception/driver_calibration.js"></script>
-  <script src="/static/js/driver_perception/driver_metric_calculator.js"></script>
-  <script src="/static/js/driver_perception/driver_metric_snapshot.js"></script>
-  <script src="/static/js/driver_perception/driver_perception_runtime.js"></script>
   <script src="/static/js/sensor_observation.js"></script>
   <script src="/static/js/driver_state_config.js"></script>
   <script src="/static/js/driver_state.js"></script>
@@ -428,12 +421,26 @@
   <script src="/static/js/driver_policy_engine.js"></script>
   <script src="/static/js/driver_action_config.js"></script>
   <script src="/static/js/driver_action_dispatcher.js"></script>
+  <script src="/static/js/driver_input_mode_controller.js"></script>
+  <script src="/static/js/driver_runtime_page.js"></script>
+  <script src="/static/js/driver_perception/driver_perception_config.js"></script>
+  <script src="/static/js/driver_perception/camera_manager.js"></script>
+  <script src="/static/js/driver_perception/face_landmark_adapter.js"></script>
+  <script src="/static/js/driver_perception/driver_calibration.js"></script>
+  <script src="/static/js/driver_perception/driver_metric_calculator.js"></script>
+  <script src="/static/js/driver_perception/driver_metric_snapshot.js"></script>
+  <script src="/static/js/driver_perception/driver_perception_runtime.js"></script>
   <script src="/static/js/runtime_event_graph.js"></script>
   <script src="/static/js/runtime_triple_engine.js"></script>
   <script>
     window.DriverStatePage = window.DriverState.initializeDriverStatePage();
     window.DriverPolicyPage = window.DriverPolicy.initializeDriverPolicyPage();
     window.DriverActionPage = window.DriverActions.initializeDriverActionPage();
+    window.DriverRuntimePage.attach({
+      driverStatePage: window.DriverStatePage,
+      policyPage: window.DriverPolicyPage,
+      actionPage: window.DriverActionPage
+    });
     window.RuntimeGraphViewer = window.RuntimeEventGraph.initializeRuntimeGraphViewer();
     window.RuntimeTripleViewer = window.RuntimeTripleEngine.initializeRuntimeTripleViewer();
     const tabButtons = document.querySelectorAll('.tab-button');

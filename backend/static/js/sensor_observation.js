@@ -40,14 +40,17 @@
             if (!Object.values(ObservationType).includes(input.observationType)) {
                 throw new RangeError(`Unsupported observationType: ${input.observationType}`);
             }
-            if (
+            if (input.confidence !== null && (
                 typeof input.confidence !== 'number' || !Number.isFinite(input.confidence) ||
                 input.confidence < 0 || input.confidence > 1
-            ) {
-                throw new RangeError('SensorObservation.confidence must be between 0 and 1');
+            )) {
+                throw new RangeError('SensorObservation.confidence must be null or between 0 and 1');
             }
             if (!input.metadata || typeof input.metadata !== 'object' || Array.isArray(input.metadata)) {
                 throw new TypeError('SensorObservation.metadata must be an object');
+            }
+            if (input.confidence === null && input.metadata.quality?.confidenceAvailable !== false) {
+                throw new TypeError('SensorObservation with null confidence requires metadata.quality.confidenceAvailable=false');
             }
 
             const isoTimestampPattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/;

@@ -213,6 +213,7 @@
             observationHistory: [],
             eventIds: new Set()
         };
+        const cancellationAuditHistory = [];
         adapterOutput.textContent = Object.entries(adapters)
             .map(([name, adapter]) => `${name}: ${adapter.isConnected() ? 'CONNECTED' : 'DISCONNECTED'}`)
             .join('\n');
@@ -393,6 +394,45 @@
         });
         renderContext();
         return Object.freeze({
+            cancelDeterministicRun(options = {}) {
+                const targetId = requireNonEmptyString(options.targetId, 'targetId');
+                const observationType = options.observationType || ObservationType.DROWSINESS;
+                const matches = sequenceRunState.targetId === targetId &&
+                    sequenceRunState.observationType === observationType;
+                const active = matches && sequenceRunState.timerHandle !== null;
+                if (active) {
+                    global.clearTimeout(sequenceRunState.timerHandle);
+                    sequenceRunState.timerHandle = null;
+                    sequenceRunState.generation += 1;
+                    sequenceOutput.textContent = 'CANCELLED';
+                }
+                const result = Object.freeze({
+                    cancelled: active,
+                    targetId,
+                    generation: sequenceRunState.generation,
+                    reason: options.reason || 'EXPLICIT_CANCEL'
+                });
+                if (active) cancellationAuditHistory.push({ ...result, timestamp: new Date().toISOString() });
+                return result;
+            },
+            getDeterministicRunState(targetId) {
+                if (targetId && sequenceRunState.targetId !== targetId) return null;
+                return {
+                    timerHandle: sequenceRunState.timerHandle,
+                    generation: sequenceRunState.generation,
+                    runId: sequenceRunState.runId,
+                    targetId: sequenceRunState.targetId,
+                    observationType: sequenceRunState.observationType,
+                    active: sequenceRunState.timerHandle !== null,
+                    observationHistory: cloneJsonValue(sequenceRunState.observationHistory),
+                    cancellationAuditHistory: cloneJsonValue(cancellationAuditHistory)
+                };
+            },
+            isDeterministicRunActive(targetId) {
+                return sequenceRunState.targetId === targetId && sequenceRunState.timerHandle !== null;
+            },
+            getRiskEventStateMachine() { return riskEventStateMachine; },
+            readContext,
             getSequenceRunState() {
                 return {
                     timerHandle: sequenceRunState.timerHandle,
