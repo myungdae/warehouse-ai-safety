@@ -14,6 +14,7 @@
   <link rel="stylesheet" href="/static/css/vehicle_proximity.css">
   <link rel="stylesheet" href="/static/css/right_turn.css">
   <link rel="stylesheet" href="/static/css/runtime_calibration.css">
+  <link rel="stylesheet" href="/static/css/alcohol_sensor.css">
   <style>
     :root {
       --bg: #070b14;
@@ -419,6 +420,14 @@
       <details><summary>Administrator / Developer Details</summary><div class="confidence-details"><article><h3>Components</h3><pre data-confidence-components>{}</pre></article><article><h3>Availability / Penalties</h3><pre data-confidence-breakdown>{}</pre></article><article><h3>Reasons / Gated Actions</h3><pre data-confidence-reasons>[]</pre></article><article><h3>Audit / Lineage</h3><pre data-confidence-audit>[]</pre></article></div></details>
     </section>
 
+    <section id="alcoholSensorRuntimePanel" class="driver-test-panel alcohol-sensor-runtime" aria-labelledby="alcoholSensorRuntimeTitle">
+      <h2 id="alcoholSensorRuntimeTitle" class="panel-title">Alcohol Sensor Runtime</h2>
+      <div class="alcohol-sensor-badges"><span>SENSOR ADAPTER FIXTURE</span><span>SIMULATION ONLY</span><span>NO STARTER INTERLOCK</span><span>NO VEHICLE CONTROL</span><span>NOT FOR OPERATIONAL USE</span></div>
+      <div class="alcohol-sensor-summary"><article><span>Sensor Type</span><strong data-alcohol-sensor-type>UNKNOWN</strong></article><article><span>BAC</span><strong data-alcohol-bac>UNKNOWN</strong></article><article><span>BrAC</span><strong data-alcohol-brac>UNKNOWN</strong></article><article><span>Unit</span><strong data-alcohol-unit>UNKNOWN</strong></article><article><span>Confidence</span><strong data-alcohol-confidence>UNKNOWN</strong></article><article><span>Sensor Health</span><strong data-alcohol-health>UNKNOWN</strong></article><article><span>Freshness</span><strong data-alcohol-freshness>UNKNOWN</strong></article><article><span>Runtime Risk</span><strong data-alcohol-risk>NORMAL</strong></article><article><span>Fusion</span><strong data-alcohol-fusion>NORMAL</strong></article><article><span>Recommendation</span><strong data-alcohol-recommendation>VERIFY FIRST</strong></article></div>
+      <div class="actions"><button type="button" data-alcohol-run>RUN FIXTURE</button><button type="button" data-alcohol-ack>ACK</button><button type="button" data-alcohol-reset>RESET</button><button type="button" data-alcohol-export>EXPORT JSON</button></div>
+      <details><summary>Measurement / Observation / Runtime</summary><pre data-alcohol-detail>{}</pre></details>
+    </section>
+
     <section id="runtimeCalibrationPanel" class="driver-test-panel runtime-calibration" aria-labelledby="runtimeCalibrationTitle">
       <h2 id="runtimeCalibrationTitle" class="panel-title">Field Calibration &amp; Threshold Profile</h2>
       <div class="runtime-calibration-badges"><span>DEVELOPMENT CANDIDATE</span><span>NOT AUTOMATICALLY APPLIED</span><span>NO IMAGE OR LANDMARK STORAGE</span><span>SIMULATION ONLY</span><span>NOT FOR OPERATIONAL USE</span></div>
@@ -565,6 +574,7 @@
   <script src="/static/js/driver_runtime_page.js"></script>
   <script src="/static/js/vehicle_proximity_runtime.js"></script>
   <script src="/static/js/right_turn_runtime.js"></script>
+  <script src="/static/js/alcohol_sensor_runtime.js"></script>
   <script src="/static/js/driver_perception/driver_perception_config.js"></script>
   <script src="/static/js/driver_perception/camera_manager.js"></script>
   <script src="/static/js/driver_perception/face_landmark_adapter.js"></script>
@@ -699,6 +709,9 @@
         tabPanels.forEach(panel => panel.classList.toggle('active', panel.id === targetId));
       });
     });
+  </script>
+  <script>
+    (()=>{const panel=document.getElementById('alcoholSensorRuntimePanel'),field=name=>panel.querySelector(`[data-alcohol-${name}]`);if(!panel)return;let targetId=null,latest=null,sequence=0;const runtime=new window.AlcoholSensorRuntime.Runtime({identityRegistry:window.RuntimeIdentityRegistryPage.registry,runtimePage:window.DriverRuntimePage,fusionEngine:window.MultiHazardFusionPage,confidenceEngine:window.RuntimeConfidencePage.engine});const render=result=>{latest=result||latest;const m=latest?.measurement,r=latest?.runtimeResult?.riskSignal,f=latest?.fusion?.compositeRisk,c=latest?.confidence?.confidenceRecommendation;field('sensor-type').textContent=m?.sensorType||'UNKNOWN';field('bac').textContent=m?.bac==null?'UNKNOWN':String(m.bac);field('brac').textContent=m?.brac==null?'UNKNOWN':String(m.brac);field('unit').textContent=m?.unit||'UNKNOWN';field('confidence').textContent=m?.measurementConfidence==null?'UNKNOWN':m.measurementConfidence.toFixed(2);field('health').textContent=m?.sensorHealth||'UNKNOWN';field('freshness').textContent=m?(m.quality?.sampleFresh?'FRESH':'STALE'):'UNKNOWN';field('risk').textContent=r?.policyStatus||r?.reason||'NORMAL';field('fusion').textContent=f?.priorityBand||'NORMAL';field('recommendation').textContent=c?.decisionMode||'VERIFY FIRST';field('detail').textContent=JSON.stringify(latest||{},null,2)};const run=()=>{let identity=window.RuntimeIdentityRegistryPage.getActiveIdentity()||window.RuntimeIdentityRegistryPage.register(),sensorId='ALCOHOL-FIXTURE';const attached=window.RuntimeIdentityRegistryPage.adapter.adapt({runtimeSource:'ALCOHOL_SENSOR',vehicleId:identity.vehicleId,sensorId,sourceTargetId:`alcohol:${identity.canonicalTargetId}`,ownershipToken:identity.ownershipToken});identity=attached.identity||identity;targetId=identity.canonicalTargetId;const base=Date.now(),input=timestamp=>({measurementId:`alcohol-fixture-${++sequence}`,timestamp:new Date(timestamp).toISOString(),sensorId,sensorType:'FIXTURE',targetId,bac:.08,brac:null,unit:'BAC',measurementConfidence:.94,sensorTemperature:24,sensorHealth:'ONLINE',sampleAgeMs:0,simulation:true});runtime.ingest(input(base));latest=runtime.ingest(input(base+400));render(latest);return latest};field('run').addEventListener('click',run);field('ack').addEventListener('click',()=>{const id=latest?.runtimeResult?.riskEvent?.eventId;if(id)runtime.acknowledge(id)});field('reset').addEventListener('click',()=>{if(targetId)runtime.reset(targetId);latest=null;render(null)});field('export').addEventListener('click',()=>{if(!targetId)return;const blob=new Blob([runtime.exportJSON(targetId)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='alcohol-sensor-runtime.json';a.click();URL.revokeObjectURL(url)});window.AlcoholSensorRuntimePage=Object.freeze({runtime,run,getLatest:()=>latest});render(null)})();
   </script>
 </body>
 </html>

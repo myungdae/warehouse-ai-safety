@@ -17,6 +17,12 @@
         Object.freeze({ id:'SYNERGY-RIGHT-TURN-DROWSINESS', risks:['DROWSINESS'], bonus:12, minimumBand:'HIGH' }),
         Object.freeze({ id:'SYNERGY-RIGHT-TURN-INCAPACITATION', risks:['DRIVER_INCAPACITATION'], bonus:15, minimumBand:'CRITICAL' })
     ]);
+    const alcoholSynergyRules = Object.freeze([
+        Object.freeze({id:'SYNERGY-ALCOHOL-DROWSINESS',risks:['ALCOHOL_POLICY_VIOLATION','DROWSINESS'],bonus:18,minimumBand:'HIGH'}),
+        Object.freeze({id:'SYNERGY-ALCOHOL-INCAPACITATION',risks:['ALCOHOL_POLICY_VIOLATION','DRIVER_INCAPACITATION'],bonus:20,minimumBand:'CRITICAL'}),
+        Object.freeze({id:'SYNERGY-ALCOHOL-PEDESTRIAN',risks:['ALCOHOL_POLICY_VIOLATION','HUMAN_PROXIMITY'],bonus:14,minimumBand:'HIGH'}),
+        Object.freeze({id:'SYNERGY-ALCOHOL-VEHICLE',risks:['ALCOHOL_POLICY_VIOLATION','VEHICLE_PROXIMITY'],bonus:14,minimumBand:'HIGH'})
+    ]);
 
     function privacyViolation(value, seen = new Set()) {
         if (!value || typeof value !== 'object') return null;
@@ -106,6 +112,7 @@
                 let score=Math.max(0,...Object.values(baseScores)),contextMultiplier=1;const modifiers={};Object.entries(this.configuration.conditionMultipliers).forEach(([type,multiplier])=>{if(conditionTypes.has(type)){modifiers[type]=multiplier;contextMultiplier*=multiplier;}});contextMultiplier=Math.min(contextMultiplier,1.5);score*=contextMultiplier;
                 const synergyRules=[];let synergyBonus=0;this.configuration.synergyRules.forEach(rule=>{if(hasAll(riskTypes,rule.risks)&&hasAll(conditionTypes,rule.conditions)){synergyRules.push(rule.id);synergyBonus+=rule.bonus;score=Math.max(score+rule.bonus,this._minimumScore(rule.minimumBand));}});
                 if(conditionTypes.has('RIGHT_TURN_ACTIVE'))rightTurnSynergyRules.forEach(rule=>{if(hasAll(riskTypes,rule.risks)){synergyRules.push(rule.id);synergyBonus+=rule.bonus;score=Math.max(score+rule.bonus,this._minimumScore(rule.minimumBand));}});
+                alcoholSynergyRules.forEach(rule=>{if(hasAll(riskTypes,rule.risks)){synergyRules.push(rule.id);synergyBonus+=rule.bonus;score=Math.max(score+rule.bonus,this._minimumScore(rule.minimumBand));}});if(riskTypes.has('ALCOHOL_POLICY_VIOLATION')&&conditionTypes.has('RIGHT_TURN_ACTIVE')){synergyRules.push('SYNERGY-ALCOHOL-RIGHT-TURN');synergyBonus+=12;score=Math.max(score+12,this._minimumScore('HIGH'));}
                 const acknowledged=data.active.some(r=>r.state==='ACKNOWLEDGED')||conditionTypes.has('DRIVER_ACKNOWLEDGED');const recoveryModifier=acknowledged?this.configuration.recoveryModifier.DRIVER_ACKNOWLEDGED:0;score-=recoveryModifier;
                 const override=this.configuration.overrideRules.find(rule=>hasAll(riskTypes,rule.risks)&&hasAll(conditionTypes,rule.conditions))||null;if(override)score=Math.max(score,override.score);score=Math.max(0,Math.min(100,Math.round(score)));
                 const band=this._band(score),dominant=Object.entries(baseScores).sort((a,b)=>b[1]-a[1])[0]?.[0]||null;const reasonCodes=[...riskTypes].map(type=>`RISK_${type}`);synergyRules.forEach(id=>reasonCodes.push(id));if(override)reasonCodes.push(override.id);Object.keys(modifiers).forEach(type=>reasonCodes.push(`CONTEXT_${type}`));if(acknowledged)reasonCodes.push('ACKNOWLEDGED_RISK_RETAINED');
