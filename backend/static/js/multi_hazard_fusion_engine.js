@@ -50,8 +50,8 @@
     }
 
     class FusionEngine {
-        constructor({ configuration=global.MultiHazardFusionConfig, identityRegistry=global.RuntimeIdentityRegistry.registry, now=()=>Date.now(), scheduler=global.setTimeout?.bind(global), canceller=global.clearTimeout?.bind(global), actionSink=null }={}) {
-            if(!identityRegistry?.resolveRuntimeIdentity)throw new TypeError('Canonical Identity Registry is required');this.configuration=configuration;this.identityRegistry=identityRegistry;this.now=now;this.scheduler=scheduler;this.canceller=canceller;this.actionSink=actionSink;
+        constructor({ configuration=global.MultiHazardFusionConfig, identityRegistry=global.RuntimeIdentityRegistry.registry, confidenceEngine=null, now=()=>Date.now(), scheduler=global.setTimeout?.bind(global), canceller=global.clearTimeout?.bind(global), actionSink=null }={}) {
+            if(!identityRegistry?.resolveRuntimeIdentity)throw new TypeError('Canonical Identity Registry is required');this.configuration=configuration;this.identityRegistry=identityRegistry;this.confidenceEngine=confidenceEngine;this.now=now;this.scheduler=scheduler;this.canceller=canceller;this.actionSink=actionSink;
             this.contexts=new Map();this.targetKeys=new Map();this.risks=new Map();this.conditions=new Map();this.composites=new Map();this.decisions=new Map();this.audit=[];this.sequence=0;this.actionSignatures=new Map();this.lineage=new FusionLineage();this.timers=new Map();
         }
         _identity(input) {
@@ -112,7 +112,8 @@
                 if(override)this._audit('OVERRIDE_SELECTED',state,{overrideRuleId:override.id,selectedPolicy:policy,suppressedLowerPolicies:true},data.active.map(r=>r.eventId),[override.id]);
                 this._audit('POLICY_SELECTED',state,{selectedPolicy:policy,recommendedActions:actions},data.active.map(r=>r.eventId),reasonCodes);
                 if(compositeState==='CLEARED'&&previous?.state!=='CLEARED')this._audit('CONTEXT_CLEARED',state,{compositeRiskId:composite.compositeRiskId},data.retained.map(r=>r.eventId),['NO_ACTIVE_UNDERLYING_RISK']);
-                results.push({context:context.toJSON(),compositeRisk:composite.toJSON(),priorityDecision:decision.toJSON(),actionRequests:actionResult.actions,actionExecutions:actionResult.executions,lineage:this.lineage.toJSON()});});
+                let confidenceResult=null,confidenceError=null;if(this.confidenceEngine?.evaluateContext){try{confidenceResult=this.confidenceEngine.evaluateContext(context.toJSON(),composite.toJSON(),state.identity,{observations:context.observations||[],sensorStates:[],evidence:{}});}catch(error){confidenceError=error.message;this._audit('CONFIDENCE_EVALUATION_FAILED',state,{error:error.message},[],['CONFIDENCE_FAILURE_ISOLATED']);}}
+                results.push({context:context.toJSON(),compositeRisk:composite.toJSON(),priorityDecision:decision.toJSON(),actionRequests:actionResult.actions,actionExecutions:actionResult.executions,lineage:this.lineage.toJSON(),runtimeConfidence:confidenceResult?.runtimeConfidence||null,confidenceRecommendation:confidenceResult?.confidenceRecommendation||null,confidenceError});});
             return clone(results.length===1?results[0]:results);
         }
         _buildContext(state,data,composite) { const now=this.now(),id=state.identity;return new OperationalContext({contextId:state.contextId,contextVersion:this.configuration.contextVersion,createdAt:state.createdAt,updatedAt:iso(now),windowStart:iso(now-this.configuration.contextWindowMs),windowEnd:iso(now),...id,activeRiskEventIds:data.active.map(r=>r.eventId),activeRiskTypes:[...new Set(data.active.map(r=>r.eventType))],observations:[],conditions:data.conditions.map(c=>c.toJSON()),compositeRiskId:composite.compositeRiskId,priorityScore:composite.priorityScore,priorityBand:composite.priorityBand,status:state.status,source:'runtime-fusion',simulation:composite.simulation,operationalUseAllowed:false}); }
