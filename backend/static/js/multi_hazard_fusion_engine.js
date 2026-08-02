@@ -16,6 +16,9 @@
         Object.freeze({ id:'SYNERGY-RIGHT-TURN-BOTH', risks:['HUMAN_PROXIMITY','VEHICLE_PROXIMITY'], bonus:12, minimumBand:'CRITICAL' }),
         Object.freeze({ id:'SYNERGY-RIGHT-TURN-DROWSINESS', risks:['DROWSINESS'], bonus:12, minimumBand:'HIGH' }),
         Object.freeze({ id:'SYNERGY-RIGHT-TURN-INCAPACITATION', risks:['DRIVER_INCAPACITATION'], bonus:15, minimumBand:'CRITICAL' })
+        ,Object.freeze({ id:'SYNERGY-RIGHT-TURN-DISTRACTION-RELATED', risks:['DRIVER_DISTRACTION'], conditions:['ATTENTION_HAZARD_RELATED'], bonus:14, minimumBand:'HIGH' })
+        ,Object.freeze({ id:'SYNERGY-RIGHT-TURN-DISTRACTION-PEDESTRIAN', risks:['DRIVER_DISTRACTION','HUMAN_PROXIMITY'], conditions:['ATTENTION_HAZARD_RELATED'], bonus:22, minimumBand:'CRITICAL' })
+        ,Object.freeze({ id:'SYNERGY-RIGHT-TURN-DISTRACTION-VEHICLE', risks:['DRIVER_DISTRACTION','VEHICLE_PROXIMITY'], conditions:['ATTENTION_HAZARD_RELATED'], bonus:20, minimumBand:'CRITICAL' })
     ]);
     const alcoholSynergyRules = Object.freeze([
         Object.freeze({id:'SYNERGY-ALCOHOL-DROWSINESS',risks:['ALCOHOL_POLICY_VIOLATION','DROWSINESS'],bonus:18,minimumBand:'HIGH'}),
@@ -111,7 +114,7 @@
                 const baseScores={};data.active.forEach(r=>{const score=this.configuration.baseScores[r.eventType];if(Number.isFinite(score))baseScores[r.eventType]=Math.max(baseScores[r.eventType]||0,score);});
                 let score=Math.max(0,...Object.values(baseScores)),contextMultiplier=1;const modifiers={};Object.entries(this.configuration.conditionMultipliers).forEach(([type,multiplier])=>{if(conditionTypes.has(type)){modifiers[type]=multiplier;contextMultiplier*=multiplier;}});contextMultiplier=Math.min(contextMultiplier,1.5);score*=contextMultiplier;
                 const synergyRules=[];let synergyBonus=0;this.configuration.synergyRules.forEach(rule=>{if(hasAll(riskTypes,rule.risks)&&hasAll(conditionTypes,rule.conditions)){synergyRules.push(rule.id);synergyBonus+=rule.bonus;score=Math.max(score+rule.bonus,this._minimumScore(rule.minimumBand));}});
-                if(conditionTypes.has('RIGHT_TURN_ACTIVE'))rightTurnSynergyRules.forEach(rule=>{if(hasAll(riskTypes,rule.risks)){synergyRules.push(rule.id);synergyBonus+=rule.bonus;score=Math.max(score+rule.bonus,this._minimumScore(rule.minimumBand));}});
+                if(conditionTypes.has('RIGHT_TURN_ACTIVE'))rightTurnSynergyRules.forEach(rule=>{if(hasAll(riskTypes,rule.risks)&&hasAll(conditionTypes,rule.conditions||[])){synergyRules.push(rule.id);synergyBonus+=rule.bonus;score=Math.max(score+rule.bonus,this._minimumScore(rule.minimumBand));}});
                 alcoholSynergyRules.forEach(rule=>{if(hasAll(riskTypes,rule.risks)){synergyRules.push(rule.id);synergyBonus+=rule.bonus;score=Math.max(score+rule.bonus,this._minimumScore(rule.minimumBand));}});if(riskTypes.has('ALCOHOL_POLICY_VIOLATION')&&conditionTypes.has('RIGHT_TURN_ACTIVE')){synergyRules.push('SYNERGY-ALCOHOL-RIGHT-TURN');synergyBonus+=12;score=Math.max(score+12,this._minimumScore('HIGH'));}
                 const acknowledged=data.active.some(r=>r.state==='ACKNOWLEDGED')||conditionTypes.has('DRIVER_ACKNOWLEDGED');const recoveryModifier=acknowledged?this.configuration.recoveryModifier.DRIVER_ACKNOWLEDGED:0;score-=recoveryModifier;
                 const override=this.configuration.overrideRules.find(rule=>hasAll(riskTypes,rule.risks)&&hasAll(conditionTypes,rule.conditions))||null;if(override)score=Math.max(score,override.score);score=Math.max(0,Math.min(100,Math.round(score)));

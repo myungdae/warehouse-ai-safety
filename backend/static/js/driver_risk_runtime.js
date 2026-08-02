@@ -18,6 +18,7 @@
     const alcoholRiskStates = new Map();
     const pedestrianProximityRiskStates = new Map();
     const vehicleProximityRiskStates = new Map();
+    const driverAttentionRiskStates = new Map();
     const VEHICLE_PROXIMITY_RULE = Object.freeze({
         configurationVersion: 'DEVELOPMENT_UNVALIDATED_VEHICLE_PROXIMITY_CANDIDATE-v1',
         entryDistanceMeters: 10, closeDistanceMeters: 4, clearDistanceMeters: 12,
@@ -498,6 +499,24 @@
         if (observation.observationType === ObservationType.ALCOHOL_LEVEL) {
             return alcoholObservationToRiskSignal(observation);
         }
+        if (observation.observationType === ObservationType.DRIVER_ATTENTION) {
+            const metadata=observation.metadata||{},state=metadata.attentionState,quality=metadata.quality||{};
+            const previous=driverAttentionRiskStates.get(observation.targetId)||{active:false};
+            if(!metadata.sensorConnected||quality.sampleFresh===false||state==='UNKNOWN'||state==='INVALID'){
+                driverAttentionRiskStates.set(observation.targetId,previous);
+                return {...noRisk(observation,state==='UNKNOWN'?'ATTENTION_SAMPLE_STALE':'ATTENTION_QUALITY_DEGRADED'),phase:state,reasonCodes:metadata.reasonCodes||[],preserveActiveRisk:previous.active};
+            }
+            if(state==='DISTRACTED'){
+                previous.active=true;driverAttentionRiskStates.set(observation.targetId,previous);
+                return{shouldCreateRisk:true,shouldClearRisk:false,eventInput:{eventType:'DRIVER_DISTRACTION',targetId:observation.targetId,severity:metadata.offRoadDurationMs>=5000?'HIGH':'MEDIUM'},observation:observation.toJSON(),reason:'PROLONGED_OFF_ROAD_GLANCE',reasonCodes:metadata.reasonCodes||[],phase:'ACTIVE'};
+            }
+            if(state==='RECOVERING'||state==='DISTRACTION_PENDING'||state==='BRIEF_GLANCE_AWAY'){
+                driverAttentionRiskStates.set(observation.targetId,previous);
+                return{...noRisk(observation,state==='RECOVERING'?'FORWARD_ATTENTION_RECOVERING':'DRIVER_DISTRACTION_ENTRY_PENDING'),phase:state,reasonCodes:metadata.reasonCodes||[],preserveActiveRisk:previous.active};
+            }
+            if(state==='ATTENTIVE'&&previous.active){driverAttentionRiskStates.delete(observation.targetId);return{shouldCreateRisk:false,shouldClearRisk:true,clearEventType:'DRIVER_DISTRACTION',eventInput:null,observation:observation.toJSON(),reason:'FORWARD_ATTENTION_RECOVERED',reasonCodes:metadata.reasonCodes||[],phase:'CLEARED'};}
+            return{...noRisk(observation,'DRIVER_ATTENTION_NORMAL'),phase:'NORMAL',reasonCodes:metadata.reasonCodes||[]};
+        }
         if (observation.observationType === ObservationType.PEDESTRIAN_PROXIMITY) {
             const value=observation.value||{},distance=value.distanceMeters,motion=value.motion;
             if(distance===null||!Number.isFinite(distance)||observation.metadata?.quality?.measurementAvailable===false)return noRisk(observation,'PEDESTRIAN_PROXIMITY_QUALITY_UNAVAILABLE');
@@ -555,6 +574,11 @@
         else vehicleProximityRiskStates.clear();
     }
 
+    function resetDriverAttentionRiskState(targetId) {
+        if (targetId) driverAttentionRiskStates.delete(targetId);
+        else driverAttentionRiskStates.clear();
+    }
+
     global.DriverRiskRuntime = Object.freeze({
         EventState,
         RiskEvent,
@@ -565,6 +589,7 @@
         resetAlcoholRiskState,
         resetPedestrianProximityRiskState,
         resetVehicleProximityRiskState,
+        resetDriverAttentionRiskState,
         vehicleProximityRule: VEHICLE_PROXIMITY_RULE
     });
 }(window));

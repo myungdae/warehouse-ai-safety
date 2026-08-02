@@ -54,7 +54,8 @@
             if (signal.shouldCreateRisk) riskEvent = riskRuntime.observe(signal.eventInput, observation.observedAt);
             else if (signal.shouldClearRisk) {
                 const eventType = signal.clearEventType || (observation.observationType === 'DROWSINESS' ? 'DROWSINESS'
-                    : (observation.observationType === 'INCAPACITATION' ? 'DRIVER_INCAPACITATION' : 'ALCOHOL_POLICY_VIOLATION'));
+                    : (observation.observationType === 'INCAPACITATION' ? 'DRIVER_INCAPACITATION'
+                        : (observation.observationType === 'DRIVER_ATTENTION' ? 'DRIVER_DISTRACTION' : 'ALCOHOL_POLICY_VIOLATION')));
                 riskEvent = riskRuntime.clear(eventType, observation.targetId, observation.observedAt);
             }
             const result = { observation: observation.toJSON(), riskSignal: clone(signal), riskEvent: riskEvent?.toJSON?.() || null,
