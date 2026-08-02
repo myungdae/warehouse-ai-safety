@@ -16,6 +16,7 @@
     const liveDrowsinessRiskStates = new Map();
     const incapacitationRiskStates = new Map();
     const alcoholRiskStates = new Map();
+    const pedestrianProximityRiskStates = new Map();
     const INCAPACITATION_COMPOSITE_SIGNALS = Object.freeze([
         'prolongedEyeClosure',
         'headDrop',
@@ -491,6 +492,14 @@
         if (observation.observationType === ObservationType.ALCOHOL_LEVEL) {
             return alcoholObservationToRiskSignal(observation);
         }
+        if (observation.observationType === ObservationType.PEDESTRIAN_PROXIMITY) {
+            const value=observation.value||{},distance=value.distanceMeters,motion=value.motion;
+            if(distance===null||!Number.isFinite(distance)||observation.metadata?.quality?.measurementAvailable===false)return noRisk(observation,'PEDESTRIAN_PROXIMITY_QUALITY_UNAVAILABLE');
+            const state=pedestrianProximityRiskStates.get(observation.targetId)||{active:false};
+            if((distance<=3)||(motion==='MOVING_TOWARD'&&distance<=5)){state.active=true;pedestrianProximityRiskStates.set(observation.targetId,state);return{shouldCreateRisk:true,shouldClearRisk:false,eventInput:{eventType:'HUMAN_PROXIMITY',targetId:observation.targetId,severity:distance<=1.5?'CRITICAL':'HIGH'},observation:observation.toJSON(),reason:'PEDESTRIAN_PROXIMITY_RISK_CONFIRMED'};}
+            if(state.active&&motion==='MOVING_AWAY'&&distance>=4){pedestrianProximityRiskStates.delete(observation.targetId);return{shouldCreateRisk:false,shouldClearRisk:true,clearEventType:'HUMAN_PROXIMITY',eventInput:null,observation:observation.toJSON(),reason:'PEDESTRIAN_PROXIMITY_CLEARED'};}
+            return noRisk(observation,state.active?'PEDESTRIAN_PROXIMITY_RISK_RETAINED':'PEDESTRIAN_PROXIMITY_OUTSIDE_THRESHOLD');
+        }
         return noRisk(observation, 'NO_RISK_RULE_CONFIGURED');
     }
 
@@ -509,6 +518,11 @@
         else alcoholRiskStates.clear();
     }
 
+    function resetPedestrianProximityRiskState(targetId) {
+        if (targetId) pedestrianProximityRiskStates.delete(targetId);
+        else pedestrianProximityRiskStates.clear();
+    }
+
     global.DriverRiskRuntime = Object.freeze({
         EventState,
         RiskEvent,
@@ -516,6 +530,7 @@
         observationToRiskSignal,
         resetDrowsinessRiskState,
         resetIncapacitationRiskState,
-        resetAlcoholRiskState
+        resetAlcoholRiskState,
+        resetPedestrianProximityRiskState
     });
 }(window));
