@@ -7,6 +7,7 @@
   <title>Driver Safety · IMC Agentic AI</title>
   <link rel="stylesheet" href="/static/css/driver_safety.css">
   <link rel="stylesheet" href="/static/css/driver_perception.css">
+  <link rel="stylesheet" href="/static/css/multi_hazard_fusion.css">
   <style>
     :root {
       --bg: #070b14;
@@ -383,6 +384,19 @@
       <p class="note">표시는 Request generated · Simulation dispatched · Execution simulated 범위로 제한됩니다.</p>
     </section>
 
+    <section id="multiHazardFusion" class="driver-test-panel fusion-panel" aria-labelledby="fusionTitle">
+      <h2 id="fusionTitle" class="panel-title">Multi-Hazard Runtime Fusion</h2>
+      <div class="fusion-badges"><span>DETERMINISTIC / LIVE SOURCE MIX</span><span>FUSION CONFIGURATION UNVALIDATED</span><span>ACTIONS SIMULATION ONLY</span><span>ACTUATORS DISCONNECTED</span><span>NOT FOR OPERATIONAL USE</span></div>
+      <div class="fusion-summary"><article><span>Overall Safety Status</span><strong data-fusion-band>NORMAL</strong></article><article><span>Priority Score</span><strong data-fusion-score>0</strong></article><article><span>Dominant Risk</span><strong data-fusion-dominant>-</strong></article><article><span>Recommended Action</span><strong data-fusion-action>NO_ACTION</strong></article></div>
+      <div class="actions"><button type="button" data-fusion-run>RUN FUSION FIXTURE</button><button type="button" data-fusion-ack>ACK COMPOSITE RISK</button><button type="button" data-fusion-reset>RESET FUSION TARGET</button><button type="button" data-fusion-export>EXPORT CONTEXT JSON</button></div>
+      <details><summary>Administrator / Developer Details</summary><div class="fusion-details">
+        <article><h3>Operational Context</h3><dl><div><dt>Context ID</dt><dd data-fusion-context>-</dd></div><div><dt>Target / Assignment</dt><dd data-fusion-target>-</dd></div><div><dt>Vehicle / Driver</dt><dd data-fusion-identity>-</dd></div><div><dt>Active Hazards</dt><dd data-fusion-hazards>-</dd></div><div><dt>Active Conditions</dt><dd data-fusion-conditions>-</dd></div></dl></article>
+        <article><h3>Composite Risk</h3><dl><div><dt>Composite Risk ID</dt><dd data-fusion-composite>-</dd></div><div><dt>Severity / State</dt><dd data-fusion-state>-</dd></div><div><dt>Modifiers</dt><dd data-fusion-modifiers>-</dd></div><div><dt>Synergy / Override</dt><dd data-fusion-rules>-</dd></div><div><dt>Reason Codes</dt><dd data-fusion-reasons>-</dd></div></dl></article>
+        <article><h3>Decision / Execution</h3><dl><div><dt>Selected Policy</dt><dd data-fusion-policy>-</dd></div><div><dt>Recommended Actions</dt><dd data-fusion-actions>-</dd></div><div><dt>Latest ActionExecution</dt><dd data-fusion-execution>-</dd></div><div><dt>Simulation</dt><dd>true · actuatorConnected=false</dd></div></dl></article>
+        <article><h3>Ontology Lineage</h3><dl><div><dt>Graph nodes / edges</dt><dd data-fusion-graph>0 / 0</dd></div><div><dt>Triple count</dt><dd data-fusion-triples>0</dd></div><div><dt>Context lineage</dt><dd>RiskEvent → OperationalContext → CompositeRisk → PriorityDecision → ActionRequest</dd></div></dl></article>
+      </div><h3>Recent Fusion Audit</h3><pre class="fusion-audit" data-fusion-audit>[]</pre></details>
+    </section>
+
     <section id="runtimeEventGraphViewer" class="driver-test-panel runtime-graph" aria-labelledby="runtimeGraphTitle">
       <h2 id="runtimeGraphTitle" class="panel-title">Runtime Graph</h2>
       <p class="panel-copy">Runtime artifacts are observed and connected in memory for simulation and inspection only.</p>
@@ -483,6 +497,9 @@
   <script src="/static/js/driver_policy_engine.js"></script>
   <script src="/static/js/driver_action_config.js"></script>
   <script src="/static/js/driver_action_dispatcher.js"></script>
+  <script src="/static/js/runtime_operational_context.js"></script>
+  <script src="/static/js/multi_hazard_fusion_config.js"></script>
+  <script src="/static/js/multi_hazard_fusion_engine.js"></script>
   <script src="/static/js/driver_input_mode_controller.js"></script>
   <script src="/static/js/driver_runtime_page.js"></script>
   <script src="/static/js/driver_perception/driver_perception_config.js"></script>
@@ -505,6 +522,20 @@
       policyPage: window.DriverPolicyPage,
       actionPage: window.DriverActionPage
     });
+    (() => {
+      const panel = document.getElementById('multiHazardFusion'); if (!panel) return;
+      const engine = new window.MultiHazardFusionEngine.FusionEngine({ actionSink: (action, context) => window.DriverRuntimePage.ingestActionRequest(action, context) });
+      window.MultiHazardFusionPage = engine; let targetId = null, latest = null, fixtureSequence = 0;
+      const field = name => panel.querySelector(`[data-fusion-${name}]`);
+      const render = result => { latest = result || latest; const context = latest?.context, risk = latest?.compositeRisk, decision = latest?.priorityDecision, lineage = latest?.lineage || engine.getLineage();
+        field('band').textContent = risk?.priorityBand || 'NORMAL'; field('score').textContent = risk?.priorityScore ?? 0; field('dominant').textContent = risk?.dominantRiskType || '-'; field('action').textContent = decision?.recommendedActions?.[0] || 'NO_ACTION';
+        field('context').textContent = context?.contextId || '-'; field('target').textContent = context ? `${context.targetId} / ${context.driverAssignmentId || '-'}` : '-'; field('identity').textContent = context ? `${context.vehicleId || '-'} / ${context.driverId || '-'}` : '-';
+        field('hazards').textContent = context?.activeRiskTypes?.join(', ') || '-'; field('conditions').textContent = context?.conditions?.map(item => item.conditionType).join(', ') || '-';field('composite').textContent = risk?.compositeRiskId || '-';field('state').textContent = risk ? `${risk.severity} / ${risk.state}` : '-';
+        field('modifiers').textContent = risk ? JSON.stringify(risk.modifiers) : '-';field('rules').textContent = risk ? [...risk.synergyRules,...risk.overrideRules.map(item => item.overrideRuleId)].join(', ') || '-' : '-';field('reasons').textContent = risk?.reasonCodes?.join(', ') || '-';
+        field('policy').textContent = decision?.selectedPolicy || '-';field('actions').textContent = decision?.recommendedActions?.join(', ') || '-';field('execution').textContent = latest?.actionExecutions?.at(-1)?.executionId || '-';field('graph').textContent = `${lineage.nodes.length} / ${lineage.edges.length}`;field('triples').textContent = lineage.triples.length;field('audit').textContent = JSON.stringify(engine.getAuditHistory(targetId).slice(-12),null,2); };
+      field('run').addEventListener('click', () => { const identity = { vehicleType:document.getElementById('driverVehicleType').value,vehicleId:document.getElementById('driverVehicleId').value,driverId:document.getElementById('driverId').value,driverAssignmentId:document.getElementById('driverAssignmentId').value };targetId=new window.DriverState.VehicleContext(identity).targetId;engine.resetTarget(targetId);const at=Date.now(),ctx={...identity,targetId};const condition=(type,index)=>({conditionId:`fusion-fixture-condition-${++fixtureSequence}-${index}`,conditionType:type,targetId,driverAssignmentId:identity.driverAssignmentId,value:true,sourceObservationId:`fusion-fixture-observation-${fixtureSequence}-${index}`,timestamp:new Date(at).toISOString(),validUntil:new Date(at+5000).toISOString(),quality:{confidenceAvailable:false},simulation:true,confidence:null,confidenceAvailable:false,operationalContext:ctx});engine.ingestCondition(condition('VEHICLE_MOVING',1));engine.ingestCondition(condition('REVERSING',2));const event=type=>({eventId:`fusion-fixture-event-${++fixtureSequence}-${type}`,eventType:type,targetId,severity:'HIGH',state:'ACTIVE',createdTime:new Date(at).toISOString(),updatedTime:new Date(at).toISOString(),simulation:true,operationalContext:ctx});engine.ingestRiskEvent(event('DROWSINESS'));render(engine.ingestRiskEvent(event('HUMAN_PROXIMITY'))); });
+      field('ack').addEventListener('click',()=>{if(latest?.compositeRisk){engine.acknowledgeCompositeRisk(latest.compositeRisk.compositeRiskId);render(engine.reevaluate(targetId));}});field('reset').addEventListener('click',()=>{if(targetId)engine.resetTarget(targetId);latest=null;render(null);});field('export').addEventListener('click',()=>{if(!targetId)return;const blob=new Blob([engine.exportContextJSON(targetId)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='multi-hazard-operational-context.json';a.click();URL.revokeObjectURL(url);});render(null);
+    })();
     window.RuntimeGraphViewer = window.RuntimeEventGraph.initializeRuntimeGraphViewer();
     window.RuntimeTripleViewer = window.RuntimeTripleEngine.initializeRuntimeTripleViewer();
     document.addEventListener('DOMContentLoaded', () => {
