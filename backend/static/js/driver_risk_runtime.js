@@ -199,6 +199,13 @@
         const state = liveDrowsinessRiskStates.get(observation.targetId) || {
             enterStartedAt: null, clearStartedAt: null, riskActive: false
         };
+        const evidence = [];
+        if (quality.marValid !== true) evidence.push('MAR_UNAVAILABLE');
+        else if (quality.mouthCalibrationAvailable !== true) evidence.push('MOUTH_CALIBRATION_UNAVAILABLE');
+        else if (metrics.yawnConfirmed === true) evidence.push(metrics.yawnCount >= 2
+            ? 'REPEATED_YAWN_SUPPORTING_SIGNAL' : 'YAWN_CONFIRMED_SUPPORTING_SIGNAL');
+        else if (metrics.yawnCandidate === true) evidence.push('YAWN_CANDIDATE_OBSERVED');
+        const withEvidence = signal => ({ ...signal, supportingEvidence: evidence });
         const qualityValid = metadata.simulation === false && metadata.sensorConnected === true &&
             quality.faceDetected === true && quality.landmarkAvailable === true &&
             quality.calibrated === true && quality.calibrationState === 'READY' &&
@@ -207,9 +214,9 @@
             quality.sampleAgeMs <= config.maximumSampleAgeMs;
         if (!qualityValid) {
             liveDrowsinessRiskStates.set(observation.targetId, state);
-            return noRisk(observation, state.riskActive
+            return withEvidence(noRisk(observation, state.riskActive
                 ? 'LIVE_DROWSINESS_QUALITY_LOSS_RISK_PRESERVED'
-                : 'LIVE_DROWSINESS_QUALITY_INSUFFICIENT');
+                : 'LIVE_DROWSINESS_QUALITY_INSUFFICIENT'));
         }
         const primary = metrics.eyeClosed === true && metrics.ear < metrics.earThreshold;
         const accumulated = quality.perclosValid === true && Number.isFinite(metrics.perclos) &&
@@ -218,30 +225,30 @@
         if (!state.riskActive) {
             if (!entry) {
                 liveDrowsinessRiskStates.delete(observation.targetId);
-                return noRisk(observation, 'LIVE_DROWSINESS_NORMAL');
+                return withEvidence(noRisk(observation, 'LIVE_DROWSINESS_NORMAL'));
             }
             if (state.enterStartedAt === null || observedAtMs < state.enterStartedAt) state.enterStartedAt = observedAtMs;
             if (observedAtMs - state.enterStartedAt < config.entrySustainMs) {
                 liveDrowsinessRiskStates.set(observation.targetId, state);
-                return noRisk(observation, 'LIVE_DROWSINESS_ENTRY_PENDING');
+                return withEvidence(noRisk(observation, 'LIVE_DROWSINESS_ENTRY_PENDING'));
             }
             state.riskActive = true;
             state.clearStartedAt = null;
             liveDrowsinessRiskStates.set(observation.targetId, state);
-            return createDrowsinessRiskSignal(observation, 'LIVE_DROWSINESS_RISK_CONFIRMED');
+            return withEvidence(createDrowsinessRiskSignal(observation, 'LIVE_DROWSINESS_RISK_CONFIRMED'));
         }
         if (entry) {
             state.clearStartedAt = null;
             liveDrowsinessRiskStates.set(observation.targetId, state);
-            return createDrowsinessRiskSignal(observation, 'LIVE_DROWSINESS_RISK_MAINTAINED');
+            return withEvidence(createDrowsinessRiskSignal(observation, 'LIVE_DROWSINESS_RISK_MAINTAINED'));
         }
         if (state.clearStartedAt === null || observedAtMs < state.clearStartedAt) state.clearStartedAt = observedAtMs;
         if (observedAtMs - state.clearStartedAt < config.clearSustainMs) {
             liveDrowsinessRiskStates.set(observation.targetId, state);
-            return noRisk(observation, 'LIVE_DROWSINESS_CLEAR_PENDING');
+            return withEvidence(noRisk(observation, 'LIVE_DROWSINESS_CLEAR_PENDING'));
         }
         liveDrowsinessRiskStates.delete(observation.targetId);
-        return { ...noRisk(observation, 'LIVE_DROWSINESS_CLEARED'), shouldClearRisk: true };
+        return withEvidence({ ...noRisk(observation, 'LIVE_DROWSINESS_CLEARED'), shouldClearRisk: true });
     }
 
     function createIncapacitationRiskSignal(observation, reason, compositeSignalCount) {

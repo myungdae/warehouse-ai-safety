@@ -122,7 +122,10 @@
                 quality: { confidenceAvailable: false, faceDetected: snapshot.faceDetected, calibrated: snapshot.calibrated,
                     calibrationState: snapshot.calibrationState, earValid: snapshot.quality.earValid,
                     perclosValid: snapshot.quality.perclosValid, headPoseValid: snapshot.quality.headPoseValid,
-                    landmarkAvailable: snapshot.quality.landmarkAvailable, sampleAgeMs },
+                    landmarkAvailable: snapshot.quality.landmarkAvailable, sampleAgeMs,
+                    marValid: snapshot.quality.marValid === true,
+                    mouthCalibrationAvailable: snapshot.quality.mouthCalibrationAvailable === true,
+                    yawnMetricAvailable: snapshot.quality.yawnMetricAvailable === true },
                 runtime: { processingTimeMs: snapshot.runtime?.processingTimeMs ?? null,
                     frameTimestamp: snapshot.runtime?.frameTimestamp ?? null, snapshotTimestamp: snapshot.timestamp }
             };

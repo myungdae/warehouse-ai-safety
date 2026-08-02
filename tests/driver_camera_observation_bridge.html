@@ -36,7 +36,7 @@
   const base = () => ({ driverMetricSnapshotId: `snapshot-${now}`, timestamp: new Date(now).toISOString(), cameraId: 'camera-1',
     faceDetected: true, calibrated: true, calibrationState: 'READY',
     metrics: { leftEAR:.3,rightEAR:.3,ear:.3,earBaseline:.3,earThreshold:.225,eyeClosed:false,eyeClosureDurationMs:0,blinkCount:1,blinkRate:1,lastBlinkDurationMs:120,perclos:5,pitch:0,roll:0,yaw:0,headPoseState:'CENTER' },
-    quality: { earValid:true,perclosValid:true,headPoseValid:true,landmarkAvailable:true,sampleAgeMs:0 },
+    quality: { earValid:true,perclosValid:true,headPoseValid:true,landmarkAvailable:true,sampleAgeMs:0,marValid:true,mouthCalibrationAvailable:true,yawnMetricAvailable:true },
     runtime: { processingTimeMs:2,frameTimestamp:new Date(now).toISOString() }, privacy:{imageStored:false,imageTransmitted:false,browserLocalProcessing:true}, operationalUseAllowed:false });
   callback(base());
   const json = observations[0].toJSON();
@@ -47,6 +47,7 @@
   check(json.metadata.imageStored === false && json.metadata.imageTransmitted === false && json.metadata.browserLocalProcessing === true, 'PRIVACY_FLAGS');
   check(!JSON.stringify(json).includes('landmarks') && !JSON.stringify(json).includes('video') && !JSON.stringify(json).includes('base64'), 'NO_RAW_MEDIA');
   check(json.value === 'live-driver-state' && json.unit === 'composite-driver-state', 'OBSERVATION_CONTRACT');
+  check(json.metadata.quality.marValid === true && json.metadata.quality.yawnMetricAvailable === true, 'YAWN_QUALITY_PRESERVED');
   runtime.state = DriverPerception.States.FACE_NOT_DETECTED; const noFace = base(); noFace.faceDetected=false; noFace.quality.landmarkAvailable=false; callback(noFace);
   check(observations.length === 1 && bridge.getState().status === 'FACE_NOT_DETECTED', 'FACE_QUALITY_GATE');
   runtime.state = DriverPerception.States.RUNNING; const stale=base(); stale.timestamp=new Date(now-2000).toISOString(); callback(stale);

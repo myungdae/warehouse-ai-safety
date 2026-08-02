@@ -13,7 +13,7 @@
             this.cameraManager = cameraManager || new namespace.CameraManager();
             this.landmarkAdapter = landmarkAdapter || new namespace.FaceLandmarkAdapter();
             this.metricCalculator = metricCalculator || new namespace.DriverMetricCalculator(namespace.Config.metrics);
-            this.calibration = calibration || new namespace.DriverCalibration(namespace.Config.calibration);
+            this.calibration = calibration || new namespace.DriverCalibration({ ...namespace.Config.calibration, ...namespace.Config.yawn });
             this.snapshotFactory = snapshotFactory || namespace.createDriverMetricSnapshot;
             this.scheduler = scheduler || global.requestAnimationFrame.bind(global);
             this.cancelScheduler = cancelScheduler || global.cancelAnimationFrame.bind(global);
@@ -88,7 +88,9 @@
             let calibrationState = this.calibration.getState(Date.parse(frame.timestamp));
             const metrics = this.metricCalculator.processFrame(frame, calibrationState);
             if (calibrationState.state === namespace.CalibrationStates.COLLECTING) {
-                calibrationState = this.calibration.addSample(metrics.rawEar, { valid: metrics.earValid, timestamp: Date.parse(frame.timestamp) });
+                calibrationState = this.calibration.addSample(metrics.rawEar, { valid: metrics.earValid,
+                    mar: metrics.marRaw, marValid: metrics.marValid, marRejectReason: metrics.marInvalidReason,
+                    timestamp: Date.parse(frame.timestamp) });
             }
             this.latestMetricSnapshot = this.snapshotFactory({ frame, metrics, calibration: calibrationState });
             this.metricListeners.forEach(listener => listener(this.latestMetricSnapshot));
@@ -108,6 +110,7 @@
             this.videoElement = null;
             this.lastLandmarkFrame = null;
             this.latestMetricSnapshot = null;
+            this.metricCalculator.reset();
             this.state = States.STOPPED;
             this._publish({ faceDetected: null, frameStatus: 'STOPPED' });
             return count;
@@ -135,6 +138,7 @@
             display('baseline', calibrationState.baseline);
             display('threshold', calibrationState.threshold);
         };
+        let latestMouthMetrics = null;
         const drawOverlay = frame => {
             if (!overlay) return;
             const width = frame.imageWidth || video.videoWidth || 640;
@@ -155,6 +159,13 @@
             drawPath(namespace.Config.metrics.leftEyeIndices); drawPath(namespace.Config.metrics.rightEyeIndices);
             const outline = [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 152, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109];
             context.strokeStyle = 'rgba(0,212,255,.45)'; drawPath(outline);
+            context.strokeStyle = '#f59e0b'; drawPath(namespace.Config.metrics.mouthIndices.contour);
+            if (latestMouthMetrics) {
+                context.fillStyle = latestMouthMetrics.yawnConfirmed ? '#ef4444' : '#fbbf24';
+                context.font = 'bold 16px ui-monospace, monospace';
+                const marText = Number.isFinite(latestMouthMetrics.marSmoothed) ? latestMouthMetrics.marSmoothed.toFixed(3) : 'UNKNOWN';
+                context.fillText(`MAR ${marText} · ${latestMouthMetrics.yawnState}`, 12, height - 16);
+            }
         };
         const refresh = async (preferredDeviceId = select.value) => {
             try {
@@ -198,12 +209,32 @@
         root.querySelector('[data-calibration-reset]')?.addEventListener('click', () => renderCalibration(runtime.resetCalibration()));
         runtime.onMetricSnapshot(snapshot => {
             const metrics = snapshot.metrics; const quality = snapshot.quality; const calibrationState = runtime.getCalibrationState();
+            latestMouthMetrics = metrics;
             display('last-frame', snapshot.runtime.frameTimestamp, 0);
             renderCalibration(calibrationState);
             display('left-ear', metrics.leftEAR); display('right-ear', metrics.rightEAR); display('ear', metrics.ear);
             display('ear-valid', quality.earValid, 0); display('eye-state', metrics.eyeClosed === null ? 'RAW ONLY' : (metrics.eyeClosed ? 'CLOSED' : 'OPEN'), 0);
             display('closure', metrics.eyeClosureDurationMs, 0); display('blink-count', metrics.blinkCount, 0); display('blink-rate', metrics.blinkRate, 1); display('perclos', metrics.perclos, 1);
             display('pitch', metrics.pitch, 1); display('roll', metrics.roll, 1); display('yaw', metrics.yaw, 1); display('pose-state', metrics.headPoseState, 0);
+            display('mar-raw', metrics.marRaw); display('mar-smoothed', metrics.marSmoothed); display('mar-valid', quality.marValid, 0);
+            display('mouth-baseline', metrics.mouthBaseline); display('mouth-threshold', metrics.mouthOpenThreshold);
+            display('mouth-state', metrics.mouthOpen === null ? 'INVALID' : (metrics.mouthOpen ? 'OPEN' : 'CLOSED'), 0);
+            display('mouth-duration', metrics.mouthOpenDurationMs, 0); display('yawn-state', metrics.yawnState, 0);
+            display('yawn-candidate', metrics.yawnCandidate, 0); display('yawn-confirmed', metrics.yawnConfirmed, 0);
+            display('yawn-count', metrics.yawnCount, 0); display('last-yawn', metrics.lastYawnDurationMs, 0);
+            const debug = snapshot.diagnostics;
+            display('debug-ear-raw', debug.eye.rawEAR); display('debug-ear-smooth', debug.eye.smoothedEAR);
+            display('debug-ear-threshold', debug.eye.activeEARThreshold); display('debug-closure', debug.eye.currentClosureDurationMs, 0);
+            display('debug-blink-candidate', debug.eye.blinkCandidate, 0); display('debug-blink-accepted', debug.eye.blinkAccepted, 0);
+            display('debug-blink-reason', debug.eye.blinkRejectReason || '-', 0); display('debug-frame-delta', debug.eye.frameDeltaMs, 0);
+            display('debug-mouth-width', debug.mouth.mouthWidth); display('debug-mouth-vertical', JSON.stringify(debug.mouth.verticalDistances), 0);
+            display('debug-mar-raw', debug.mouth.marRaw); display('debug-mar-smooth', debug.mouth.marSmoothed);
+            display('debug-mar-reason', debug.mouth.marInvalidReason || '-', 0); display('debug-mouth-accepted', debug.mouth.calibrationAccepted, 0);
+            display('debug-mouth-rejected', debug.mouth.calibrationRejected, 0); display('debug-mouth-reject-reason', debug.mouth.lastCalibrationRejectReason || '-', 0);
+            display('debug-mouth-calibration', debug.mouth.calibrationState, 0); display('debug-mouth-baseline-ready', debug.mouth.baselineReady, 0);
+            display('debug-face', debug.quality.faceDetected, 0); display('debug-landmark', debug.quality.landmarkAvailable, 0);
+            display('debug-head-pose', debug.mouth.headPoseAllowsMouthMetric, 0); display('debug-sample-age', debug.quality.sampleAgeMs, 0);
+            display('debug-processing-time', debug.quality.processingTimeMs, 0);
             display('snapshot-time', snapshot.timestamp, 0);
             const json = field('snapshot-json'); if (json) json.textContent = JSON.stringify(snapshot, null, 2);
         });

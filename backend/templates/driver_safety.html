@@ -194,8 +194,19 @@
         <section class="driver-perception__group"><h3>Head Pose <small>HEURISTIC</small></h3>
           <dl><div><dt>Pitch scale</dt><dd data-perception-pitch>-</dd></div><div><dt>Roll °</dt><dd data-perception-roll>-</dd></div><div><dt>Yaw scale</dt><dd data-perception-yaw>-</dd></div><div><dt>State</dt><dd data-perception-pose-state>UNKNOWN</dd></div></dl>
         </section>
+        <section class="driver-perception__group driver-perception__mouth"><h3>Mouth / Yawn <small>HEURISTIC</small></h3>
+          <dl><div><dt>MAR raw</dt><dd data-perception-mar-raw>-</dd></div><div><dt>MAR smoothed</dt><dd data-perception-mar-smoothed>-</dd></div><div><dt>MAR valid</dt><dd data-perception-mar-valid>false</dd></div><div><dt>Mouth baseline</dt><dd data-perception-mouth-baseline>-</dd></div><div><dt>Open threshold</dt><dd data-perception-mouth-threshold>-</dd></div><div><dt>Mouth state</dt><dd data-perception-mouth-state>INVALID</dd></div><div><dt>Open duration</dt><dd data-perception-mouth-duration>-</dd></div><div><dt>Yawn state</dt><dd data-perception-yawn-state>INVALID</dd></div><div><dt>Candidate</dt><dd data-perception-yawn-candidate>false</dd></div><div><dt>Confirmed</dt><dd data-perception-yawn-confirmed>false</dd></div><div><dt>Count</dt><dd data-perception-yawn-count>0</dd></div><div><dt>Last duration</dt><dd data-perception-last-yawn>-</dd></div></dl>
+          <small>HEURISTIC YAWN CANDIDATE · DEVELOPMENT / UNVALIDATED · NOT A BEHAVIORAL OR MEDICAL DIAGNOSIS</small>
+        </section>
       </div>
       <details class="driver-perception__snapshot"><summary>Latest DriverMetricSnapshot · <span data-perception-snapshot-time>-</span></summary><pre data-perception-snapshot-json>{}</pre></details>
+      <details class="driver-perception__debug"><summary>PERCEPTION DEBUG · DEVELOPMENT ONLY</summary>
+        <div class="driver-perception__debug-grid">
+          <section><h3>Eye Debug</h3><dl><div><dt>Raw / Smoothed EAR</dt><dd><span data-perception-debug-ear-raw>-</span> / <span data-perception-debug-ear-smooth>-</span></dd></div><div><dt>Threshold</dt><dd data-perception-debug-ear-threshold>-</dd></div><div><dt>Closure duration</dt><dd data-perception-debug-closure>-</dd></div><div><dt>Blink candidate / accepted</dt><dd><span data-perception-debug-blink-candidate>false</span> / <span data-perception-debug-blink-accepted>false</span></dd></div><div><dt>Blink reject reason</dt><dd data-perception-debug-blink-reason>-</dd></div><div><dt>Frame delta</dt><dd data-perception-debug-frame-delta>-</dd></div></dl></section>
+          <section><h3>Mouth Debug</h3><dl><div><dt>Width</dt><dd data-perception-debug-mouth-width>-</dd></div><div><dt>Vertical distances</dt><dd data-perception-debug-mouth-vertical>-</dd></div><div><dt>Raw / Smoothed MAR</dt><dd><span data-perception-debug-mar-raw>-</span> / <span data-perception-debug-mar-smooth>-</span></dd></div><div><dt>Invalid reason</dt><dd data-perception-debug-mar-reason>-</dd></div><div><dt>Calibration accepted / rejected</dt><dd><span data-perception-debug-mouth-accepted>0</span> / <span data-perception-debug-mouth-rejected>0</span></dd></div><div><dt>Last reject reason</dt><dd data-perception-debug-mouth-reject-reason>-</dd></div><div><dt>Calibration state / baseline</dt><dd><span data-perception-debug-mouth-calibration>UNAVAILABLE</span> / <span data-perception-debug-mouth-baseline-ready>false</span></dd></div></dl></section>
+          <section><h3>Quality Debug</h3><dl><div><dt>Face / landmark</dt><dd><span data-perception-debug-face>false</span> / <span data-perception-debug-landmark>false</span></dd></div><div><dt>Head pose gate</dt><dd data-perception-debug-head-pose>false</dd></div><div><dt>Sample age</dt><dd data-perception-debug-sample-age>-</dd></div><div><dt>Processing time</dt><dd data-perception-debug-processing-time>-</dd></div></dl></section>
+        </div>
+      </details>
       <section class="driver-perception__recorder" data-recorder-panel>
         <h3>Perception Dataset Recorder <small>DEVELOPMENT / RESEARCH</small></h3>
         <div class="driver-perception__notices"><span class="driver-perception__notice">RESEARCH METRICS ONLY</span><span class="driver-perception__notice">NO VIDEO RECORDING</span><span class="driver-perception__notice">NO IMAGE STORAGE</span><span class="driver-perception__notice">NO RAW LANDMARK STORAGE</span><span class="driver-perception__notice">LOCAL BROWSER MEMORY ONLY</span><span class="driver-perception__notice">USER-INITIATED EXPORT</span><span class="driver-perception__notice">NOT FOR OPERATIONAL USE</span></div>
@@ -249,6 +260,9 @@
         <span class="driver-perception__notice">BROWSER-LOCAL PROCESSING</span>
         <span class="driver-perception__notice">NO IMAGE STORAGE</span>
         <span class="driver-perception__notice">NO IMAGE TRANSMISSION</span>
+        <span class="driver-perception__notice">NO MOUTH IMAGE STORAGE</span>
+        <span class="driver-perception__notice">HEURISTIC YAWN DETECTION</span>
+        <span class="driver-perception__notice">NOT A MEDICAL DIAGNOSIS</span>
         <span class="driver-perception__notice">METRICS ONLY</span>
         <span class="driver-perception__notice">NOT FOR OPERATIONAL USE</span>
         <span class="driver-perception__notice">NOT CONNECTED TO RISK RUNTIME YET</span>
