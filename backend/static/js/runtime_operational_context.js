@@ -25,6 +25,7 @@
             this.timestamp = iso(input.timestamp);
             this.validUntil = iso(input.validUntil);
             this.quality = clone(input.quality || { confidenceAvailable: false });
+            this.operationalContext = clone(input.operationalContext || null);
             this.simulation = input.simulation === true;
             this.confidence = Number.isFinite(input.confidence) ? input.confidence : null;
             this.confidenceAvailable = input.confidenceAvailable === true;

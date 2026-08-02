@@ -1,7 +1,7 @@
 (function defineMultiHazardFusionEngine(global) {
     'use strict';
-    if (!global.RuntimeOperationalContext || !global.MultiHazardFusionConfig) {
-        throw new Error('MultiHazardFusionEngine requires models and configuration');
+    if (!global.RuntimeOperationalContext || !global.MultiHazardFusionConfig || !global.RuntimeIdentityRegistry) {
+        throw new Error('MultiHazardFusionEngine requires models, configuration, and canonical identity registry');
     }
     const { ContextCondition, OperationalContext, CompositeRisk, PriorityDecision } = global.RuntimeOperationalContext;
     const clone = value => value == null ? value : JSON.parse(JSON.stringify(value));
@@ -50,17 +50,15 @@
     }
 
     class FusionEngine {
-        constructor({ configuration=global.MultiHazardFusionConfig, now=()=>Date.now(), scheduler=global.setTimeout?.bind(global), canceller=global.clearTimeout?.bind(global), actionSink=null }={}) {
-            this.configuration=configuration;this.now=now;this.scheduler=scheduler;this.canceller=canceller;this.actionSink=actionSink;
+        constructor({ configuration=global.MultiHazardFusionConfig, identityRegistry=global.RuntimeIdentityRegistry.registry, now=()=>Date.now(), scheduler=global.setTimeout?.bind(global), canceller=global.clearTimeout?.bind(global), actionSink=null }={}) {
+            if(!identityRegistry?.resolveRuntimeIdentity)throw new TypeError('Canonical Identity Registry is required');this.configuration=configuration;this.identityRegistry=identityRegistry;this.now=now;this.scheduler=scheduler;this.canceller=canceller;this.actionSink=actionSink;
             this.contexts=new Map();this.targetKeys=new Map();this.risks=new Map();this.conditions=new Map();this.composites=new Map();this.decisions=new Map();this.audit=[];this.sequence=0;this.actionSignatures=new Map();this.lineage=new FusionLineage();this.timers=new Map();
         }
         _identity(input) {
-            const supplied=input.operationalContext||input.metadata?.operationalContext||{};
-            const targetId=supplied.targetId||input.targetId;if(!targetId)throw new TypeError('Canonical targetId is required');
-            const pieces=String(targetId).split('|');
-            return { targetId:String(targetId),vehicleId:supplied.vehicleId||pieces[0]||null,vehicleType:supplied.vehicleType||null,
-                driverId:supplied.driverId||(pieces.length===3?pieces[1]:null),driverAssignmentId:supplied.driverAssignmentId||(pieces.length===3?pieces[2]:null),
-                motionState:supplied.motionState||null,operationState:supplied.operationState||null,directionState:supplied.directionState||null,turnState:supplied.turnState||null };
+            const supplied=input.operationalContext||input.metadata?.operationalContext||{},identity=this.identityRegistry.resolveRuntimeIdentity(input);
+            return { identityId:identity.identityId,canonicalTargetId:identity.canonicalTargetId,targetId:identity.canonicalTargetId,vehicleId:identity.vehicleId,vehicleType:identity.vehicleType,
+                driverId:identity.driverId,driverAssignmentId:identity.driverAssignmentId,ownershipToken:identity.ownershipToken,assignmentVersion:identity.assignmentVersion,
+                runtimeSources:identity.runtimeSources,motionState:supplied.motionState||null,operationState:supplied.operationState||null,directionState:supplied.directionState||null,turnState:supplied.turnState||null };
         }
         _key(identity) { return `${identity.targetId}|${identity.driverAssignmentId||'UNASSIGNED'}`; }
         _state(identity, at) {
