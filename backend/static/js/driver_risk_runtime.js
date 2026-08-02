@@ -13,6 +13,7 @@
         CLEARED: 'CLEARED'
     });
     const drowsinessRiskStates = new Map();
+    const liveDrowsinessRiskStates = new Map();
     const incapacitationRiskStates = new Map();
     const alcoholRiskStates = new Map();
     const INCAPACITATION_COMPOSITE_SIGNALS = Object.freeze([
@@ -137,6 +138,9 @@
     }
 
     function drowsinessObservationToRiskSignal(observation) {
+        if (observation.metadata?.source === 'live-webcam') {
+            return liveDrowsinessObservationToRiskSignal(observation);
+        }
         const rule = global.DriverStateConfig.drowsiness;
         const observedAtMs = Date.parse(observation.observedAt);
         const state = drowsinessRiskStates.get(observation.targetId) || {
@@ -184,6 +188,60 @@
             ...noRisk(observation, 'DROWSINESS_CLEARED'),
             shouldClearRisk: true
         };
+    }
+
+    function liveDrowsinessObservationToRiskSignal(observation) {
+        const config = global.DriverPerception?.Config?.liveDrowsinessConfig;
+        const metadata = observation.metadata || {};
+        const metrics = metadata.metrics || {};
+        const quality = metadata.quality || {};
+        const observedAtMs = Date.parse(observation.observedAt);
+        const state = liveDrowsinessRiskStates.get(observation.targetId) || {
+            enterStartedAt: null, clearStartedAt: null, riskActive: false
+        };
+        const qualityValid = metadata.simulation === false && metadata.sensorConnected === true &&
+            quality.faceDetected === true && quality.landmarkAvailable === true &&
+            quality.calibrated === true && quality.calibrationState === 'READY' &&
+            quality.earValid === true && Number.isFinite(metrics.ear) &&
+            Number.isFinite(metrics.earThreshold) && Number.isFinite(quality.sampleAgeMs) &&
+            quality.sampleAgeMs <= config.maximumSampleAgeMs;
+        if (!qualityValid) {
+            liveDrowsinessRiskStates.set(observation.targetId, state);
+            return noRisk(observation, state.riskActive
+                ? 'LIVE_DROWSINESS_QUALITY_LOSS_RISK_PRESERVED'
+                : 'LIVE_DROWSINESS_QUALITY_INSUFFICIENT');
+        }
+        const primary = metrics.eyeClosed === true && metrics.ear < metrics.earThreshold;
+        const accumulated = quality.perclosValid === true && Number.isFinite(metrics.perclos) &&
+            metrics.perclos >= config.perclosEntryPercent;
+        const entry = primary && (metrics.eyeClosureDurationMs >= config.prolongedEyeClosureMs || accumulated);
+        if (!state.riskActive) {
+            if (!entry) {
+                liveDrowsinessRiskStates.delete(observation.targetId);
+                return noRisk(observation, 'LIVE_DROWSINESS_NORMAL');
+            }
+            if (state.enterStartedAt === null || observedAtMs < state.enterStartedAt) state.enterStartedAt = observedAtMs;
+            if (observedAtMs - state.enterStartedAt < config.entrySustainMs) {
+                liveDrowsinessRiskStates.set(observation.targetId, state);
+                return noRisk(observation, 'LIVE_DROWSINESS_ENTRY_PENDING');
+            }
+            state.riskActive = true;
+            state.clearStartedAt = null;
+            liveDrowsinessRiskStates.set(observation.targetId, state);
+            return createDrowsinessRiskSignal(observation, 'LIVE_DROWSINESS_RISK_CONFIRMED');
+        }
+        if (entry) {
+            state.clearStartedAt = null;
+            liveDrowsinessRiskStates.set(observation.targetId, state);
+            return createDrowsinessRiskSignal(observation, 'LIVE_DROWSINESS_RISK_MAINTAINED');
+        }
+        if (state.clearStartedAt === null || observedAtMs < state.clearStartedAt) state.clearStartedAt = observedAtMs;
+        if (observedAtMs - state.clearStartedAt < config.clearSustainMs) {
+            liveDrowsinessRiskStates.set(observation.targetId, state);
+            return noRisk(observation, 'LIVE_DROWSINESS_CLEAR_PENDING');
+        }
+        liveDrowsinessRiskStates.delete(observation.targetId);
+        return { ...noRisk(observation, 'LIVE_DROWSINESS_CLEARED'), shouldClearRisk: true };
     }
 
     function createIncapacitationRiskSignal(observation, reason, compositeSignalCount) {
@@ -430,8 +488,8 @@
     }
 
     function resetDrowsinessRiskState(targetId) {
-        if (targetId) drowsinessRiskStates.delete(targetId);
-        else drowsinessRiskStates.clear();
+        if (targetId) { drowsinessRiskStates.delete(targetId); liveDrowsinessRiskStates.delete(targetId); }
+        else { drowsinessRiskStates.clear(); liveDrowsinessRiskStates.clear(); }
     }
 
     function resetIncapacitationRiskState(targetId) {

@@ -139,8 +139,17 @@
             configurationVersion: requireNonEmptyString(input.configurationVersion, 'configurationVersion'),
             policyVersion: input.policyVersion || null,
             operationalUseAllowed: input.operationalUseAllowed ?? null,
+            targetId: context.targetId,
+            processingLocation: input.processingLocation || null,
+            imageStored: input.imageStored ?? null,
+            imageTransmitted: input.imageTransmitted ?? null,
+            browserLocalProcessing: input.browserLocalProcessing ?? null,
+            driverMetricSnapshotId: input.driverMetricSnapshotId || null,
+            snapshotTimestamp: input.snapshotTimestamp || null,
+            derivedFromType: input.derivedFromType || null,
             metrics: input.metrics || {},
             quality: input.quality || {},
+            runtime: input.runtime || {},
             policy: input.policy || {}
         }, 'metadata');
     }

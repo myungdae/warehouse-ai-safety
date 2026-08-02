@@ -65,6 +65,12 @@
                 result.actionRequests = policy?.actions || [];
                 result.actionExecutions = policy?.executions || [];
             }
+            const observationOutput = global.document?.getElementById?.('lastDriverObservation');
+            const riskOutput = global.document?.getElementById?.('driverRiskEventHistory');
+            const signalOutput = global.document?.getElementById?.('lastDriverRiskSignal');
+            if (observationOutput) observationOutput.textContent = JSON.stringify(result.observation, null, 2);
+            if (riskOutput) riskOutput.textContent = JSON.stringify(riskRuntime.toJSON(), null, 2);
+            if (signalOutput) signalOutput.textContent = JSON.stringify(result.riskSignal, null, 2);
             this.lastResultByTarget.set(observation.targetId, result);
             return clone(result);
         }

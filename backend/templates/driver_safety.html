@@ -196,6 +196,38 @@
         </section>
       </div>
       <details class="driver-perception__snapshot"><summary>Latest DriverMetricSnapshot · <span data-perception-snapshot-time>-</span></summary><pre data-perception-snapshot-json>{}</pre></details>
+      <section class="driver-perception__bridge" data-live-bridge-panel>
+        <h3>Live Runtime Bridge</h3>
+        <p class="driver-perception__copy">Published metrics use the public Runtime facade. Quality loss never clears an active risk.</p>
+        <div class="driver-perception__controls">
+          <button type="button" data-live-bridge-start>START LIVE BRIDGE</button>
+          <button type="button" data-live-bridge-stop>STOP LIVE BRIDGE</button>
+          <button type="button" data-live-bridge-ack>ACK RISK</button>
+          <button type="button" data-live-bridge-reset>RESET LIVE TARGET</button>
+          <button type="button" data-live-bridge-simulation>SWITCH TO SIMULATION</button>
+        </div>
+        <div class="driver-perception__status" aria-live="polite">
+          <div class="driver-perception__metric"><span>Input mode</span><strong data-live-mode>STOPPED</strong></div>
+          <div class="driver-perception__metric"><span>Bridge status</span><strong data-live-status>STOPPED</strong></div>
+          <div class="driver-perception__metric"><span>Ownership</span><strong data-live-ownership>INACTIVE</strong></div>
+          <div class="driver-perception__metric"><span>Target ID</span><strong data-live-target>-</strong></div>
+          <div class="driver-perception__metric"><span>Snapshot ID</span><strong data-live-snapshot>-</strong></div>
+          <div class="driver-perception__metric"><span>Observation</span><strong data-live-observation>-</strong></div>
+          <div class="driver-perception__metric"><span>Risk state</span><strong data-live-risk>NORMAL</strong></div>
+          <div class="driver-perception__metric"><span>Triple count</span><strong data-live-triples>0</strong></div>
+        </div>
+        <details class="driver-perception__snapshot"><summary>Live Runtime Result</summary><pre data-live-result>{}</pre></details>
+        <div class="driver-perception__notices">
+          <span class="driver-perception__notice">LIVE WEBCAM OBSERVATION</span>
+          <span class="driver-perception__notice">OBSERVATION simulation=false</span>
+          <span class="driver-perception__notice">ACTION EXECUTION simulation=true</span>
+          <span class="driver-perception__notice">ACTUATORS DISCONNECTED</span>
+          <span class="driver-perception__notice">BROWSER-LOCAL IMAGE PROCESSING</span>
+          <span class="driver-perception__notice">NO IMAGE STORAGE</span>
+          <span class="driver-perception__notice">NO IMAGE TRANSMISSION</span>
+          <span class="driver-perception__notice">NOT FOR OPERATIONAL USE</span>
+        </div>
+      </section>
       <div class="driver-perception__notices">
         <span class="driver-perception__notice">LIVE CAMERA INPUT</span>
         <span class="driver-perception__notice">BROWSER-LOCAL PROCESSING</span>
@@ -430,6 +462,7 @@
   <script src="/static/js/driver_perception/driver_metric_calculator.js"></script>
   <script src="/static/js/driver_perception/driver_metric_snapshot.js"></script>
   <script src="/static/js/driver_perception/driver_perception_runtime.js"></script>
+  <script src="/static/js/driver_perception/driver_camera_observation_bridge.js"></script>
   <script src="/static/js/runtime_event_graph.js"></script>
   <script src="/static/js/runtime_triple_engine.js"></script>
   <script>
@@ -443,6 +476,47 @@
     });
     window.RuntimeGraphViewer = window.RuntimeEventGraph.initializeRuntimeGraphViewer();
     window.RuntimeTripleViewer = window.RuntimeTripleEngine.initializeRuntimeTripleViewer();
+    document.addEventListener('DOMContentLoaded', () => {
+      const root = document.querySelector('[data-driver-perception-root]');
+      const panel = root?.querySelector('[data-live-bridge-panel]');
+      const runtime = root?.driverPerceptionRuntime;
+      if (!panel || !runtime) return;
+      const bridge = new window.DriverPerception.DriverCameraObservationBridge({ perceptionRuntime: runtime });
+      window.DriverCameraObservationBridgePage = bridge;
+      const modeController = window.DriverRuntimePage.getInputModeController();
+      modeController.registerSource({ sourceId: 'driver-deterministic-page', mode: window.DriverInputModeController.Mode.DETERMINISTIC_SIMULATION });
+      const out = name => panel.querySelector(`[data-live-${name}]`);
+      const context = () => ({ vehicleType: document.getElementById('driverVehicleType').value,
+        vehicleId: document.getElementById('driverVehicleId').value, driverId: document.getElementById('driverId').value,
+        driverAssignmentId: document.getElementById('driverAssignmentId').value });
+      const render = () => {
+        const state = bridge.getState(); const targetId = state.targetId;
+        const runtimeState = targetId ? window.DriverRuntimePage.getRuntimeSnapshot(targetId) : null;
+        out('mode').textContent = runtimeState?.inputMode || 'STOPPED'; out('status').textContent = state.status;
+        out('ownership').textContent = state.ownershipTokenActive ? 'ACTIVE' : 'INACTIVE'; out('target').textContent = targetId || '-';
+        out('snapshot').textContent = state.lastObservation?.metadata?.driverMetricSnapshotId || '-';
+        out('observation').textContent = state.lastObservation?.observationId || '-';
+        out('risk').textContent = state.lastResult?.riskEvent?.state || 'NORMAL';
+        out('triples').textContent = String(window.RuntimeTripleEngine.getRuntimeTriples().length);
+        out('result').textContent = JSON.stringify({ bridge: state, runtime: runtimeState }, null, 2);
+      };
+      panel.querySelector('[data-live-bridge-start]').addEventListener('click', () => { bridge.start(context()); render(); });
+      panel.querySelector('[data-live-bridge-stop]').addEventListener('click', () => { bridge.stop(); render(); });
+      panel.querySelector('[data-live-bridge-ack]').addEventListener('click', () => { const id = bridge.getState().lastResult?.riskEvent?.eventId; if (id) window.DriverRuntimePage.acknowledgeRisk(id); render(); });
+      panel.querySelector('[data-live-bridge-reset]').addEventListener('click', () => { bridge.resetTarget(); render(); });
+      document.getElementById('driverStateTestForm').addEventListener('submit', event => {
+        const requestedType = event.submitter?.id === 'incapacitationTestButton' ? 'INCAPACITATION'
+          : (event.submitter?.id === 'alcoholTestButton' ? 'ALCOHOL_LEVEL' : 'DROWSINESS');
+        const target = new window.DriverState.VehicleContext(context()).targetId;
+        if (requestedType === 'DROWSINESS') bridge.stop('SWITCH_TO_SIMULATION');
+        modeController.activateMode({ observationType: requestedType, targetId: target,
+          mode: window.DriverInputModeController.Mode.DETERMINISTIC_SIMULATION,
+          sourceId: 'driver-deterministic-page', reason: 'DETERMINISTIC_FORM_SUBMIT' });
+        render();
+      }, true);
+      panel.querySelector('[data-live-bridge-simulation]').addEventListener('click', () => { document.getElementById('drowsinessTestButton').click(); render(); });
+      runtime.onMetricSnapshot(render); render();
+    });
     const tabButtons = document.querySelectorAll('.tab-button');
     const tabPanels = document.querySelectorAll('.tab-panel');
 

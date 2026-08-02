@@ -45,6 +45,14 @@
             minimumBaseline: 0.18,
             thresholdRatio: 0.75,
             validationStatus: 'DEVELOPMENT_UNVALIDATED'
+        }),
+        liveDrowsinessConfig: Object.freeze({
+            validationStatus: 'UNVALIDATED_LIVE_WEBCAM_CANDIDATE',
+            entrySustainMs: 1500,
+            clearSustainMs: 2000,
+            maximumSampleAgeMs: 1000,
+            perclosEntryPercent: 40,
+            prolongedEyeClosureMs: 1200
         })
     });
 })(window);

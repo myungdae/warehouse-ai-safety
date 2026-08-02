@@ -36,6 +36,8 @@
 .driver-perception__group dd { margin: 0; color: #00d4ff; font: 12px ui-monospace, monospace; }
 .driver-perception__snapshot { margin-top: 16px; color: #aab6c5; }
 .driver-perception__snapshot pre { max-height: 320px; overflow: auto; padding: 12px; color: #9feaf9; background: #020409; }
+.driver-perception__bridge { margin-top: 20px; padding: 18px; border: 1px solid rgba(34,197,94,.35); border-radius: 12px; background: rgba(5,46,22,.16); }
+.driver-perception__bridge h3 { margin: 0 0 8px; color: #4ade80; }
 .driver-perception__notice { padding: 7px 10px; border: 1px solid rgba(250,204,21,.3); border-radius: 999px; color: #fde68a; font-size: 11px; font-weight: 800; }
 @media (max-width: 900px) { .driver-perception__metric-groups { grid-template-columns: 1fr; } }
 @media (max-width: 760px) { .driver-perception { padding: 18px; } .driver-perception__field { min-width: 100%; } }

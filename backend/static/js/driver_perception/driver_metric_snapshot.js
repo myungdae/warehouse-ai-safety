@@ -8,10 +8,13 @@
         return Object.freeze(value);
     };
     const safeNumber = value => Number.isFinite(value) ? value : null;
+    let snapshotSequence = 0;
 
     function createDriverMetricSnapshot({ frame, metrics, calibration, now = Date.now() }) {
         const frameTime = Date.parse(frame.timestamp);
+        snapshotSequence += 1;
         const snapshot = {
+            driverMetricSnapshotId: `driver-metric-${Number(now)}-${snapshotSequence}`,
             timestamp: new Date(now).toISOString(),
             source: 'live-webcam',
             cameraId: frame.cameraId || null,
