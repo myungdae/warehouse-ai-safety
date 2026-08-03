@@ -21,7 +21,8 @@
   <link rel="stylesheet" href="/static/css/edge_hardware.css">
   <link rel="stylesheet" href="/static/css/perception_validation.css">
   <link rel="stylesheet" href="/static/css/voice_interaction.css">
-  <link rel="stylesheet" href="/static/css/driver_runtime_memory.css">
+<link rel="stylesheet" href="/static/css/driver_runtime_memory.css">
+<link rel="stylesheet" href="/static/css/driver_companion.css">
   <style>
     :root {
       --bg: #070b14;
@@ -527,6 +528,14 @@
       <div class="driver-memory__history"><article><h3>Risk / Trend / Replay History</h3><pre data-memory-history>[]</pre></article><article><h3>Voice History / Evidence</h3><pre data-memory-voice>null</pre></article></div>
     </section>
 
+    <section id="driverCompanionPanel" class="driver-test-panel driver-companion" aria-labelledby="driverCompanionTitle">
+      <h2 id="driverCompanionTitle" class="panel-title">Driver Companion Decision Runtime</h2>
+      <div class="driver-companion__badges"><span>DRIVER COMPANION DEVELOPMENT MODE</span><span>DECISION SUPPORT ONLY</span><span>NO VEHICLE CONTROL</span><span>NO AUTOMATIC EMERGENCY CALL</span><span>MEMORY IS RAM-ONLY</span><span>NOT FOR OPERATIONAL USE</span></div>
+      <div class="driver-companion__summary"><article><span>Companion State</span><strong data-companion-state>UNKNOWN</strong></article><article><span>Recommended Action</span><strong data-companion-action>UNKNOWN</strong></article><article><span>Selected Voice Scenario</span><strong data-companion-voice>-</strong></article><article><span>Urgency</span><strong data-companion-urgency>-</strong></article><article><span>Immediate Hazard State</span><strong data-companion-hazard>-</strong></article><article><span>Fatigue Trend</span><strong data-companion-fatigue>UNKNOWN</strong></article><article><span>Risk Trend</span><strong data-companion-risk>UNKNOWN</strong></article><article><span>Confidence Trend</span><strong data-companion-confidence>UNKNOWN</strong></article><article><span>Context Trend</span><strong data-companion-context>UNKNOWN</strong></article><article><span>Verification Required</span><strong data-companion-verification>false</strong></article><article><span>ACK Required</span><strong data-companion-ack>false</strong></article><article><span>Escalation Level</span><strong data-companion-escalation>0</strong></article><article><span>Decision Age</span><strong data-companion-age>-</strong></article><article><span>Expiry</span><strong data-companion-expiry>-</strong></article></div>
+      <div class="driver-companion__controls"><button data-companion-action="stable">RUN STABLE DRIVER FIXTURE</button><button data-companion-action="increasing">RUN INCREASING FATIGUE FIXTURE</button><button data-companion-action="rapid">RUN RAPID FATIGUE FIXTURE</button><button data-companion-action="right-turn">RUN RIGHT-TURN PEDESTRIAN FIXTURE</button><button data-companion-action="low-ttc">RUN LOW-TTC FIXTURE</button><button data-companion-action="incapacitation">RUN INCAPACITATION FIXTURE</button><button data-companion-action="alcohol">RUN ALCOHOL PRESTART FIXTURE</button><button data-companion-action="confidence">RUN CONFIDENCE DEGRADATION FIXTURE</button><button data-companion-action="improving">RUN IMPROVING DRIVER FIXTURE</button><button data-companion-action="ok">SIMULATE I-AM-OK</button><button data-companion-action="will-stop">SIMULATE I-WILL-STOP</button><button data-companion-action="help">SIMULATE HELP</button><button data-companion-action="no-response">SIMULATE NO-RESPONSE</button><button data-companion-action="reset">RESET COMPANION TARGET</button><button data-companion-action="export">EXPORT COMPANION JSON</button></div>
+      <div class="driver-companion__details"><article><h3>Evidence / Suppressed Recommendations</h3><pre data-companion-evidence>{}</pre></article><article><h3>Decision / ACK / Escalation History</h3><pre data-companion-history>[]</pre></article></div>
+    </section>
+
     <section id="runtimeCalibrationPanel" class="driver-test-panel runtime-calibration" aria-labelledby="runtimeCalibrationTitle">
       <h2 id="runtimeCalibrationTitle" class="panel-title">Field Calibration &amp; Threshold Profile</h2>
       <div class="runtime-calibration-badges"><span>DEVELOPMENT CANDIDATE</span><span>NOT AUTOMATICALLY APPLIED</span><span>NO IMAGE OR LANDMARK STORAGE</span><span>SIMULATION ONLY</span><span>NOT FOR OPERATIONAL USE</span></div>
@@ -721,7 +730,11 @@
   <script src="/static/js/driver_runtime_memory_config.js"></script>
   <script src="/static/js/driver_runtime_memory_model.js"></script>
   <script src="/static/js/driver_fatigue_trend_engine.js"></script>
-  <script src="/static/js/driver_runtime_memory_engine.js"></script>
+<script src="/static/js/driver_runtime_memory_engine.js"></script>
+<script src="/static/js/driver_companion_config.js"></script>
+<script src="/static/js/driver_companion_decision_model.js"></script>
+<script src="/static/js/driver_companion_recommendation_mapper.js"></script>
+<script src="/static/js/driver_companion_decision_runtime.js"></script>
   <script src="/static/js/driver_input_mode_controller.js"></script>
   <script src="/static/js/driver_runtime_page.js"></script>
   <script src="/static/js/vehicle_proximity_runtime.js"></script>
