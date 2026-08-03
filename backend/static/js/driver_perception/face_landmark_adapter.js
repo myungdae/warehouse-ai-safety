@@ -16,6 +16,9 @@
             this.callback = null;
             this.cameraId = null;
             this.imageSize = { width: 0, height: 0 };
+            this.loaderState = 'NOT_STARTED';
+            this.missingAssetFilename = null;
+            this.initializationError = null;
         }
 
         static loadScript(url) {
@@ -34,14 +37,19 @@
         async initialize() {
             if (this.initialized) return;
             if (!this.config) throw new Error('MEDIAPIPE_CONFIG_REQUIRED');
+            this.loaderState = 'LOADING_LOCAL_ASSETS';
+            this.missingAssetFilename = null;
+            this.initializationError = null;
+            try {
             if (!this.faceMeshFactory) {
+                await this._preflightLocalAssets();
                 await this.scriptLoader(this.config.cameraUtilsUrl);
                 await this.scriptLoader(this.config.faceMeshUrl);
                 if (typeof global.FaceMesh !== 'function') throw new Error('MEDIAPIPE_FACEMESH_UNAVAILABLE');
                 this.faceMeshFactory = options => new global.FaceMesh(options);
             }
 
-            this.faceMesh = this.faceMeshFactory({ locateFile: file => `${this.config.assetBaseUrl}${file}` });
+            this.faceMesh = this.faceMeshFactory({ locateFile: file => this.locateFile(file) });
             this.faceMesh.setOptions({
                 maxNumFaces: this.config.maxNumFaces,
                 refineLandmarks: this.config.refineLandmarks,
@@ -51,6 +59,41 @@
             this.faceMesh.onResults(results => this._handleResults(results));
             if (typeof this.faceMesh.initialize === 'function') await this.faceMesh.initialize();
             this.initialized = true;
+            this.loaderState = 'READY';
+            } catch (error) {
+                this.loaderState = this.missingAssetFilename ? 'LOCAL_ASSET_MISSING' : 'ERROR';
+                this.initializationError = error?.message || String(error);
+                throw error;
+            }
+        }
+
+        locateFile(file) {
+            const allowed = new Set(this.config.requiredAssets || []);
+            if (!allowed.has(file)) {
+                this.missingAssetFilename = file;
+                throw new Error(`LOCAL_ASSET_MISSING:${file}`);
+            }
+            return `${this.config.assetBaseUrl}${file}`;
+        }
+
+        async _preflightLocalAssets() {
+            if (this.config.source !== 'LOCAL') throw new Error('MEDIAPIPE_LOCAL_SOURCE_REQUIRED');
+            const urls = [this.config.cameraUtilsUrl, this.config.faceMeshUrl,
+                ...(this.config.requiredAssets || []).map(file => `${this.config.assetBaseUrl}${file}`)];
+            if (urls.some(url => !String(url).startsWith('/static/vendor/mediapipe/'))) throw new Error('MEDIAPIPE_EXTERNAL_URL_REJECTED');
+            for (const url of urls) {
+                const response = await global.fetch(url, { method: 'HEAD', cache: 'no-store', credentials: 'same-origin' });
+                if (!response.ok) {
+                    this.missingAssetFilename = url.split('/').pop();
+                    throw new Error(`LOCAL_ASSET_MISSING:${this.missingAssetFilename}`);
+                }
+            }
+        }
+
+        getLoaderDiagnostics() {
+            return Object.freeze({ source: this.config?.source || 'UNKNOWN',
+                version: this.config?.packages?.faceMesh?.version || null, loaderState: this.loaderState,
+                missingAssetFilename: this.missingAssetFilename, initializationError: this.initializationError });
         }
 
         start({ cameraId, imageWidth, imageHeight, onLandmarkFrame }) {

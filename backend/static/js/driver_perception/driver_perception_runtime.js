@@ -89,6 +89,8 @@
             const metrics = this.metricCalculator.processFrame(frame, calibrationState);
             if (calibrationState.state === namespace.CalibrationStates.COLLECTING) {
                 calibrationState = this.calibration.addSample(metrics.rawEar, { valid: metrics.earValid,
+                    leftEAR: metrics.leftEAR, rightEAR: metrics.rightEAR,
+                    pitch: metrics.pitch, yaw: metrics.yaw, roll: metrics.roll,
                     mar: metrics.marRaw, marValid: metrics.marValid, marRejectReason: metrics.marInvalidReason,
                     timestamp: Date.parse(frame.timestamp) });
             }
@@ -187,6 +189,28 @@
             if (field('face')) field('face').textContent = snapshot.faceDetected === null || snapshot.faceDetected === undefined
                 ? 'NOT EVALUATED' : (snapshot.faceDetected ? 'DETECTED' : 'NOT DETECTED');
             if (field('frame')) field('frame').textContent = snapshot.frameStatus || 'IDLE';
+            const loader = runtime.landmarkAdapter.getLoaderDiagnostics?.() || {};
+            if (field('mediapipe-source')) field('mediapipe-source').textContent = loader.source || 'UNKNOWN';
+            if (field('mediapipe-version')) field('mediapipe-version').textContent = loader.version || '-';
+            if (field('mediapipe-loader')) field('mediapipe-loader').textContent = loader.loaderState || 'NOT_STARTED';
+            if (field('mediapipe-missing')) field('mediapipe-missing').textContent = loader.missingAssetFilename || 'NONE';
+            if (field('mediapipe-error')) field('mediapipe-error').textContent = loader.initializationError || 'NONE';
+            const camera = runtime.cameraManager.getDiagnostics?.() || {};
+            if (field('camera-open-state')) field('camera-open-state').textContent = camera.cameraOpenState || 'IDLE';
+            if (field('camera-requested-device')) field('camera-requested-device').textContent = camera.requestedDeviceId || 'DEFAULT';
+            if (field('camera-opened-device')) field('camera-opened-device').textContent = camera.openedDeviceId || 'NONE';
+            if (field('camera-stream-id')) field('camera-stream-id').textContent = camera.streamId || 'NONE';
+            if (field('camera-track-state')) field('camera-track-state').textContent = camera.videoTrackState || 'NONE';
+            if (field('camera-track-enabled')) field('camera-track-enabled').textContent = camera.trackEnabled == null ? 'UNKNOWN' : String(camera.trackEnabled);
+            if (field('camera-track-muted')) field('camera-track-muted').textContent = camera.trackMuted == null ? 'UNKNOWN' : String(camera.trackMuted);
+            if (field('camera-resolution')) field('camera-resolution').textContent = camera.width && camera.height ? `${camera.width} × ${camera.height}` : 'UNKNOWN';
+            if (field('camera-fps')) field('camera-fps').textContent = camera.frameRate ?? 'UNKNOWN';
+            if (field('camera-label')) field('camera-label').textContent = camera.cameraLabel || 'UNKNOWN';
+            if (field('camera-error')) field('camera-error').textContent = camera.lastCameraError
+                ? `${camera.lastCameraError.name}: ${camera.lastCameraError.message}` : 'NONE';
+            if (field('camera-error-stack')) field('camera-error-stack').textContent = camera.lastCameraError?.stack || 'NONE';
+            if (field('camera-constraints')) field('camera-constraints').textContent = JSON.stringify(camera.requestedConstraints || {}, null, 2);
+            if (field('camera-stop-verification')) field('camera-stop-verification').textContent = JSON.stringify(camera.trackStopVerification || [], null, 2);
             if (snapshot.landmarkFrame) drawOverlay(snapshot.landmarkFrame);
             if (snapshot.frameStatus === 'STOPPED' && overlay) overlay.getContext('2d').clearRect(0, 0, overlay.width, overlay.height);
             start.disabled = [States.STARTING, States.RUNNING, States.FACE_NOT_DETECTED].includes(snapshot.state);
@@ -208,21 +232,36 @@
         root.querySelector('[data-calibration-start]')?.addEventListener('click', () => renderCalibration(runtime.startCalibration()));
         root.querySelector('[data-calibration-reset]')?.addEventListener('click', () => renderCalibration(runtime.resetCalibration()));
         runtime.onMetricSnapshot(snapshot => {
-            const metrics = snapshot.metrics; const quality = snapshot.quality; const calibrationState = runtime.getCalibrationState();
+            const metrics = snapshot.metrics; const quality = snapshot.quality; const debug = snapshot.diagnostics; const calibrationState = runtime.getCalibrationState();
             latestMouthMetrics = metrics;
             display('last-frame', snapshot.runtime.frameTimestamp, 0);
             renderCalibration(calibrationState);
             display('left-ear', metrics.leftEAR); display('right-ear', metrics.rightEAR); display('ear', metrics.ear);
+            display('left-baseline', metrics.leftBaseline); display('right-baseline', metrics.rightBaseline);
+            display('left-closure-ratio', metrics.leftClosureRatio); display('right-closure-ratio', metrics.rightClosureRatio);
+            display('left-eye-state', debug.eye.leftEyeState, 0); display('right-eye-state', debug.eye.rightEyeState, 0);
+            display('blink-episode-state', debug.eye.episodeState, 0); display('blink-armed', debug.eye.armed ? 'ARMED' : 'NOT ARMED', 0);
+            display('rearm-pending', debug.eye.episodeState === 'REARM_PENDING', 0); display('bilateral-correlation', debug.eye.bilateralCorrelationMs, 0);
+            display('calibration-quality', debug.eye.calibrationQuality, 0); display('episode-reject', debug.eye.blinkRejectReason, 0);
             display('ear-valid', quality.earValid, 0); display('eye-state', metrics.eyeClosed === null ? 'RAW ONLY' : (metrics.eyeClosed ? 'CLOSED' : 'OPEN'), 0);
             display('closure', metrics.eyeClosureDurationMs, 0); display('blink-count', metrics.blinkCount, 0); display('blink-rate', metrics.blinkRate, 1); display('perclos', metrics.perclos, 1);
+            display('gate-calibration', snapshot.calibrated, 0); display('gate-bilateral', debug.eye.earValid && !debug.eye.oneEyeOnly, 0);
+            display('gate-one-eye', debug.eye.oneEyeOnly, 0); display('gate-blink-candidate', debug.eye.blinkCandidate, 0);
+            display('gate-blink-accepted', debug.eye.blinkAccepted, 0); display('gate-blink-reason', debug.eye.blinkRejectReason, 0);
             display('pitch', metrics.pitch, 1); display('roll', metrics.roll, 1); display('yaw', metrics.yaw, 1); display('pose-state', metrics.headPoseState, 0);
+            display('neutral-pitch', metrics.neutralPitch, 1); display('neutral-roll', metrics.neutralRoll, 1); display('neutral-yaw', metrics.neutralYaw, 1);
+            display('pitch-delta', metrics.pitchDelta, 1); display('roll-delta', metrics.rollDelta, 1); display('yaw-delta', metrics.yawDelta, 1);
             display('mar-raw', metrics.marRaw); display('mar-smoothed', metrics.marSmoothed); display('mar-valid', quality.marValid, 0);
             display('mouth-baseline', metrics.mouthBaseline); display('mouth-threshold', metrics.mouthOpenThreshold);
             display('mouth-state', metrics.mouthOpen === null ? 'INVALID' : (metrics.mouthOpen ? 'OPEN' : 'CLOSED'), 0);
+            display('gate-mar-reason', debug.mouth.marInvalidReason, 0); display('gate-mouth-pose', debug.mouth.headPoseAllowsMouthMetric, 0);
+            display('gate-pitch', `${metrics.pitch == null ? '-' : metrics.pitch.toFixed(1)} / allowed ±${debug.mouth.pitchLimit} => ${metrics.pitch != null && Math.abs(metrics.pitch) > debug.mouth.pitchLimit ? 'OUT_OF_RANGE' : 'IN_RANGE'}`, 0);
+            display('gate-yaw', `${metrics.yaw == null ? '-' : metrics.yaw.toFixed(1)} / allowed ±${debug.mouth.yawLimit} => ${metrics.yaw != null && Math.abs(metrics.yaw) > debug.mouth.yawLimit ? 'OUT_OF_RANGE' : 'IN_RANGE'}`, 0);
+            display('gate-roll', `${metrics.roll == null ? '-' : metrics.roll.toFixed(1)} / allowed ±${debug.mouth.rollLimit} => ${metrics.roll != null && Math.abs(metrics.roll) > debug.mouth.rollLimit ? 'OUT_OF_RANGE' : 'IN_RANGE'}`, 0);
+            display('gate-mouth-calibration', quality.mouthCalibrationAvailable, 0);
             display('mouth-duration', metrics.mouthOpenDurationMs, 0); display('yawn-state', metrics.yawnState, 0);
             display('yawn-candidate', metrics.yawnCandidate, 0); display('yawn-confirmed', metrics.yawnConfirmed, 0);
             display('yawn-count', metrics.yawnCount, 0); display('last-yawn', metrics.lastYawnDurationMs, 0);
-            const debug = snapshot.diagnostics;
             display('debug-ear-raw', debug.eye.rawEAR); display('debug-ear-smooth', debug.eye.smoothedEAR);
             display('debug-ear-threshold', debug.eye.activeEARThreshold); display('debug-closure', debug.eye.currentClosureDurationMs, 0);
             display('debug-blink-candidate', debug.eye.blinkCandidate, 0); display('debug-blink-accepted', debug.eye.blinkAccepted, 0);

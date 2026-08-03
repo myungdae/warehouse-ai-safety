@@ -27,6 +27,41 @@
     const manager=new DriverPerception.CameraManager({mediaDevices:{getUserMedia:async()=>{throw denied;}}});
     try{await manager.start();}catch(_){} assert(manager.permissionState === 'DENIED','must record denial');
   });
+  await test('supported browser errors preserve exact diagnostics', async () => {
+    for (const name of ['NotReadableError','NotAllowedError','OverconstrainedError','NotFoundError','AbortError','SecurityError']) {
+      const failure=Object.assign(new Error(`${name}-message`),{name,constraint:name==='OverconstrainedError'?'deviceId':undefined,stack:`${name}-stack`});
+      const manager=new DriverPerception.CameraManager({mediaDevices:{getUserMedia:async()=>{throw failure;}}});
+      try{await manager.start({deviceId:'camera-error'});}catch(_){}
+      const diagnostic=manager.getDiagnostics();
+      assert(diagnostic.cameraOpenState==='ERROR'&&diagnostic.lastCameraError.name===name,`${name} name lost`);
+      assert(diagnostic.lastCameraError.message===`${name}-message`&&diagnostic.lastCameraError.stack===`${name}-stack`,`${name} detail lost`);
+    }
+  });
+  await test('getUserMedia request and opened settings instrumented', async () => {
+    let constraints;const openedTrack=track();openedTrack.id='track-1';openedTrack.label='C922';openedTrack.enabled=true;openedTrack.muted=false;
+    openedTrack.getSettings=()=>({deviceId:'actual-c922',facingMode:'user',width:1280,height:720,frameRate:30});
+    const openedStream=stream([openedTrack]);openedStream.id='stream-1';
+    const manager=new DriverPerception.CameraManager({mediaDevices:{getUserMedia:async input=>{constraints=input;return openedStream;}}});
+    await manager.start({deviceId:'requested-c922'});const d=manager.getDiagnostics();
+    assert(constraints.video.deviceId.exact==='requested-c922'&&constraints.audio===false,'constraints not logged');
+    assert(d.requestedDeviceId==='requested-c922'&&d.openedDeviceId==='actual-c922','device ids missing');
+    assert(d.cameraLabel==='C922'&&d.streamId==='stream-1'&&d.videoTrackState==='live','stream identity missing');
+    assert(d.facingMode==='user'&&d.width===1280&&d.height===720&&d.frameRate===30,'settings missing');
+  });
+  await test('alive stream reports STREAM_ALREADY_OPEN without a second call', async () => {
+    let calls=0;const source=stream([track()]);source.id='existing-stream';
+    const manager=new DriverPerception.CameraManager({mediaDevices:{getUserMedia:async()=>{calls++;return source;}}});
+    await manager.start();await manager.start();
+    assert(calls===1&&manager.getDiagnostics().cameraOpenState==='STREAM_ALREADY_OPEN','alive stream reopened');
+  });
+  await test('dead existing tracks verified before replacement open', async () => {
+    const oldTrack=track();oldTrack.readyState='ended';const oldStream=stream([oldTrack]);
+    const newTrack=track();const newStream=stream([newTrack]);let calls=0;
+    const manager=new DriverPerception.CameraManager({mediaDevices:{getUserMedia:async()=>{calls++;return newStream;}}});
+    manager.streams.set('primary',oldStream);await manager.start();const verification=manager.getDiagnostics().trackStopVerification;
+    assert(calls===1&&oldTrack.stopped===1,'old track not stopped');
+    assert(verification[0].before==='ended'&&verification[0].after==='ended','readyState verification missing');
+  });
   await test('duplicate start blocked', async () => {
     let calls=0; const source=stream([track()]);
     const manager=new DriverPerception.CameraManager({mediaDevices:{getUserMedia:async()=>{calls++;return source;}}});

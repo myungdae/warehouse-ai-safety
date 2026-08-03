@@ -10,13 +10,22 @@
         imageStorageAllowed: false,
         imageTransmissionAllowed: false,
         mediaPipe: Object.freeze({
-            dependencyMode: 'DEVELOPMENT_ONLY_CDN',
-            // Preserved exactly from the smart source. These URLs are intentionally
-            // unversioned and must be replaced by reviewed, pinned local assets
-            // before operational or offline Edge deployment.
-            cameraUtilsUrl: 'https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js',
-            faceMeshUrl: 'https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js',
-            assetBaseUrl: 'https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/',
+            dependencyMode: 'LOCAL_PINNED',
+            source: 'LOCAL',
+            assetManifestVersion: 'mediapipe-browser-assets-v1',
+            packages: Object.freeze({
+                cameraUtils: Object.freeze({ name: '@mediapipe/camera_utils', version: '0.3.1675466862' }),
+                faceMesh: Object.freeze({ name: '@mediapipe/face_mesh', version: '0.4.1633559619' })
+            }),
+            cameraUtilsUrl: '/static/vendor/mediapipe/camera_utils/camera_utils.js',
+            faceMeshUrl: '/static/vendor/mediapipe/face_mesh/face_mesh.js',
+            assetBaseUrl: '/static/vendor/mediapipe/face_mesh/',
+            requiredAssets: Object.freeze([
+                'face_mesh.binarypb', 'face_mesh_solution_packed_assets_loader.js',
+                'face_mesh_solution_packed_assets.data', 'face_mesh_solution_simd_wasm_bin.data',
+                'face_mesh_solution_simd_wasm_bin.js', 'face_mesh_solution_simd_wasm_bin.wasm',
+                'face_mesh_solution_wasm_bin.js', 'face_mesh_solution_wasm_bin.wasm'
+            ]),
             maxNumFaces: 1,
             refineLandmarks: true,
             minDetectionConfidence: 0.4,
@@ -28,6 +37,7 @@
             frameRate: 30
         }),
         metrics: Object.freeze({
+            geometryVersion: 'PERCEPTION_GEOMETRY_V2',
             leftEyeIndices: Object.freeze([33, 160, 158, 133, 153, 144]),
             rightEyeIndices: Object.freeze([362, 385, 387, 263, 373, 380]),
             mouthIndices: Object.freeze({
@@ -43,6 +53,13 @@
             minimumPerclosValidMs: 3000,
             minimumPerclosValidRatio: 0.7,
             blink: Object.freeze({ minimumDurationMs: 80, maximumDurationMs: 500, rateWindowMs: 60000 }),
+            blinkRearm: Object.freeze({
+                version: 'DEVELOPMENT_UNVALIDATED_BLINK_REARM_CANDIDATE-v1',
+                closeEntryRatio: 0.55, openRecoveryRatio: 0.65,
+                entrySustainMs: 40, recoverySustainMs: 100,
+                bilateralCorrelationMs: 140, invalidFrameTolerance: 2,
+                maximumEpisodeDurationMs: 500, smoothingAlpha: 0.45
+            }),
             headPose: Object.freeze({ downDegrees: 20, upDegrees: -10, yawDegrees: 18, method: 'HEURISTIC' })
         }),
         yawn: Object.freeze({
@@ -54,6 +71,7 @@
             maximumAbsoluteYaw: 30, maximumAbsoluteRoll: 25, maximumAbsolutePitch: 30
         }),
         calibration: Object.freeze({
+            profileVersion: 'PERCEPTION_GEOMETRY_V2',
             durationMs: 3000,
             minimumSamples: 8,
             minimumOpenEar: 0.18,
