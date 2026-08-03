@@ -509,6 +509,14 @@
       <div class="voice-grid"><article><h3>Queue</h3><pre data-voice-queue>[]</pre></article><article><h3>Voice History</h3><pre data-voice-history>[]</pre></article></div>
     </section>
 
+    <section id="driverVoiceScenarioPanel" class="driver-test-panel voice-scenarios" aria-labelledby="driverVoiceScenarioTitle">
+      <h2 id="driverVoiceScenarioTitle" class="panel-title">Driver Voice Scenario Pack &amp; Escalation</h2>
+      <div class="voice-badges"><span>SCENARIO PACK V1</span><span>STATE TRANSITIONS ONLY</span><span>SIMULATION</span><span>NO MICROPHONE</span><span>NO VEHICLE CONTROL</span><span>NOT FOR OPERATIONAL USE</span></div>
+      <div class="voice-summary"><article><span>Current Scenario</span><strong data-scenario-current>NONE</strong></article><article><span>Current Escalation Level</span><strong data-scenario-level>0</strong></article><article><span>Remaining Cooldown</span><strong data-scenario-cooldown>0 ms</strong></article><article><span>Repeat Count</span><strong data-scenario-repeat>0</strong></article><article><span>Reason</span><strong data-scenario-reason>IDLE</strong></article><article><span>Next Escalation</span><strong data-scenario-next>-</strong></article></div>
+      <div class="voice-controls"><button data-scenario-action="drowsiness">RUN DROWSINESS TIMELINE</button><button data-scenario-action="pedestrian">RUN PEDESTRIAN TIMELINE</button><button data-scenario-action="collision">RUN COLLISION TIMELINE</button><button data-scenario-action="alcohol">RUN ALCOHOL TIMELINE</button><button data-scenario-action="multi">RUN MULTI HAZARD TIMELINE</button><button data-scenario-action="incapacitation">RUN INCAPACITATION TIMELINE</button><button data-scenario-action="deliver">DELIVER PRIMARY</button><button data-scenario-action="tick">ADVANCE ESCALATION</button><button data-scenario-action="ack">PHYSICAL ACK</button><button data-scenario-action="ok">I AM OK</button><button data-scenario-action="help">HELP</button><button data-scenario-action="timeout">NO RESPONSE TIMEOUT</button><button data-scenario-action="reset">RESET SCENARIO</button></div>
+      <div class="voice-scenario-grid"><article><h3>Queue</h3><pre data-scenario-queue>[]</pre></article><article><h3>Suppressed Messages</h3><pre data-scenario-suppressed>[]</pre></article><article class="voice-scenario-history"><h3>Scenario History</h3><pre data-scenario-history>[]</pre></article></div>
+    </section>
+
     <section id="runtimeCalibrationPanel" class="driver-test-panel runtime-calibration" aria-labelledby="runtimeCalibrationTitle">
       <h2 id="runtimeCalibrationTitle" class="panel-title">Field Calibration &amp; Threshold Profile</h2>
       <div class="runtime-calibration-badges"><span>DEVELOPMENT CANDIDATE</span><span>NOT AUTOMATICALLY APPLIED</span><span>NO IMAGE OR LANDMARK STORAGE</span><span>SIMULATION ONLY</span><span>NOT FOR OPERATIONAL USE</span></div>
@@ -698,6 +706,8 @@
   <script src="/static/js/local_audio_asset_registry.js"></script>
   <script src="/static/js/audio_playback_adapter.js"></script>
   <script src="/static/js/voice_alert_orchestrator.js"></script>
+  <script src="/static/js/driver_voice_scenario_pack.js"></script>
+  <script src="/static/js/driver_voice_scenario_runtime.js"></script>
   <script src="/static/js/driver_input_mode_controller.js"></script>
   <script src="/static/js/driver_runtime_page.js"></script>
   <script src="/static/js/vehicle_proximity_runtime.js"></script>
