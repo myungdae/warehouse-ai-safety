@@ -1,11 +1,11 @@
 (function(g){'use strict';
 const result=(state,action,voice,urgency,ack=false,level=0,reasons=[],suppressed=[])=>({companionState:state,recommendedActionCode:action,selectedVoiceScenarioCode:voice,urgency,requiresAcknowledgement:ack,escalationLevel:level,decisionReasonCodes:reasons,suppressedRecommendationCodes:suppressed});
 function map(i={}){const h=i.immediateHazardState||{},fat=i.fatigueTrend||'UNKNOWN',risk=i.riskTrend||'UNKNOWN',conf=i.confidenceBand||'UNKNOWN',types=new Set(i.activeRiskTypes||[]),reason=[];
-if(h.type==='COLLISION_CRITICAL')return result('URGENT_WARNING','STOP_WHEN_SAFE','COLLISION_CRITICAL','CRITICAL',true,4,['IMMEDIATE_COLLISION_DOMINANT']);
-if(['PEDESTRIAN_IMMEDIATE','RIGHT_TURN_PEDESTRIAN_CRITICAL'].includes(h.type))return result('URGENT_WARNING','STOP_TURN_AND_CHECK','RIGHT_TURN_PEDESTRIAN_WARNING','CRITICAL',true,4,['IMMEDIATE_PEDESTRIAN_DOMINANT']);
-if(h.type==='VEHICLE_LOW_TTC')return result('URGENT_WARNING','REDUCE_SPEED','VEHICLE_LOW_TTC_WARNING','CRITICAL',true,4,['LOW_TTC_DOMINANT']);
-if(h.type==='INCAPACITATION_NO_RESPONSE'||i.ackType==='NO_RESPONSE')return result('EMERGENCY_ASSISTANCE_CANDIDATE','REQUEST_HELP_CANDIDATE','DRIVER_ACK_REQUEST','CRITICAL',true,4,['NO_RESPONSE_ESCALATION']);
-if(h.type==='ALCOHOL_IN_OPERATION')return result('URGENT_WARNING','STOP_WHEN_SAFE','ALCOHOL_DETECTED_IN_OPERATION','CRITICAL',true,4,['ALCOHOL_IN_OPERATION']);
+if(h.active===true&&h.type==='COLLISION_CRITICAL')return result('URGENT_WARNING','STOP_WHEN_SAFE','COLLISION_CRITICAL','CRITICAL',true,4,['IMMEDIATE_COLLISION_DOMINANT']);
+if(h.active===true&&['PEDESTRIAN_IMMEDIATE','RIGHT_TURN_PEDESTRIAN_CRITICAL'].includes(h.type))return result('URGENT_WARNING','STOP_TURN_AND_CHECK','RIGHT_TURN_PEDESTRIAN_WARNING','CRITICAL',true,4,['IMMEDIATE_PEDESTRIAN_DOMINANT']);
+if(h.active===true&&h.type==='VEHICLE_LOW_TTC')return result('URGENT_WARNING','REDUCE_SPEED','VEHICLE_LOW_TTC_WARNING','CRITICAL',true,4,['LOW_TTC_DOMINANT']);
+if((h.active===true&&h.type==='INCAPACITATION_NO_RESPONSE')||i.ackType==='NO_RESPONSE')return result('EMERGENCY_ASSISTANCE_CANDIDATE','REQUEST_HELP_CANDIDATE','DRIVER_ACK_REQUEST','CRITICAL',true,4,['NO_RESPONSE_ESCALATION']);
+if(h.active===true&&h.type==='ALCOHOL_IN_OPERATION')return result('URGENT_WARNING','STOP_WHEN_SAFE','ALCOHOL_DETECTED_IN_OPERATION','CRITICAL',true,4,['ALCOHOL_IN_OPERATION']);
 if(types.has('ALCOHOL_POLICY_VIOLATION'))return result('WARNING','DO_NOT_DRIVE','ALCOHOL_DETECTED_PRESTART','HIGH',true,3,['ALCOHOL_PRESTART']);
 if(types.has('DRIVER_INCAPACITATION'))return result('STATUS_CHECK','RESPOND_IF_OK','DRIVER_ACK_REQUEST','HIGH',true,2,['INCAPACITATION_STATUS_CHECK']);
 if(types.has('LONG_EYE_CLOSURE'))return result(fat==='RAPID_INCREASE'?'SAFE_STOP_RECOMMENDED':'WARNING',fat==='RAPID_INCREASE'?'STOP_WHEN_SAFE':'LOOK_FORWARD',fat==='RAPID_INCREASE'?'SAFE_STOP_RECOMMENDED':'LONG_EYE_CLOSURE_WARNING','HIGH',true,3,['LONG_EYE_CLOSURE',fat]);

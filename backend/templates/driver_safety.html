@@ -23,6 +23,7 @@
   <link rel="stylesheet" href="/static/css/voice_interaction.css">
 <link rel="stylesheet" href="/static/css/driver_runtime_memory.css">
 <link rel="stylesheet" href="/static/css/driver_companion.css">
+<link rel="stylesheet" href="/static/css/driver_stabilization.css">
   <style>
     :root {
       --bg: #070b14;
@@ -536,6 +537,26 @@
       <div class="driver-companion__details"><article><h3>Evidence / Suppressed Recommendations</h3><pre data-companion-evidence>{}</pre></article><article><h3>Decision / ACK / Escalation History</h3><pre data-companion-history>[]</pre></article></div>
     </section>
 
+    <section id="driverStabilizationPanel" class="driver-test-panel driver-stabilization" aria-labelledby="driverStabilizationTitle">
+      <h2 id="driverStabilizationTitle" class="panel-title">Driver Companion Stabilization &amp; Productization Gate</h2>
+      <div class="driver-stabilization__badges"><span>STABILIZATION MODE</span><span>CONTROLLED VALIDATION ONLY</span><span>NO COMMERCIAL RELEASE</span><span>NO VEHICLE CONTROL</span><span>NO AUTOMATIC EMERGENCY CALL</span><span>NOT FOR OPERATIONAL USE</span></div>
+      <div class="driver-stabilization__summary">
+        <article><span>Overall Gate</span><strong data-stabilization-overall>NOT EVALUATED</strong></article><article><span>Product Maturity</span><strong data-stabilization-maturity>68%</strong></article>
+        <article><span>Hazard Activation Consistency</span><strong data-stabilization-hazard>MITIGATED</strong></article><article><span>ACK / Expiry Lifecycle</span><strong data-stabilization-ack>MITIGATED</strong></article>
+        <article><span>Voice Preemption Safety</span><strong data-stabilization-voice>MITIGATED</strong></article><article><span>Policy Vocabulary</span><strong data-stabilization-vocabulary>MITIGATED</strong></article>
+        <article><span>Runtime State Bounds</span><strong data-stabilization-bounds>MITIGATED</strong></article><article><span>Reset Isolation</span><strong data-stabilization-reset>MITIGATED</strong></article>
+        <article><span>Operational Chain Coverage</span><strong data-stabilization-chain>MITIGATED</strong></article><article><span>Open Blockers</span><strong data-stabilization-blockers>0</strong></article>
+        <article><span>Field Validation Required</span><strong data-stabilization-field>4</strong></article><article><span>Last Evaluation</span><strong data-stabilization-evaluated>-</strong></article>
+        <article><span>Voice History Count / Limit</span><strong data-stabilization-voice-retention>0 / 256</strong></article><article><span>Memory History Count / Limit</span><strong>0 / 1024</strong></article>
+        <article><span>Replay Artifact Count / Limit</span><strong>0 / 2048</strong></article><article><span>Companion History Count / Limit</span><strong>0 / 512</strong></article>
+        <article><span>Dropped Count</span><strong data-stabilization-dropped>0</strong></article><article><span>Current Generation</span><strong data-stabilization-generation>0</strong></article>
+        <article><span>Last Reset Scope</span><strong data-stabilization-reset-scope>-</strong></article><article><span>Reset Status</span><strong data-stabilization-reset-status>-</strong></article>
+        <article><span>Modules Completed</span><strong data-stabilization-completed>-</strong></article><article><span>Modules Failed</span><strong data-stabilization-failed>-</strong></article>
+      </div>
+      <div class="driver-stabilization__controls"><button data-stabilization-action="hazard">RUN HAZARD CONSISTENCY FIXTURE</button><button data-stabilization-action="ack">RUN ACK/EXPIRY FIXTURE</button><button data-stabilization-action="voice">RUN VOICE RACE FIXTURE</button><button data-stabilization-action="vocabulary">RUN VOCABULARY FIXTURE</button><button data-stabilization-action="bounds">RUN STATE BOUNDS FIXTURE</button><button data-stabilization-action="reset">RUN RESET ISOLATION FIXTURE</button><button data-stabilization-action="chain">RUN SIX-STAGE LINEAGE FIXTURE</button><button data-stabilization-action="full">RUN FULL PRODUCTIZATION GATE</button><button data-stabilization-action="reset-target">RESET STABILIZATION TARGET</button><button data-stabilization-action="export">EXPORT GATE JSON</button></div>
+      <div class="driver-stabilization__details"><article><h3>Gate / Evidence</h3><pre data-stabilization-gate>{}</pre></article><article><h3>Six-Stage Lineage / Reset Diagnostics</h3><pre data-stabilization-lineage>{}</pre></article></div>
+    </section>
+
     <section id="runtimeCalibrationPanel" class="driver-test-panel runtime-calibration" aria-labelledby="runtimeCalibrationTitle">
       <h2 id="runtimeCalibrationTitle" class="panel-title">Field Calibration &amp; Threshold Profile</h2>
       <div class="runtime-calibration-badges"><span>DEVELOPMENT CANDIDATE</span><span>NOT AUTOMATICALLY APPLIED</span><span>NO IMAGE OR LANDMARK STORAGE</span><span>SIMULATION ONLY</span><span>NOT FOR OPERATIONAL USE</span></div>
@@ -691,6 +712,14 @@
     </section>
   </main>
 
+  <script src="/static/js/driver_stabilization_config.js"></script>
+  <script src="/static/js/driver_runtime_lifecycle_contracts.js"></script>
+  <script src="/static/js/driver_policy_vocabulary.js"></script>
+  <script src="/static/js/runtime_state_retention_policy.js"></script>
+  <script src="/static/js/runtime_reset_coordinator.js"></script>
+  <script src="/static/js/runtime_lifecycle_contract.js"></script>
+  <script src="/static/js/runtime_bounded_store.js"></script>
+  <script src="/static/js/runtime_store_registry.js"></script>
   <script src="/static/js/sensor_observation.js"></script>
   <script src="/static/js/driver_state_config.js"></script>
   <script src="/static/js/driver_state.js"></script>
@@ -755,6 +784,9 @@
   <script src="/static/js/driver_perception/driver_camera_observation_bridge.js"></script>
   <script src="/static/js/runtime_event_graph.js"></script>
   <script src="/static/js/runtime_triple_engine.js"></script>
+  <script>
+    (()=>{const panel=document.getElementById('driverStabilizationPanel');if(!panel)return;const field=name=>panel.querySelector(`[data-stabilization-${name}]`),runtime=new DriverStabilizationConfig.StabilizationRuntime(),coordinator=new RuntimeResetCoordinator.RuntimeResetCoordinator(),target='stabilization-target',assignment='stabilization-assignment';let gate=null,lineage=null,lastReset=null;coordinator.register('VOICE',()=>window.VoiceInteractionPage?.orchestrator?.resetTarget?.(target),['TARGET','VOICE','FULL_RUNTIME']);coordinator.register('MEMORY',()=>window.DriverRuntimeMemoryPage?.engine?.resetTarget?.(target),['TARGET','MEMORY','FULL_RUNTIME']);coordinator.register('COMPANION',()=>window.DriverCompanionPage?.runtime?.resetTarget?.(target),['TARGET','COMPANION','FULL_RUNTIME']);const render=()=>{const map={overall:gate?.overallStatus,maturity:`${gate?.productMaturity||68}%`,hazard:gate?.hazardActivationConsistency,ack:gate?.ackExpiryLifecycle,voice:gate?.voicePreemptionSafety,vocabulary:gate?.policyVocabularyConsistency,bounds:gate?.runtimeStateBoundedness,reset:gate?.resetIsolation,chain:gate?.operationalChainCoverage,blockers:gate?.blockers?.length??0,field:gate?.fieldValidationRequired?.length??4,evaluated:gate?.evaluatedAt||'-',generation:coordinator.generation(target,assignment),'reset-scope':lastReset?.scope||'-','reset-status':lastReset?.status||'-',completed:lastReset?.completedModules?.join(', ')||'-',failed:lastReset?.failedModules?.map(x=>x.module).join(', ')||'-'};Object.entries(map).forEach(([name,value])=>{if(field(name))field(name).textContent=value??'NOT EVALUATED'});field('gate').textContent=JSON.stringify(gate||{},null,2);field('lineage').textContent=JSON.stringify({lineage,reset:lastReset},null,2);const retention=window.VoiceInteractionPage?.orchestrator?.getRetentionState?.();if(retention){field('voice-retention').textContent=`${retention.count} / ${retention.maximumEntries}`;field('dropped').textContent=retention.droppedCount}};const evaluate=()=>{gate=runtime.evaluate({ackExpiryLifecycle:'OPEN',runtimeStateBoundedness:'OPEN',mitigations:['INACTIVE_HAZARD_DOMINANCE_BLOCKED','VOICE_PLAYBACK_OWNERSHIP_GUARD','BOUNDED_STORE_CONTRACT','RESET_COORDINATOR'],verifiedEvidence:[],fieldValidationRequired:['CAMERA_HARDWARE','EDGE_AUDIO_HARDWARE','ALCOHOL_SENSOR','RADAR_LIDAR']});render()};panel.addEventListener('click',async event=>{const action=event.target.dataset.stabilizationAction;if(!action)return;if(action==='chain'){lineage=runtime.createLineage({canonicalTargetId:target,assignmentId:assignment})}else if(action==='reset'||action==='reset-target'){lastReset=await coordinator.reset({scope:action==='reset'?'FULL_RUNTIME':'TARGET',canonicalTargetId:target,assignmentId:assignment,reasonCode:'STABILIZATION_FIXTURE'});runtime.markReset(lastReset.resetId)}else if(action==='export'){const blob=new Blob([runtime.exportJSON()],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='driver-companion-productization-gate.json';a.click();URL.revokeObjectURL(url)}else evaluate();render()});window.DriverStabilizationPage=Object.freeze({runtime,coordinator,evaluate,render,getGate:()=>gate});render()})();
+  </script>
   <script>
     window.RuntimeIdentityRegistryPage=window.RuntimeIdentityRegistryPage||{registry:window.RuntimeIdentityRegistry.registry};
     window.MultiHazardFusionPage=window.MultiHazardFusionPage||window.MultiHazardFusionEngine.engine;
