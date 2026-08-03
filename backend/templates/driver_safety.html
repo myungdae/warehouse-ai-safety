@@ -21,6 +21,7 @@
   <link rel="stylesheet" href="/static/css/edge_hardware.css">
   <link rel="stylesheet" href="/static/css/perception_validation.css">
   <link rel="stylesheet" href="/static/css/voice_interaction.css">
+  <link rel="stylesheet" href="/static/css/driver_runtime_memory.css">
   <style>
     :root {
       --bg: #070b14;
@@ -517,6 +518,15 @@
       <div class="voice-scenario-grid"><article><h3>Queue</h3><pre data-scenario-queue>[]</pre></article><article><h3>Suppressed Messages</h3><pre data-scenario-suppressed>[]</pre></article><article class="voice-scenario-history"><h3>Scenario History</h3><pre data-scenario-history>[]</pre></article></div>
     </section>
 
+    <section id="driverRuntimeMemoryPanel" class="driver-test-panel driver-memory" aria-labelledby="driverRuntimeMemoryTitle">
+      <h2 id="driverRuntimeMemoryTitle" class="panel-title">Driver Memory &amp; Fatigue Trend</h2>
+      <div class="voice-badges"><span>RUNTIME MEMORY ONLY</span><span>NO CLOUD</span><span>NO DATABASE</span><span>NO BROWSER STORAGE</span><span>NO PERSONAL PROFILE</span><span>NOT FOR OPERATIONAL USE</span></div>
+      <div class="driver-memory__summary"><article><span>Memory State</span><strong data-memory-state>EMPTY</strong></article><article><span>Active Target</span><strong data-memory-target>-</strong></article><article><span>Active Assignment</span><strong data-memory-assignment>-</strong></article><article><span>Current Fatigue Trend</span><strong data-memory-fatigue>UNKNOWN</strong></article><article><span>Fatigue Trend Score</span><strong data-memory-score>-</strong></article><article><span>Trend Confidence</span><strong data-memory-confidence>-</strong></article><article><span>Risk Trend</span><strong data-memory-risk>UNKNOWN</strong></article><article><span>Confidence Trend</span><strong data-memory-confidence-trend>UNKNOWN</strong></article><article><span>Context Trend</span><strong data-memory-context>NO_MEANINGFUL_TREND</strong></article><article><span>Evidence Count</span><strong data-memory-evidence>0</strong></article><article><span>Last Update</span><strong data-memory-updated>-</strong></article><article><span>Last Memory Replay Artifact</span><strong data-memory-last-replay>-</strong></article><article><span>Last Fatigue Trend Artifact</span><strong data-memory-last-fatigue>-</strong></article><article><span>Last Risk Trend Artifact</span><strong data-memory-last-risk>-</strong></article><article><span>Last Confidence Trend Artifact</span><strong data-memory-last-confidence>-</strong></article><article><span>Last Context Trend Artifact</span><strong data-memory-last-context>-</strong></article><article><span>Last Trend Voice Selection</span><strong data-memory-last-voice>-</strong></article><article><span>Trend Voice Suppression Reason</span><strong data-memory-voice-suppression>-</strong></article><article><span>Immediate Hazard Dominance</span><strong data-memory-hazard>INACTIVE</strong></article><article><span>Trend Voice Cooldown State</span><strong data-memory-voice-cooldown>UNKNOWN</strong></article><article><span>Trend Voice ACK Suppression</span><strong data-memory-voice-ack>UNKNOWN</strong></article><article><span>Current Generation</span><strong data-memory-generation>0</strong></article></div>
+      <div class="voice-controls"><button data-memory-action="stable">RUN STABLE TREND FIXTURE</button><button data-memory-action="increasing">RUN INCREASING FATIGUE FIXTURE</button><button data-memory-action="rapid">RUN RAPID FATIGUE FIXTURE</button><button data-memory-action="improving">RUN IMPROVING TREND FIXTURE</button><button data-memory-action="attention">RUN ATTENTION TREND FIXTURE</button><button data-memory-action="risk">RUN RISK ESCALATION FIXTURE</button><button data-memory-action="confidence">RUN CONFIDENCE DEGRADATION FIXTURE</button><button data-memory-action="advance">ADVANCE MEMORY CLOCK</button><button data-memory-action="reset">RESET MEMORY TARGET</button><button data-memory-action="export">EXPORT MEMORY JSON</button></div>
+      <h3>Trend Graph / Window Cards</h3><div class="driver-memory__windows" data-memory-graph></div>
+      <div class="driver-memory__history"><article><h3>Risk / Trend / Replay History</h3><pre data-memory-history>[]</pre></article><article><h3>Voice History / Evidence</h3><pre data-memory-voice>null</pre></article></div>
+    </section>
+
     <section id="runtimeCalibrationPanel" class="driver-test-panel runtime-calibration" aria-labelledby="runtimeCalibrationTitle">
       <h2 id="runtimeCalibrationTitle" class="panel-title">Field Calibration &amp; Threshold Profile</h2>
       <div class="runtime-calibration-badges"><span>DEVELOPMENT CANDIDATE</span><span>NOT AUTOMATICALLY APPLIED</span><span>NO IMAGE OR LANDMARK STORAGE</span><span>SIMULATION ONLY</span><span>NOT FOR OPERATIONAL USE</span></div>
@@ -708,6 +718,10 @@
   <script src="/static/js/voice_alert_orchestrator.js"></script>
   <script src="/static/js/driver_voice_scenario_pack.js"></script>
   <script src="/static/js/driver_voice_scenario_runtime.js"></script>
+  <script src="/static/js/driver_runtime_memory_config.js"></script>
+  <script src="/static/js/driver_runtime_memory_model.js"></script>
+  <script src="/static/js/driver_fatigue_trend_engine.js"></script>
+  <script src="/static/js/driver_runtime_memory_engine.js"></script>
   <script src="/static/js/driver_input_mode_controller.js"></script>
   <script src="/static/js/driver_runtime_page.js"></script>
   <script src="/static/js/vehicle_proximity_runtime.js"></script>
