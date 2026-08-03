@@ -20,6 +20,7 @@
   <link rel="stylesheet" href="/static/css/runtime_replay.css">
   <link rel="stylesheet" href="/static/css/edge_hardware.css">
   <link rel="stylesheet" href="/static/css/perception_validation.css">
+  <link rel="stylesheet" href="/static/css/voice_interaction.css">
   <style>
     :root {
       --bg: #070b14;
@@ -496,6 +497,18 @@
       <details><summary>Measurement / Observation / Runtime</summary><pre data-alcohol-detail>{}</pre></details>
     </section>
 
+    <section id="voiceInteractionPanel" class="driver-test-panel voice-interaction" aria-labelledby="voiceInteractionTitle">
+      <h2 id="voiceInteractionTitle" class="panel-title">Context-Aware Voice Interaction</h2>
+      <div class="voice-badges"><span>LOCAL AUDIO DEVELOPMENT ASSETS</span><span>SAME-ORIGIN WAV ONLY</span><span>NO EXTERNAL TTS</span><span>NO MICROPHONE RECORDING</span><span>EDGE SPEAKER NOT CONNECTED</span><span>NOT FOR OPERATIONAL USE</span></div>
+      <h3>Voice Summary</h3>
+      <div class="voice-summary"><article><span>Audio Enabled</span><strong data-voice-enabled>NO</strong></article><article><span>Current Message</span><strong data-voice-message>NONE</strong></article><article><span>Spoken Text</span><strong data-voice-text>-</strong></article><article><span>Severity / Priority</span><strong data-voice-priority>-</strong></article><article><span>Escalation</span><strong data-voice-escalation>-</strong></article><article><span>Confidence</span><strong data-voice-confidence>UNKNOWN</strong></article><article><span>Playback</span><strong data-voice-playback>IDLE</strong></article><article><span>ACK Required</span><strong data-voice-ack>NO</strong></article><article><span>Cooldown</span><strong data-voice-cooldown>-</strong></article><article><span>Repeat Count</span><strong data-voice-repeat>0</strong></article><article><span>Browser Voice</span><strong data-voice-browser-voice>SYSTEM_DEFAULT</strong></article><article><span>Volume / Rate</span><strong data-voice-levels>0.8 / 1</strong></article></div>
+      <div class="voice-summary"><article><span>Manifest State</span><strong data-voice-manifest>NOT_INITIALIZED</strong></article><article><span>Current Asset</span><strong data-voice-asset>-</strong></article><article><span>Requested Mode</span><strong data-voice-requested>-</strong></article><article><span>Attempted Modes</span><strong data-voice-attempted>-</strong></article><article><span>Successful Mode</span><strong data-voice-successful>-</strong></article><article><span>WAV Error</span><strong data-voice-wav-error>-</strong></article><article><span>TTS Error</span><strong data-voice-tts-error>-</strong></article><article><span>Tone Fallback</span><strong data-voice-tone-fallback>NO</strong></article></div>
+      <h3>Current Decision</h3><pre class="voice-current-decision" data-voice-decision>{}</pre>
+      <div class="voice-controls"><button data-voice-action="initialize">INITIALIZE AUDIO ASSETS</button><button data-voice-action="enable">ENABLE AUDIO</button><button data-voice-action="disable">DISABLE AUDIO</button><button data-voice-action="test-local">TEST LOCAL WAV</button><button data-voice-action="test-voice">TEST TTS</button><button data-voice-action="test-fallback">TEST FULL FALLBACK CHAIN</button><button data-voice-action="chime">TEST CHIME</button><button data-voice-action="critical">TEST CRITICAL ALARM</button><button data-voice-action="drowsiness">RUN DROWSINESS FIXTURE</button><button data-voice-action="right-turn">RUN RIGHT-TURN PEDESTRIAN FIXTURE</button><button data-voice-action="multi">RUN MULTI-HAZARD FIXTURE</button><button data-voice-action="physical-ack">SIMULATE PHYSICAL ACK</button><button data-voice-action="ok-ack">SIMULATE I-AM-OK ACK</button><button data-voice-action="help-ack">SIMULATE HELP ACK</button><button data-voice-action="mute">MUTE</button><button data-voice-action="unmute">UNMUTE</button><button data-voice-action="cancel">CANCEL CURRENT AUDIO</button><button data-voice-action="reset">RESET VOICE TARGET</button><button data-voice-action="export">EXPORT VOICE JSON</button></div>
+      <div class="voice-level-controls"><label>Volume <input data-voice-volume type="range" min="0" max="1" step="0.1" value="0.8"></label><label>Rate <input data-voice-rate type="range" min="0.6" max="1.4" step="0.1" value="1"></label><label>Pitch <input data-voice-pitch type="range" min="0.5" max="1.5" step="0.1" value="1"></label></div>
+      <div class="voice-grid"><article><h3>Queue</h3><pre data-voice-queue>[]</pre></article><article><h3>Voice History</h3><pre data-voice-history>[]</pre></article></div>
+    </section>
+
     <section id="runtimeCalibrationPanel" class="driver-test-panel runtime-calibration" aria-labelledby="runtimeCalibrationTitle">
       <h2 id="runtimeCalibrationTitle" class="panel-title">Field Calibration &amp; Threshold Profile</h2>
       <div class="runtime-calibration-badges"><span>DEVELOPMENT CANDIDATE</span><span>NOT AUTOMATICALLY APPLIED</span><span>NO IMAGE OR LANDMARK STORAGE</span><span>SIMULATION ONLY</span><span>NOT FOR OPERATIONAL USE</span></div>
@@ -679,6 +692,12 @@
   <script src="/static/js/edge_hardware_registry.js"></script>
   <script src="/static/js/edge_hardware_adapter.js"></script>
   <script src="/static/js/edge_hardware_runtime_bridge.js"></script>
+  <script src="/static/js/voice_message_catalog.js"></script>
+  <script src="/static/js/voice_interaction_config.js"></script>
+  <script src="/static/js/voice_interaction_runtime.js"></script>
+  <script src="/static/js/local_audio_asset_registry.js"></script>
+  <script src="/static/js/audio_playback_adapter.js"></script>
+  <script src="/static/js/voice_alert_orchestrator.js"></script>
   <script src="/static/js/driver_input_mode_controller.js"></script>
   <script src="/static/js/driver_runtime_page.js"></script>
   <script src="/static/js/vehicle_proximity_runtime.js"></script>
