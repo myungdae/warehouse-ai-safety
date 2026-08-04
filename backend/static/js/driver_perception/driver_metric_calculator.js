@@ -341,7 +341,13 @@
             const earValid = leftEarValid && rightEarValid;
             const rawEar = earValid ? (leftEAR + rightEAR) / 2 : null;
             const ear = earValid ? this._smooth('ear', rawEar) : null;
-            const calibrated = Boolean(calibrationState?.calibrated);
+            const sessionMismatch = Boolean(calibrationState?.calibrationSessionId) &&
+                calibrationState?.baselineSourceSessionId !== calibrationState.calibrationSessionId;
+            const generationMismatch = Number.isInteger(calibrationState?.calibrationGeneration) &&
+                calibrationState?.baselineSourceGeneration !== calibrationState.calibrationGeneration;
+            const runtimeGenerationMismatch = Number.isInteger(calibrationState?.runtimeGeneration) && Number.isInteger(calibrationState?.currentRuntimeGeneration) &&
+                calibrationState.runtimeGeneration !== calibrationState.currentRuntimeGeneration;
+            const calibrated = calibrationState?.state === 'READY' && calibrationState?.calibrated === true && !sessionMismatch && !generationMismatch && !runtimeGenerationMismatch;
             const relativeReady = geometryV2 && finite(calibrationState?.leftBaseline) && finite(calibrationState?.rightBaseline);
             const leftClosureRatio = relativeReady && leftEarValid ? leftEAR / calibrationState.leftBaseline : null;
             const rightClosureRatio = relativeReady && rightEarValid ? rightEAR / calibrationState.rightBaseline : null;
@@ -352,7 +358,7 @@
             let oneEyeOnly = calibrated && earValid && leftEyeClosed !== rightEyeClosed;
             let bothEyesClosed = leftEyeClosed === true && rightEyeClosed === true;
             const frameDeltaMs = this.lastFrameTimestamp === null ? null : usableTimestamp - this.lastFrameTimestamp;
-            const blink = relativeReady && this.config.blinkRearm
+            const blink = calibrated && relativeReady && this.config.blinkRearm
                 ? this._updateBlinkV2(usableTimestamp, { leftRatio: leftClosureRatio, rightRatio: rightClosureRatio,
                     leftValid: calibrated && leftEarValid, rightValid: calibrated && rightEarValid, frameGapMs: frameDeltaMs })
                 : this._updateBlink(usableTimestamp, calibrated && earValid && !oneEyeOnly, bothEyesClosed, { oneEyeOnly });
@@ -365,6 +371,9 @@
             const blinkRejectReasons = [];
             if (!frame.faceDetected) blinkRejectReasons.push('FACE_LOST');
             if (!calibrated) blinkRejectReasons.push('CALIBRATION_NOT_READY');
+            if (sessionMismatch) blinkRejectReasons.unshift('CALIBRATION_SESSION_MISMATCH');
+            if (generationMismatch) blinkRejectReasons.unshift('CALIBRATION_GENERATION_MISMATCH');
+            if (runtimeGenerationMismatch) blinkRejectReasons.unshift('CALIBRATION_GENERATION_MISMATCH');
             if (!earValid) blinkRejectReasons.push('EAR_INVALID');
             if (oneEyeOnly) blinkRejectReasons.push('ONE_EYE_ONLY');
             if (Number.isFinite(blink.frameDeltaMs) && blink.frameDeltaMs > this.config.maxFrameGapMs) blinkRejectReasons.push('FRAME_GAP_TOO_LARGE');
@@ -403,6 +412,11 @@
                 eyeClosed, leftEyeClosed, rightEyeClosed, bothEyesClosed, oneEyeOnly,
                 leftClosureRatio, rightClosureRatio, relativeClosureThreshold: relativeReady ? relativeThreshold : null,
                 geometryVersion: geometryV2 ? 'PERCEPTION_GEOMETRY_V2' : 'PERCEPTION_GEOMETRY_V1',
+                calibrationSessionId: calibrationState?.calibrationSessionId || null,
+                calibrationGeneration: calibrationState?.calibrationGeneration ?? null,
+                baselineSourceSessionId: calibrationState?.baselineSourceSessionId || null,
+                baselineSourceGeneration: calibrationState?.baselineSourceGeneration ?? null,
+                calibrationSessionMatch: !sessionMismatch, calibrationGenerationMatch: !generationMismatch && !runtimeGenerationMismatch,
                 geometryDimensionsValid, geometryFallback: geometryV2 && !geometryDimensionsValid ? 'V2_DIMENSIONS_UNAVAILABLE' : null,
                 ...blink, blinkRejectReason: blinkDiagnosticReason, blinkRejectReasons: Object.freeze([...new Set(blinkRejectReasons)]),
                 blinkRecoveryDurationMs: blink.recoveryDurationMs ?? null,

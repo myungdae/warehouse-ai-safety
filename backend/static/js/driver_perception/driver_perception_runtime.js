@@ -9,7 +9,8 @@
     });
 
     class DriverPerceptionRuntime {
-        constructor({ cameraManager, landmarkAdapter, metricCalculator, calibration, snapshotFactory, scheduler, cancelScheduler } = {}) {
+        constructor({ cameraManager, landmarkAdapter, metricCalculator, calibration, snapshotFactory, scheduler, cancelScheduler,
+            canonicalTargetId = null, assignmentId = null } = {}) {
             this.cameraManager = cameraManager || new namespace.CameraManager();
             this.landmarkAdapter = landmarkAdapter || new namespace.FaceLandmarkAdapter();
             this.metricCalculator = metricCalculator || new namespace.DriverMetricCalculator(namespace.Config.metrics);
@@ -25,14 +26,48 @@
             this.lastLandmarkFrame = null;
             this.latestMetricSnapshot = null;
             this.metricListeners = new Set();
+            this.runtimeGeneration = 0;
+            this.canonicalTargetId = canonicalTargetId;
+            this.assignmentId = assignmentId;
+            this.guidedState = null;
         }
 
         subscribe(listener) { this.listeners.add(listener); return () => this.listeners.delete(listener); }
         onMetricSnapshot(listener) { this.metricListeners.add(listener); return () => this.metricListeners.delete(listener); }
         getLatestMetricSnapshot() { return this.latestMetricSnapshot; }
-        startCalibration(timestamp = Date.now()) { this.metricCalculator.reset(); return this.calibration.start(timestamp); }
-        resetCalibration() { this.metricCalculator.reset(); return this.calibration.reset(); }
+        startCalibration(timestamp = Date.now(), source = 'CALIBRATION_START_BUTTON') {
+            let current = this.calibration.getState(timestamp);
+            if (source === 'POC_EYE_CALIBRATION' && ![namespace.CalibrationStates.NOT_STARTED, namespace.CalibrationStates.RESETTING].includes(current.state)) {
+                current = this.resetCalibration('POC_EYE_CALIBRATION_EXPLICIT_RESET');
+            }
+            if (![namespace.CalibrationStates.NOT_STARTED, namespace.CalibrationStates.RESETTING].includes(current.state)) return current;
+            this.metricCalculator.reset();
+            return this.calibration.start(timestamp, { runtimeGeneration: this.runtimeGeneration,
+                canonicalTargetId: this.canonicalTargetId, assignmentId: this.assignmentId, source });
+        }
+        resetCalibration(source = 'CALIBRATION_RESET_BUTTON') { this.metricCalculator.reset(); return this.calibration.reset(true, source); }
         getCalibrationState(timestamp = Date.now()) { return this.calibration.getState(timestamp); }
+        setGuidedState(state) { this.guidedState = state || null; return this.getSynchronizationSnapshot(); }
+        getSynchronizationSnapshot(timestamp = Date.now()) {
+            const calibration = this.getCalibrationState(timestamp), guided = this.guidedState || {};
+            const snapshotSessionMatch = !guided.calibrationSessionId || guided.calibrationSessionId === calibration.calibrationSessionId;
+            const snapshotGenerationMatch = guided.calibrationGeneration == null || guided.calibrationGeneration === calibration.calibrationGeneration;
+            let synchronizationStatus = 'SYNCHRONIZED';
+            if (!snapshotSessionMatch) synchronizationStatus = 'SESSION_MISMATCH';
+            else if (!snapshotGenerationMatch || calibration.runtimeGeneration !== this.runtimeGeneration) synchronizationStatus = 'GENERATION_MISMATCH';
+            else if (calibration.lastStateWriter === 'STALE_CALLBACK_REJECTED') synchronizationStatus = 'STALE_CALLBACK_REJECTED';
+            else if (calibration.state === namespace.CalibrationStates.INVALID) synchronizationStatus = 'BLOCKED_BY_CALIBRATION_INVALID';
+            else if (calibration.state !== namespace.CalibrationStates.READY) synchronizationStatus = 'WAITING_FOR_CALIBRATION';
+            return Object.freeze({ calibrationSessionId: calibration.calibrationSessionId,
+                calibrationGeneration: calibration.calibrationGeneration, guidedSessionId: guided.guidedSessionId || null,
+                guidedStepId: guided.step?.id || null, runtimeGeneration: this.runtimeGeneration,
+                canonicalTargetId: calibration.canonicalTargetId, assignmentId: calibration.assignmentId,
+                authoritativeCalibrationState: calibration.state, guidedBlockedReason: guided.blockedReason || null,
+                snapshotSessionMatch, snapshotGenerationMatch,
+                blinkBaselineSessionMatch: calibration.baselineSourceSessionId == null || calibration.baselineSourceSessionId === calibration.calibrationSessionId,
+                lastResetSource: calibration.lastResetSource, lastStateWriter: calibration.lastStateWriter,
+                lastStateTransition: calibration.lastStateTransition, synchronizationStatus });
+        }
         _publish(extra = {}) {
             const snapshot = Object.freeze({ state: this.state, permission: this.cameraManager.permissionState, ...extra });
             this.listeners.forEach(listener => listener(snapshot));
@@ -43,6 +78,7 @@
             if ([States.STARTING, States.RUNNING, States.FACE_NOT_DETECTED].includes(this.state)) return false;
             if (!videoElement) throw new Error('VIDEO_ELEMENT_REQUIRED');
             const token = ++this.runToken;
+            this.runtimeGeneration += 1;
             this.videoElement = videoElement;
             this.state = States.STARTING;
             this._publish();
@@ -86,13 +122,16 @@
             if (token !== this.runToken) return;
             this.lastLandmarkFrame = frame;
             let calibrationState = this.calibration.getState(Date.parse(frame.timestamp));
-            const metrics = this.metricCalculator.processFrame(frame, calibrationState);
+            const callbackSessionId = calibrationState.calibrationSessionId;
+            const callbackGeneration = calibrationState.calibrationGeneration;
+            const metrics = this.metricCalculator.processFrame(frame, { ...calibrationState, currentRuntimeGeneration: this.runtimeGeneration });
             if (calibrationState.state === namespace.CalibrationStates.COLLECTING) {
                 calibrationState = this.calibration.addSample(metrics.rawEar, { valid: metrics.earValid,
                     leftEAR: metrics.leftEAR, rightEAR: metrics.rightEAR,
                     pitch: metrics.pitch, yaw: metrics.yaw, roll: metrics.roll,
                     mar: metrics.marRaw, marValid: metrics.marValid, marRejectReason: metrics.marInvalidReason,
-                    timestamp: Date.parse(frame.timestamp) });
+                    timestamp: Date.parse(frame.timestamp), expectedCalibrationSessionId: callbackSessionId,
+                    expectedCalibrationGeneration: callbackGeneration });
             }
             this.latestMetricSnapshot = this.snapshotFactory({ frame, metrics, calibration: calibrationState });
             this.metricListeners.forEach(listener => listener(this.latestMetricSnapshot));
@@ -137,8 +176,20 @@
             display('calibration-state', calibrationState.state, 0);
             display('calibration-samples', calibrationState.sampleCount, 0);
             display('calibration-progress', `${Math.round(calibrationState.progress * 100)}%`, 0);
+            const counts = calibrationState.completionDiagnostics?.counts || {};
+            const gates = calibrationState.completionDiagnostics?.gates || {};
+            display('calibration-observed', counts.observed, 0);
+            display('calibration-rejected', counts.combinedRejected, 0);
+            display('calibration-left-neutral', counts.leftNeutralAccepted, 0);
+            display('calibration-right-neutral', counts.rightNeutralAccepted, 0);
+            display('calibration-required', counts.requiredPerEye, 0);
+            display('calibration-gates', `${Object.values(gates).filter(Boolean).length} / ${Object.keys(gates).length}`, 0);
             display('baseline', calibrationState.baseline);
             display('threshold', calibrationState.threshold);
+            const diagnostics = field('calibration-completion-diagnostics');
+            if (diagnostics) diagnostics.textContent = JSON.stringify(calibrationState.completionDiagnostics, null, 2);
+            const synchronization = field('calibration-synchronization');
+            if (synchronization) synchronization.textContent = JSON.stringify(runtime.getSynchronizationSnapshot(), null, 2);
         };
         let latestMouthMetrics = null;
         const drawOverlay = frame => {
