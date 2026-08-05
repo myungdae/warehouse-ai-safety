@@ -91,6 +91,15 @@
     await adapter.initialize(); adapter.start({cameraId:'cam-1',imageWidth:640,imageHeight:480,onLandmarkFrame:f=>{delivered=f;}}); await adapter.process({});
     assert(delivered.faceDetected && delivered.landmarks===points && delivered.cameraId==='cam-1','callback mismatch');
   });
+  await test('adapter emits monotonic video-frame timing contract', async () => {
+    let handler,delivered,mono=100;const mesh={setOptions(){},onResults(fn){handler=fn},async initialize(){},async send(){mono+=20;handler({multiFaceLandmarks:[]})}};
+    const adapter=new DriverPerception.FaceLandmarkAdapter({faceMeshFactory:()=>mesh,monotonicClock:()=>mono,timeOrigin:1000});
+    await adapter.initialize();adapter.start({cameraId:'c922',imageWidth:640,imageHeight:480,onLandmarkFrame:x=>delivered=x});
+    await adapter.process({}, {expectedDisplayTime:90,mediaTime:2});
+    assert(delivered.captureTimestampMs===90&&delivered.submissionTimestampMs===100&&delivered.resultCallbackTimestampMs===120,'timing values');
+    assert(delivered.timestamp==='1970-01-01T00:00:01.090Z'&&delivered.timestampSource==='VIDEO_FRAME_EXPECTED_DISPLAY_TIME','authoritative timestamp');
+    assert(delivered.callbackLatencyMs===20&&delivered.frameSequence===1&&!delivered.duplicateResult&&delivered.droppedResultEstimate===0,'timing diagnostics');
+  });
   await test('stale callback invalidated', async () => {
     let handler,count=0; const mesh={setOptions(){},onResults(fn){handler=fn;},async initialize(){},async send(){}};
     const adapter=new DriverPerception.FaceLandmarkAdapter({faceMeshFactory:()=>mesh});
@@ -100,6 +109,40 @@
   await test('start stop repeats', async () => {
     const tracks=[]; const manager=new DriverPerception.CameraManager({mediaDevices:{getUserMedia:async()=>{const t=track();tracks.push(t);return stream([t]);}}});
     await manager.start();await manager.stop();await manager.start();await manager.stop(); assert(tracks.length===2&&tracks.every(t=>t.stopped===1),'repeat failed');
+  });
+  await test('authoritative managed stream readiness', async () => {
+    const t=track();t.enabled=true;t.muted=false;const source=stream([t]);source.id='managed-stream';
+    const manager=new DriverPerception.CameraManager({mediaDevices:{getUserMedia:async()=>source}});
+    await manager.start();const ready=manager.getLiveReadiness();
+    assert(ready.cameraReady&&ready.streamSource==='CAMERA_MANAGER_PRIMARY_STREAM'&&ready.videoTrackState==='live','managed readiness mismatch');
+  });
+  await test('authoritative video srcObject survives stale empty map', async () => {
+    const t=track();t.enabled=true;t.muted=false;const source=stream([t]);source.id='attached-stream';
+    const manager=new DriverPerception.CameraManager({mediaDevices:{getUserMedia:async()=>source}}),video={srcObject:null,play:async()=>{}};
+    await manager.start({videoElement:video});manager.streams.clear();const ready=manager.getLiveReadiness({videoElement:video});
+    assert(ready.cameraReady&&ready.streamPresent&&!ready.managedStreamPresent&&ready.streamSource==='VIDEO_ELEMENT_SRC_OBJECT','attached readiness mismatch');
+  });
+  await test('disabled and ended tracks are not camera ready', () => {
+    const t=track();t.enabled=false;const source=stream([t]);source.id='blocked-stream';
+    const manager=new DriverPerception.CameraManager({mediaDevices:{}});manager.permissionState='GRANTED';manager.streams.set('primary',source);
+    assert(!manager.getLiveReadiness().cameraReady,'disabled track accepted');t.enabled=true;t.readyState='ended';
+    assert(!manager.getLiveReadiness().cameraReady,'ended track accepted');
+  });
+  await test('runtime readiness exposes explicit blocked reasons', () => {
+    const t=track();t.enabled=true;const source=stream([t]);source.id='runtime-stream';
+    const manager=new DriverPerception.CameraManager({mediaDevices:{}}),runtime=new DriverPerception.DriverPerceptionRuntime({cameraManager:manager,landmarkAdapter:{},metricCalculator:{},calibration:{},snapshotFactory:()=>{},scheduler:()=>0,cancelScheduler:()=>{}});
+    let ready=runtime.getLiveBridgeReadiness();assert(ready.blockedReason==='RUNTIME_NOT_RUNNING','idle reason missing');
+    runtime.state=DriverPerception.States.RUNNING;ready=runtime.getLiveBridgeReadiness();assert(ready.blockedReason==='CAMERA_STREAM_UNAVAILABLE','stream reason missing');
+    manager.permissionState='GRANTED';manager.streams.set('primary',source);ready=runtime.getLiveBridgeReadiness();assert(ready.readyForLiveBridge&&ready.runtimeGeneration===0,'runtime readiness mismatch');
+    ready=runtime.getLiveBridgeReadiness(1);assert(ready.blockedReason==='GENERATION_MISMATCH','generation reason missing');
+  });
+  await test('runtime detects camera preview outside viewport', () => {
+    const runtime=new DriverPerception.DriverPerceptionRuntime({cameraManager:{permissionState:'GRANTED'},landmarkAdapter:{},metricCalculator:{},calibration:{},snapshotFactory:()=>{},scheduler:()=>0,cancelScheduler:()=>{}});
+    runtime.videoElement={currentTime:12,readyState:4,getBoundingClientRect:()=>({top:-600,bottom:-120,left:0,right:640,width:640,height:480})};
+    const health=runtime.getSchedulerHealth();
+    assert(health.videoOutsideViewport===true&&health.videoCurrentTime===12&&health.videoReadyState===4,'offscreen preview not detected');
+    runtime.videoElement.getBoundingClientRect=()=>({top:10,bottom:490,left:10,right:650,width:640,height:480});
+    assert(runtime.getSchedulerHealth().videoOutsideViewport===false,'visible preview rejected');
   });
   await test('privacy configuration', () => {
     assert(DriverPerception.Config.imageStorageAllowed===false,'storage enabled');

@@ -193,6 +193,33 @@
         <video class="driver-perception__video" data-camera-video autoplay muted playsinline aria-label="Browser-local driver camera preview"></video>
         <canvas class="driver-perception__overlay" data-camera-overlay aria-hidden="true"></canvas>
       </div>
+      <section id="customerDemoSimpleWarningPanel" class="driver-perception__group" aria-label="Customer simple warning demonstration">
+        <h3>Customer Demo Simple Warning <small>DEMONSTRATION ONLY</small></h3>
+        <div class="driver-perception__controls"><button type="button" data-customer-demo-action="toggle">DEMO ON / OFF</button></div>
+        <div class="driver-perception__status" aria-live="polite">
+          <div class="driver-perception__metric"><span>Demo ON/OFF</span><strong data-customer-demo-mode>OFF</strong></div>
+          <div class="driver-perception__metric"><span>Eye closure duration</span><strong data-customer-demo-eye>0 ms</strong></div>
+          <div class="driver-perception__metric"><span>Yawn open duration</span><strong data-customer-demo-yawn>0 ms</strong></div>
+          <div class="driver-perception__metric"><span>Armed/Re-arm</span><strong data-customer-demo-armed>EYE ARMED / YAWN ARMED</strong></div>
+          <div class="driver-perception__metric"><span>Warning played</span><strong data-customer-demo-played>EYE NO / YAWN NO</strong></div>
+          <div class="driver-perception__metric"><span>Cooldown</span><strong data-customer-demo-cooldown>0 s</strong></div>
+          <div class="driver-perception__metric"><span>Eye State</span><strong data-customer-demo-eye-state>ARMED</strong></div>
+          <div class="driver-perception__metric"><span>Episode ID</span><strong data-customer-demo-eye-episode>-</strong></div>
+          <div class="driver-perception__metric"><span>Playback Active</span><strong data-customer-demo-eye-playback-active>NO</strong></div>
+          <div class="driver-perception__metric"><span>Reopen Detected</span><strong data-customer-demo-eye-reopen>NO</strong></div>
+          <div class="driver-perception__metric"><span>Recovery Complete</span><strong data-customer-demo-eye-recovery>NO</strong></div>
+          <div class="driver-perception__metric"><span>Eye Armed</span><strong data-customer-demo-eye-armed>YES</strong></div>
+          <div class="driver-perception__metric"><span>Left Close Evidence</span><strong data-customer-demo-eye-left-close>NO</strong></div>
+          <div class="driver-perception__metric"><span>Right Close Evidence</span><strong data-customer-demo-eye-right-close>NO</strong></div>
+          <div class="driver-perception__metric"><span>Inter-eye Delay</span><strong data-customer-demo-eye-inter-delay>-</strong></div>
+          <div class="driver-perception__metric"><span>Join Window Remaining</span><strong data-customer-demo-eye-join-remaining>0 ms</strong></div>
+          <div class="driver-perception__metric"><span>Bilateral Joined</span><strong data-customer-demo-eye-bilateral-joined>NO</strong></div>
+          <div class="driver-perception__metric"><span>Wink Rejection Pending</span><strong data-customer-demo-eye-wink-pending>NO</strong></div>
+          <div class="driver-perception__metric"><span>Wink Rejection Confirmed</span><strong data-customer-demo-eye-wink-confirmed>NO</strong></div>
+          <div class="driver-perception__metric"><span>Last reject reason</span><strong data-customer-demo-reject>DEMO_OFF</strong></div>
+        </div>
+        <small>demonstration=true · validated=false · operationalUseAllowed=false · no authoritative Risk or validated count changes</small>
+      </section>
       <div class="driver-perception__status" aria-live="polite">
         <div class="driver-perception__metric"><span>Camera permission</span><strong data-perception-permission>UNKNOWN</strong></div>
         <div class="driver-perception__metric"><span>Runtime state</span><strong data-perception-state>IDLE</strong></div>
@@ -218,6 +245,10 @@
           <div><dt>Track Muted</dt><dd data-perception-camera-track-muted>UNKNOWN</dd></div>
           <div><dt>Resolution</dt><dd data-perception-camera-resolution>UNKNOWN</dd></div>
           <div><dt>FPS</dt><dd data-perception-camera-fps>UNKNOWN</dd></div>
+          <div><dt>Live Camera Scheduler</dt><dd data-perception-scheduler-health>NOT_STARTED</dd></div>
+          <div><dt>Scheduler Blocker</dt><dd data-perception-scheduler-reason>NONE</dd></div>
+          <div><dt>Camera Preview Viewport</dt><dd data-perception-video-viewport>UNKNOWN</dd></div>
+          <div><dt>Required Action</dt><dd data-perception-scheduler-message>NONE</dd></div>
           <div><dt>Last Camera Error</dt><dd data-perception-camera-error>NONE</dd></div>
         </dl>
         <details><summary>Requested constraints</summary><pre data-perception-camera-constraints>{}</pre></details>
@@ -307,6 +338,23 @@
           <div class="driver-perception__metric"><span>Input mode</span><strong data-live-mode>STOPPED</strong></div>
           <div class="driver-perception__metric"><span>Bridge status</span><strong data-live-status>STOPPED</strong></div>
           <div class="driver-perception__metric"><span>Ownership</span><strong data-live-ownership>INACTIVE</strong></div>
+          <div class="driver-perception__metric"><span>Camera Runtime State</span><strong data-live-camera-state>STOPPED</strong></div>
+          <div class="driver-perception__metric"><span>Live Bridge Owner</span><strong data-live-owner>-</strong></div>
+          <div class="driver-perception__metric"><span>Subscription Active</span><strong data-live-subscription>NO</strong></div>
+          <div class="driver-perception__metric"><span>Runtime Generation</span><strong data-live-generation>0</strong></div>
+          <div class="driver-perception__metric"><span>Runtime Notification</span><strong data-live-notification>-</strong></div>
+          <div class="driver-perception__metric"><span>Scenario / Message</span><strong data-live-scenario>- / -</strong></div>
+          <div class="driver-perception__metric"><span>Playback</span><strong data-live-playback>IDLE</strong></div>
+          <div class="driver-perception__metric"><span>Lifecycle Reasons</span><strong data-live-reasons>- / -</strong></div>
+          <div class="driver-perception__metric"><span>Automatic Status</span><strong data-live-automatic>NOT_READY</strong></div>
+          <div class="driver-perception__metric"><span>Start Attempted</span><strong data-live-start-attempted>NO</strong></div>
+          <div class="driver-perception__metric"><span>Start Result</span><strong data-live-start-result>NOT_ATTEMPTED</strong></div>
+          <div class="driver-perception__metric"><span>Blocked Reason</span><strong data-live-blocked-reason>-</strong></div>
+          <div class="driver-perception__metric"><span>Camera State Source</span><strong data-live-camera-source>-</strong></div>
+          <div class="driver-perception__metric"><span>Bridge Readiness Source</span><strong data-live-readiness-source>-</strong></div>
+          <div class="driver-perception__metric"><span>Authoritative Stream</span><strong data-live-authoritative-stream>NO / -</strong></div>
+          <div class="driver-perception__metric"><span>Authoritative Track State</span><strong data-live-authoritative-track>-</strong></div>
+          <div class="driver-perception__metric"><span>Synchronization Status</span><strong data-live-synchronization>WAITING_FOR_CAMERA</strong></div>
           <div class="driver-perception__metric"><span>Target ID</span><strong data-live-target>-</strong></div>
           <div class="driver-perception__metric"><span>Snapshot ID</span><strong data-live-snapshot>-</strong></div>
           <div class="driver-perception__metric"><span>Observation</span><strong data-live-observation>-</strong></div>
@@ -325,6 +373,16 @@
           <span class="driver-perception__notice">NOT FOR OPERATIONAL USE</span>
         </div>
       </section>
+      <section id="webDemoWarningPanel" class="driver-perception__bridge" aria-labelledby="webDemoWarningTitle">
+        <h3 id="webDemoWarningTitle">Web Demonstration Warning</h3>
+        <p><strong>DEMONSTRATION ONLY — NOT VALIDATED FOR DRIVING USE</strong></p>
+        <div class="driver-perception__notices"><span class="driver-perception__notice">DEMONSTRATION ONLY</span><span class="driver-perception__notice">NOT VALIDATED DROWSINESS DETECTION</span><span class="driver-perception__notice">NOT FOR OPERATIONAL USE</span><span class="driver-perception__notice">NOT FIELD EVIDENCE</span><span class="driver-perception__notice">CAMERA-LOCAL / NO IMAGE STORAGE</span></div>
+        <div class="driver-perception__controls"><button type="button" data-demo-action="enable">ENABLE WEB DEMO WARNING</button><button type="button" data-demo-action="disable">DISABLE WEB DEMO WARNING</button><button type="button" data-demo-action="eye">ARM DEMO EYE-CLOSURE</button><button type="button" data-demo-action="yawn">ARM DEMO YAWN</button><button type="button" data-demo-action="cancel">CANCEL DEMO AUDIO</button><button type="button" data-demo-action="reset">RESET DEMO STATE</button><button type="button" data-demo-action="export">EXPORT DEMO JSON</button></div>
+        <div class="driver-perception__status" aria-live="polite">
+          <div class="driver-perception__metric"><span>Demo Mode</span><strong data-demo-mode>OFF</strong></div><div class="driver-perception__metric"><span>Audio Enabled (Voice Runtime)</span><strong data-demo-audio>NO</strong></div><div class="driver-perception__metric"><span>Page Visible</span><strong data-demo-visible>NO</strong></div><div class="driver-perception__metric"><span>Page Focused</span><strong data-demo-focused>NO</strong></div><div class="driver-perception__metric"><span>Calibration</span><strong data-demo-calibration>NOT_STARTED</strong></div><div class="driver-perception__metric"><span>Bilateral Eye Valid</span><strong data-demo-bilateral>INVALID</strong></div><div class="driver-perception__metric"><span>Eye Closure Candidate</span><strong data-demo-eye-candidate>NO</strong></div><div class="driver-perception__metric"><span>Closure Duration</span><strong data-demo-eye-duration>0 ms</strong></div><div class="driver-perception__metric"><span>Demo Warning Armed</span><strong data-demo-eye-armed>NO</strong></div><div class="driver-perception__metric"><span>Demo Warning Played</span><strong data-demo-eye-played>NO</strong></div><div class="driver-perception__metric"><span>Demo Eye Blocker</span><strong data-demo-eye-blocker>DEMO_MODE_OFF</strong></div><div class="driver-perception__metric"><span>Re-arm State</span><strong data-demo-rearm>READY</strong></div><div class="driver-perception__metric"><span>MAR Valid</span><strong data-demo-mar>INVALID</strong></div><div class="driver-perception__metric"><span>Demo Yawn Candidate</span><strong data-demo-yawn-candidate>NO</strong></div><div class="driver-perception__metric"><span>Open Duration</span><strong data-demo-yawn-duration>0 ms</strong></div><div class="driver-perception__metric"><span>Demo Yawn Played</span><strong data-demo-yawn-played>NO</strong></div><div class="driver-perception__metric"><span>Demo Yawn Blocker</span><strong data-demo-yawn-blocker>DEMO_MODE_OFF</strong></div><div class="driver-perception__metric"><span>Existing Runtime Risk</span><strong data-demo-risk>NORMAL</strong></div><div class="driver-perception__metric"><span>Current Message (Voice Runtime)</span><strong data-demo-message>-</strong></div><div class="driver-perception__metric"><span>Playback (Voice Runtime)</span><strong data-demo-playback>IDLE</strong></div><div class="driver-perception__metric"><span>Last Reject Reason</span><strong data-demo-reject>-</strong></div>
+        </div>
+        <details><summary>Bounded RAM-only demo history</summary><pre data-demo-detail>{}</pre></details>
+      </section>
       <div class="driver-perception__notices">
         <span class="driver-perception__notice">LIVE CAMERA INPUT</span>
         <span class="driver-perception__notice">BROWSER-LOCAL PROCESSING</span>
@@ -337,7 +395,6 @@
         <span class="driver-perception__notice">NOT FOR OPERATIONAL USE</span>
         <span class="driver-perception__notice">DIAGNOSTIC ONLY</span>
         <span class="driver-perception__notice">THRESHOLDS UNCHANGED</span>
-        <span class="driver-perception__notice">NOT CONNECTED TO RISK RUNTIME YET</span>
       </div>
     </section>
 
@@ -789,6 +846,8 @@
   <script src="/static/js/driver_perception/perception_episode_validator.js"></script>
   <script src="/static/js/driver_perception/perception_threshold_comparator.js"></script>
   <script src="/static/js/driver_perception/driver_perception_runtime.js"></script>
+  <script src="/static/js/web_demo_warning.js"></script>
+  <script src="/static/js/customer_demo_simple_warning.js"></script>
   <script src="/static/js/driver_perception/guided_live_tuning.js"></script>
   <script src="/static/js/poc_functional_readiness.js"></script>
   <script src="/static/js/driver_perception/driver_camera_observation_bridge.js"></script>
@@ -857,24 +916,63 @@
       const bridge = new window.DriverPerception.DriverCameraObservationBridge({ perceptionRuntime: runtime });
       window.DriverCameraObservationBridgePage = bridge;
       const modeController = window.DriverRuntimePage.getInputModeController();
+      let latestNotification = null;
+      let startDiagnostic = { attempted: false, result: 'NOT_ATTEMPTED', blockedReason: null };
+      const unsubscribeResults = window.DriverRuntimePage.subscribeToResults(notification => { latestNotification = notification; render(); });
       modeController.registerSource({ sourceId: 'driver-deterministic-page', mode: window.DriverInputModeController.Mode.DETERMINISTIC_SIMULATION });
       const out = name => panel.querySelector(`[data-live-${name}]`);
       const context = () => ({ vehicleType: document.getElementById('driverVehicleType').value,
         vehicleId: document.getElementById('driverVehicleId').value, driverId: document.getElementById('driverId').value,
         driverAssignmentId: document.getElementById('driverAssignmentId').value });
+      const lifecycleContext = () => new window.DriverState.VehicleContext(context());
+      const cameraActive = state => [window.DriverPerception.States.RUNNING, window.DriverPerception.States.FACE_NOT_DETECTED].includes(state);
+      const readiness = expectedGeneration => runtime.getLiveBridgeReadiness(expectedGeneration);
+      const synchronizeBridge = (_snapshot, reason = 'CAMERA_RUNTIME_STATE_CHANGED', manual = false) => {
+        const camera = readiness();
+        const values = context(), contextAvailable = values.vehicleType && values.vehicleId && values.driverId && values.driverAssignmentId;
+        if (!contextAvailable) {
+          if (manual) startDiagnostic = { attempted: false, result: 'BLOCKED', blockedReason: 'TARGET_OR_ASSIGNMENT_UNAVAILABLE' };
+          return { ...camera, readyForLiveBridge: false, blockedReason: 'TARGET_OR_ASSIGNMENT_UNAVAILABLE' };
+        }
+        if (camera.readyForLiveBridge) {
+          const expected = lifecycleContext(), state = bridge.getState();
+          if (state.targetId && (state.targetId !== expected.targetId || state.boundRuntimeGeneration !== runtime.runtimeGeneration)) bridge.stop(state.targetId !== expected.targetId ? 'TARGET_OR_ASSIGNMENT_REPLACED' : 'RUNTIME_GENERATION_REPLACED');
+          try { const result = bridge.start(values, reason); startDiagnostic = { attempted: true, result: result.bridgeState, blockedReason: null }; }
+          catch (error) { startDiagnostic = { attempted: true, result: 'ERROR', blockedReason: 'BRIDGE_INITIALIZATION_ERROR', error: error?.message || String(error) }; }
+        } else {
+          if (manual) startDiagnostic = { attempted: false, result: 'BLOCKED', blockedReason: camera.blockedReason };
+          if (['STOPPING','STOPPED','ERROR','PERMISSION_REQUIRED','IDLE'].includes(camera.runtimeState)) bridge.stop(`CAMERA_RUNTIME_${camera.runtimeState}`);
+        }
+        return camera;
+      };
       const render = () => {
-        const state = bridge.getState(); const targetId = state.targetId;
+        const state = bridge.getState(); const targetId = state.targetId, camera = readiness(state.boundRuntimeGeneration ?? runtime.runtimeGeneration);
         const runtimeState = targetId ? window.DriverRuntimePage.getRuntimeSnapshot(targetId) : null;
-        out('mode').textContent = runtimeState?.inputMode || 'STOPPED'; out('status').textContent = state.status;
+        const rawMode = runtimeState?.inputMode || 'STOPPED', inputMode = rawMode === 'LIVE_WEBCAM' ? 'LIVE_CAMERA' : (rawMode === 'DETERMINISTIC_SIMULATION' ? 'DETERMINISTIC_FIXTURE' : rawMode);
+        out('mode').textContent = inputMode; out('status').textContent = state.bridgeState;
         out('ownership').textContent = state.ownershipTokenActive ? 'ACTIVE' : 'INACTIVE'; out('target').textContent = targetId || '-';
         out('snapshot').textContent = state.lastObservation?.metadata?.driverMetricSnapshotId || '-';
         out('observation').textContent = state.lastObservation?.observationId || '-';
         out('risk').textContent = state.lastResult?.riskEvent?.state || 'NORMAL';
         out('triples').textContent = String(window.RuntimeTripleEngine.getRuntimeTriples().length);
-        out('result').textContent = JSON.stringify({ bridge: state, runtime: runtimeState }, null, 2);
+        out('camera-state').textContent = camera.runtimeState; out('owner').textContent = state.bridgeOwner || '-';
+        out('subscription').textContent = state.subscriptionActive ? 'YES' : 'NO'; out('generation').textContent = `${state.boundRuntimeGeneration ?? '-'} / ${state.currentRuntimeGeneration ?? '-'}`;
+        out('notification').textContent = latestNotification?.notificationId || '-';
+        const scenario = targetId ? window.DriverVoiceScenarioPage?.runtime?.getState(targetId) : null, voice = window.VoiceInteractionPage?.orchestrator?.getHistory(targetId).at(-1), audio = window.VoiceInteractionPage?.audio?.getState();
+        out('scenario').textContent = `${scenario?.currentScenario || '-'} / ${voice?.messageCode || audio?.currentMessageCode || '-'}`;
+        out('playback').textContent = audio?.playbackState || 'IDLE'; out('reasons').textContent = `${state.lastStartReason || '-'} / ${state.lastStopReason || '-'}`;
+        const automaticReady = cameraActive(runtime.state) && state.bridgeState === 'RUNNING' && state.subscriptionActive && state.source === 'LIVE_WEBCAM' && state.boundRuntimeGeneration === state.currentRuntimeGeneration;
+        out('automatic').textContent = automaticReady ? 'AUTOMATIC_LIVE_BRIDGE_READY' : 'NOT_READY';
+        out('start-attempted').textContent = startDiagnostic.attempted ? 'YES' : 'NO'; out('start-result').textContent = startDiagnostic.result;
+        out('blocked-reason').textContent = startDiagnostic.blockedReason || '-'; out('camera-source').textContent = 'DRIVER_PERCEPTION_RUNTIME';
+        out('readiness-source').textContent = camera.stateSource; out('authoritative-stream').textContent = `${camera.streamPresent ? 'YES' : 'NO'} / ${camera.streamSource}`;
+        out('authoritative-track').textContent = `${camera.videoTrackState || '-'} / enabled=${camera.trackEnabled ?? '-'}`;
+        const synchronization = camera.generationMatch === false ? 'GENERATION_MISMATCH' : (camera.readyForLiveBridge ? (automaticReady ? 'SYNCHRONIZED_READY' : 'STATE_SOURCE_MISMATCH') : (camera.runtimeActive ? 'WAITING_FOR_CAMERA' : 'SYNCHRONIZED_STOPPED'));
+        out('synchronization').textContent = synchronization;
+        out('result').textContent = JSON.stringify({ bridge: state, cameraReadiness: camera, startDiagnostic, runtime: runtimeState }, null, 2);
       };
-      panel.querySelector('[data-live-bridge-start]').addEventListener('click', () => { bridge.start(context()); render(); });
-      panel.querySelector('[data-live-bridge-stop]').addEventListener('click', () => { bridge.stop(); render(); });
+      panel.querySelector('[data-live-bridge-start]').addEventListener('click', () => { synchronizeBridge({ state: runtime.state }, 'DEVELOPMENT_DIAGNOSTIC_BUTTON', true); render(); });
+      panel.querySelector('[data-live-bridge-stop]').addEventListener('click', () => { bridge.stop('DEVELOPMENT_DIAGNOSTIC_BUTTON'); render(); });
       panel.querySelector('[data-live-bridge-ack]').addEventListener('click', () => { const id = bridge.getState().lastResult?.riskEvent?.eventId; if (id) window.DriverRuntimePage.acknowledgeRisk(id); render(); });
       panel.querySelector('[data-live-bridge-reset]').addEventListener('click', () => { bridge.resetTarget(); render(); });
       document.getElementById('driverStateTestForm').addEventListener('submit', event => {
@@ -888,7 +986,12 @@
         render();
       }, true);
       panel.querySelector('[data-live-bridge-simulation]').addEventListener('click', () => { document.getElementById('drowsinessTestButton').click(); render(); });
-      runtime.onMetricSnapshot(render); render();
+      runtime.subscribe(snapshot => { synchronizeBridge(snapshot); render(); });
+      runtime.onMetricSnapshot(render);
+      window.addEventListener('pagehide', () => { unsubscribeResults(); bridge.destroy('PAGE_TEARDOWN'); }, { once: true });
+      render();
+      synchronizeBridge({ state: runtime.state }, 'INITIAL_LIFECYCLE_RECONCILIATION');
+      render();
       const recorderPanel = root.querySelector('[data-recorder-panel]');
       const recorder = new window.DriverPerception.PerceptionDatasetRecorder({ runtime, runtimeStateProvider: () => {
         const bridgeState = bridge.getState(); const targetId = bridgeState.targetId;
@@ -934,6 +1037,13 @@
   <script>
     (()=>{const panel=document.getElementById('driverAttentionRuntimePanel'),field=name=>panel.querySelector(`[data-attention-${name}]`);if(!panel)return;let targetId=null,latest=null,sequence=0;const runtime=new window.DriverAttentionRuntime.Runtime({identityRegistry:window.RuntimeIdentityRegistryPage.registry,fusionEngine:window.MultiHazardFusionPage,confidenceEngine:window.RuntimeConfidencePage.engine});const render=result=>{latest=result||latest;const m=latest?.measurement,o=latest?.observation,r=latest?.riskEvent,f=latest?.fusion?.compositeRisk,c=latest?.confidence?.runtimeConfidence,rec=latest?.confidence?.confidenceRecommendation;field('status').textContent=latest?.attentionState||'UNKNOWN';field('direction').textContent=m?.gazeDirection||'UNKNOWN';field('offroad').textContent=`${m?.offRoadDurationMs||0} ms`;field('recommendation').textContent=rec?.decisionMode||((latest?.attentionState==='DISTRACTED')?'VERIFY FIRST':'MONITOR');field('gaze').textContent=`${m?.gazeDirection||'UNKNOWN'} / ${m?.gazeSource||'UNKNOWN'}`;field('head').textContent=m?.headDirection||'UNKNOWN';field('zone').textContent=m?.roadAttentionZone||'UNKNOWN';field('duration').textContent=`${m?.glanceDurationMs||0} / ${m?.offRoadDurationMs||0} ms`;field('forward').textContent=`${m?.forwardAttentionDurationMs||0} ms`;field('face').textContent=`${m?.faceDetected===true} / ${m?.landmarkValid===true}`;field('valid').textContent=`${m?.gazeValid===true} / ${m?.headPoseValid===true}`;field('confidence').textContent=m?.measurementConfidence==null?'UNKNOWN':m.measurementConfidence.toFixed(2);field('quality').textContent=`${JSON.stringify(m?.quality||{})} / ${(o?.metadata?.reasonCodes||[]).join(', ')||'NONE'}`;field('target').textContent=m?.canonicalTargetId||'-';field('observation').textContent=o?.observationId||'-';field('risk').textContent=r?.eventId||'-';field('fusion').textContent=f?.priorityBand||'NORMAL';field('runtime-confidence').textContent=c?.confidenceBand||'UNKNOWN';field('detail-recommendation').textContent=rec?.decisionMode||'VERIFY FIRST';field('detail').textContent=JSON.stringify(latest||{},null,2)};const run=()=>{let identity=window.RuntimeIdentityRegistryPage.getActiveIdentity()||window.RuntimeIdentityRegistryPage.register(),sensorId='ATTENTION-FIXTURE';const attached=window.RuntimeIdentityRegistryPage.adapter.adapt({runtimeSource:'DRIVER_CAMERA',vehicleId:identity.vehicleId,sensorId,sourceTargetId:`attention:${identity.canonicalTargetId}`,ownershipToken:identity.ownershipToken});identity=attached.identity||identity;targetId=identity.canonicalTargetId;const base=Date.now(),input=(timestamp,duration,direction='DOWN',zone='DOWN_OFF_ROAD')=>({measurementId:`attention-fixture-${++sequence}`,timestamp:new Date(timestamp).toISOString(),sensorId,sourceType:'FIXTURE',targetId,canonicalTargetId:targetId,gazeDirection:direction,gazeSource:'FIXTURE',headDirection:direction==='FORWARD'?'CENTER':direction,roadAttentionZone:zone,glanceDurationMs:duration,offRoadDurationMs:duration,forwardAttentionDurationMs:direction==='FORWARD'?duration:0,faceDetected:true,landmarkValid:true,gazeValid:true,headPoseValid:true,pitch:direction==='DOWN'?12:0,yaw:0,roll:0,measurementConfidence:.82,sampleAgeMs:0,sensorConnected:true,quality:{fixture:true,zoneValidationStatus:'DEVELOPMENT_UNVALIDATED_ATTENTION_ZONE_CANDIDATE'},simulation:true});runtime.ingest(input(base,0,'FORWARD','ROAD_FORWARD'));runtime.ingest(input(base+100,100));latest=runtime.ingest(input(base+2000,2000),{context:{vehicleMotionAvailable:true,turnStateAvailable:true,relatedHazardAvailable:false}});render(latest);return latest};field('run').addEventListener('click',run);field('ack').addEventListener('click',()=>{if(targetId)runtime.acknowledge(targetId);render(runtime.getLatest(targetId))});field('reset').addEventListener('click',()=>{if(targetId)runtime.reset(targetId);latest=null;render(null)});field('export').addEventListener('click',()=>{if(!targetId)return;const blob=new Blob([runtime.exportJSON(targetId)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='driver-attention-runtime.json';a.click();URL.revokeObjectURL(url)});window.DriverAttentionRuntimePage=Object.freeze({runtime,run,getLatest:()=>latest});render(null)})();
     (()=>{const panel=document.getElementById('alcoholSensorRuntimePanel'),field=name=>panel.querySelector(`[data-alcohol-${name}]`);if(!panel)return;let targetId=null,latest=null,sequence=0;const runtime=new window.AlcoholSensorRuntime.Runtime({identityRegistry:window.RuntimeIdentityRegistryPage.registry,runtimePage:window.DriverRuntimePage,fusionEngine:window.MultiHazardFusionPage,confidenceEngine:window.RuntimeConfidencePage.engine});const render=result=>{latest=result||latest;const m=latest?.measurement,r=latest?.runtimeResult?.riskSignal,f=latest?.fusion?.compositeRisk,c=latest?.confidence?.confidenceRecommendation;field('sensor-type').textContent=m?.sensorType||'UNKNOWN';field('bac').textContent=m?.bac==null?'UNKNOWN':String(m.bac);field('brac').textContent=m?.brac==null?'UNKNOWN':String(m.brac);field('unit').textContent=m?.unit||'UNKNOWN';field('confidence').textContent=m?.measurementConfidence==null?'UNKNOWN':m.measurementConfidence.toFixed(2);field('health').textContent=m?.sensorHealth||'UNKNOWN';field('freshness').textContent=m?(m.quality?.sampleFresh?'FRESH':'STALE'):'UNKNOWN';field('risk').textContent=r?.policyStatus||r?.reason||'NORMAL';field('fusion').textContent=f?.priorityBand||'NORMAL';field('recommendation').textContent=c?.decisionMode||'VERIFY FIRST';field('detail').textContent=JSON.stringify(latest||{},null,2)};const run=()=>{let identity=window.RuntimeIdentityRegistryPage.getActiveIdentity()||window.RuntimeIdentityRegistryPage.register(),sensorId='ALCOHOL-FIXTURE';const attached=window.RuntimeIdentityRegistryPage.adapter.adapt({runtimeSource:'ALCOHOL_SENSOR',vehicleId:identity.vehicleId,sensorId,sourceTargetId:`alcohol:${identity.canonicalTargetId}`,ownershipToken:identity.ownershipToken});identity=attached.identity||identity;targetId=identity.canonicalTargetId;const base=Date.now(),input=timestamp=>({measurementId:`alcohol-fixture-${++sequence}`,timestamp:new Date(timestamp).toISOString(),sensorId,sensorType:'FIXTURE',targetId,bac:.08,brac:null,unit:'BAC',measurementConfidence:.94,sensorTemperature:24,sensorHealth:'ONLINE',sampleAgeMs:0,simulation:true});runtime.ingest(input(base));latest=runtime.ingest(input(base+400));render(latest);return latest};field('run').addEventListener('click',run);field('ack').addEventListener('click',()=>{const id=latest?.runtimeResult?.riskEvent?.eventId;if(id)runtime.acknowledge(id)});field('reset').addEventListener('click',()=>{if(targetId)runtime.reset(targetId);latest=null;render(null)});field('export').addEventListener('click',()=>{if(!targetId)return;const blob=new Blob([runtime.exportJSON(targetId)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='alcohol-sensor-runtime.json';a.click();URL.revokeObjectURL(url)});window.AlcoholSensorRuntimePage=Object.freeze({runtime,run,getLatest:()=>latest});render(null)})();
+  </script>
+  <script>
+    window.addEventListener('driver-camera-throttled', () => {
+      const page = window.PerceptionValidationPage;
+      if (page?.runtime?.getState?.().session?.state === 'RECORDING') page.runtime.pause();
+      page?.render?.();
+    });
   </script>
 </body>
 </html>

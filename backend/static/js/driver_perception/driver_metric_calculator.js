@@ -27,6 +27,9 @@
             this.blinkEpisodeSequence = 0;
             this.lastAcceptedEpisodeId = null;
             this.lastRejectedEpisodeId = null;
+            this.longClosureCount = 0;
+            this.longClosureEpisodeSequence = 0;
+            this.lastLongClosureEpisodeId = null;
         }
 
         _newEyeState() {
@@ -77,7 +80,9 @@
             const oneEyeOnly = (leftClosing || rightClosing) && leftClosing !== rightClosing;
             const invalid = left.state === 'INVALID' || right.state === 'INVALID';
             let accepted = false, rejected = false, rejectReason = null, episodeState = this.blinkEpisode.state;
+            let longClosureAccepted = false, longClosureRejectReason = null;
             const reject = reason => { rejected = true; rejectReason = reason; episodeState = 'REJECTED';
+                if (['LONG_CLOSED', 'REOPENING_LONG'].includes(this.blinkEpisode.state)) longClosureRejectReason = reason;
                 this.lastRejectedEpisodeId = `blink-v2-${++this.blinkEpisodeSequence}`;
                 this.blinkEpisode = { ...this._newBlinkEpisode(), state: 'REARM_PENDING', rearmStartedAt: null, countBefore: this.blinkCount }; };
             if (invalid && !['ARMED', 'REARM_PENDING'].includes(this.blinkEpisode.state)) reject('EYE_QUALITY_DEGRADED');
@@ -105,8 +110,18 @@
                 else if (bothOpen) reject('BLINK_TOO_SHORT');
             } else if (!rejected && this.blinkEpisode.state === 'CLOSED') {
                 const duration = timestamp - this.blinkEpisode.closureStartedAt;
-                if (duration > config.maximumEpisodeDurationMs) reject('BLINK_TOO_LONG');
+                if (duration > config.maximumEpisodeDurationMs) { this.blinkEpisode.state = 'LONG_CLOSED'; episodeState = 'LONG_CLOSED'; }
                 else if (!bothClosed) { this.blinkEpisode.state = 'REOPENING_PENDING'; this.blinkEpisode.recoveryStartedAt = timestamp; }
+            } else if (!rejected && this.blinkEpisode.state === 'LONG_CLOSED') {
+                if (!bothClosed) { this.blinkEpisode.state = 'REOPENING_LONG'; this.blinkEpisode.recoveryStartedAt = timestamp; }
+            } else if (!rejected && this.blinkEpisode.state === 'REOPENING_LONG') {
+                const duration = (this.blinkEpisode.recoveryStartedAt ?? timestamp) - this.blinkEpisode.closureStartedAt;
+                if (oneEyeOnly && timestamp - this.blinkEpisode.recoveryStartedAt > config.bilateralCorrelationMs) reject('RECOVERY_INCOMPLETE');
+                else if (bothOpen) {
+                    this.longClosureCount += 1; this.lastClosureDurationMs = duration; longClosureAccepted = true; episodeState = 'ACCEPTED';
+                    this.lastLongClosureEpisodeId = `long-closure-v2-${++this.longClosureEpisodeSequence}`;
+                    this.blinkEpisode = { ...this._newBlinkEpisode(), state: 'REARM_PENDING', rearmStartedAt: timestamp, countBefore: this.blinkCount };
+                }
             } else if (!rejected && this.blinkEpisode.state === 'REOPENING_PENDING') {
                 const duration = (this.blinkEpisode.recoveryStartedAt ?? timestamp) - this.blinkEpisode.closureStartedAt;
                 if (oneEyeOnly && timestamp - this.blinkEpisode.recoveryStartedAt > config.bilateralCorrelationMs) reject('RECOVERY_INCOMPLETE');
@@ -128,10 +143,15 @@
                 lastBlinkDurationMs: this.lastBlinkDurationMs, lastClosureDurationMs: this.lastClosureDurationMs,
                 blinkCandidate: ['CLOSING_PENDING', 'CLOSED', 'REOPENING_PENDING'].includes(episode.state), blinkAccepted: accepted,
                 blinkRejected: rejected, blinkRejectReason: rejectReason, blinkEpisodeState: episodeState, blinkArmed: episode.state === 'ARMED',
+                longClosureCandidate: ['LONG_CLOSED', 'REOPENING_LONG'].includes(episode.state), longClosureAccepted,
+                longClosureEpisodeId: this.lastLongClosureEpisodeId, longClosureState: longClosureAccepted ? 'ACCEPTED' : (longClosureRejectReason ? 'REJECTED' : (['LONG_CLOSED', 'REOPENING_LONG'].includes(episode.state) ? episode.state : 'IDLE')),
+                longClosureDurationMs: longClosureAccepted ? this.lastClosureDurationMs : (['LONG_CLOSED', 'REOPENING_LONG'].includes(episode.state) && episode.closureStartedAt !== null ? timestamp - episode.closureStartedAt : 0),
+                longClosureCount: this.longClosureCount, longClosureRejectReason,
                 leftEyeState: left.state, rightEyeState: right.state, leftSmoothedClosureRatio: left.smoothedRatio, rightSmoothedClosureRatio: right.smoothedRatio,
                 leftEyeStateDurationMs: left.stateSince === null ? 0 : timestamp - left.stateSince, rightEyeStateDurationMs: right.stateSince === null ? 0 : timestamp - right.stateSince,
                 leftCloseStartedAt: episode.leftCloseStartedAt, rightCloseStartedAt: episode.rightCloseStartedAt, bilateralCorrelationMs: correlation,
                 recoveryDurationMs: episode.recoveryStartedAt === null ? 0 : timestamp - episode.recoveryStartedAt,
+                recoveryStartedAt: episode.recoveryStartedAt,
                 rearmDurationMs: episode.rearmStartedAt === null ? 0 : timestamp - episode.rearmStartedAt,
                 countBefore: before, countAfter: this.blinkCount, lastAcceptedEpisodeId: this.lastAcceptedEpisodeId,
                 lastRejectedEpisodeId: this.lastRejectedEpisodeId, oneEyeOnly, frameDeltaMs: frameGapMs,
@@ -341,9 +361,9 @@
             const earValid = leftEarValid && rightEarValid;
             const rawEar = earValid ? (leftEAR + rightEAR) / 2 : null;
             const ear = earValid ? this._smooth('ear', rawEar) : null;
-            const sessionMismatch = Boolean(calibrationState?.calibrationSessionId) &&
+            const sessionMismatch = Boolean(calibrationState?.baselineSourceSessionId) &&
                 calibrationState?.baselineSourceSessionId !== calibrationState.calibrationSessionId;
-            const generationMismatch = Number.isInteger(calibrationState?.calibrationGeneration) &&
+            const generationMismatch = Number.isInteger(calibrationState?.baselineSourceGeneration) &&
                 calibrationState?.baselineSourceGeneration !== calibrationState.calibrationGeneration;
             const runtimeGenerationMismatch = Number.isInteger(calibrationState?.runtimeGeneration) && Number.isInteger(calibrationState?.currentRuntimeGeneration) &&
                 calibrationState.runtimeGeneration !== calibrationState.currentRuntimeGeneration;
@@ -357,7 +377,8 @@
             let eyeClosed = calibrated && earValid ? (relativeReady ? (leftClosureRatio + rightClosureRatio) / 2 < relativeThreshold : ear < calibrationState.threshold) : null;
             let oneEyeOnly = calibrated && earValid && leftEyeClosed !== rightEyeClosed;
             let bothEyesClosed = leftEyeClosed === true && rightEyeClosed === true;
-            const frameDeltaMs = this.lastFrameTimestamp === null ? null : usableTimestamp - this.lastFrameTimestamp;
+            const previousFrameTimestamp = this.lastFrameTimestamp;
+            const frameDeltaMs = previousFrameTimestamp === null ? null : usableTimestamp - previousFrameTimestamp;
             const blink = calibrated && relativeReady && this.config.blinkRearm
                 ? this._updateBlinkV2(usableTimestamp, { leftRatio: leftClosureRatio, rightRatio: rightClosureRatio,
                     leftValid: calibrated && leftEarValid, rightValid: calibrated && rightEarValid, frameGapMs: frameDeltaMs })
@@ -414,11 +435,13 @@
                 geometryVersion: geometryV2 ? 'PERCEPTION_GEOMETRY_V2' : 'PERCEPTION_GEOMETRY_V1',
                 calibrationSessionId: calibrationState?.calibrationSessionId || null,
                 calibrationGeneration: calibrationState?.calibrationGeneration ?? null,
+                generation: calibrationState?.runtimeGeneration ?? calibrationState?.calibrationGeneration ?? null,
                 baselineSourceSessionId: calibrationState?.baselineSourceSessionId || null,
                 baselineSourceGeneration: calibrationState?.baselineSourceGeneration ?? null,
                 calibrationSessionMatch: !sessionMismatch, calibrationGenerationMatch: !generationMismatch && !runtimeGenerationMismatch,
                 geometryDimensionsValid, geometryFallback: geometryV2 && !geometryDimensionsValid ? 'V2_DIMENSIONS_UNAVAILABLE' : null,
                 ...blink, blinkRejectReason: blinkDiagnosticReason, blinkRejectReasons: Object.freeze([...new Set(blinkRejectReasons)]),
+                previousFrameTimestamp,
                 blinkRecoveryDurationMs: blink.recoveryDurationMs ?? null,
                 blinkRearmDurationMs: blink.rearmDurationMs ?? null,
                 blinkRearmConfigVersion: relativeReady ? this.config.blinkRearm?.version : null,
@@ -450,6 +473,9 @@
             this.blinkEpisodeSequence = 0;
             this.lastAcceptedEpisodeId = null;
             this.lastRejectedEpisodeId = null;
+            this.longClosureCount = 0;
+            this.longClosureEpisodeSequence = 0;
+            this.lastLongClosureEpisodeId = null;
         }
     }
 

@@ -4,11 +4,14 @@
     const namespace = global.DriverPerception = global.DriverPerception || {};
 
     class FaceLandmarkAdapter {
-        constructor({ config, faceMeshFactory, scriptLoader, clock } = {}) {
+        constructor({ config, faceMeshFactory, scriptLoader, clock, monotonicClock, timeOrigin } = {}) {
             this.config = config || namespace.Config?.mediaPipe;
             this.faceMeshFactory = faceMeshFactory || null;
             this.scriptLoader = scriptLoader || FaceLandmarkAdapter.loadScript;
             this.clock = clock || (() => Date.now());
+            this.monotonicClock = monotonicClock || (() => global.performance?.now?.() ?? Date.now());
+            this.timeOrigin = Number.isFinite(timeOrigin) ? timeOrigin
+                : (Number.isFinite(global.performance?.timeOrigin) ? global.performance.timeOrigin : Date.now() - this.monotonicClock());
             this.faceMesh = null;
             this.initialized = false;
             this.generation = 0;
@@ -19,6 +22,10 @@
             this.loaderState = 'NOT_STARTED';
             this.missingAssetFilename = null;
             this.initializationError = null;
+            this.frameSequence = 0;
+            this.resultSequence = 0;
+            this.duplicateResultCount = 0;
+            this.droppedResultEstimate = 0;
         }
 
         static loadScript(url) {
@@ -105,29 +112,50 @@
             return this.generation;
         }
 
-        async process(videoElement) {
+        async process(videoElement, videoFrameMetadata = null) {
             if (!this.callback || !this.faceMesh) return false;
             const generation = this.generation;
-            const startedAt = this.clock();
-            this.pendingFrame = { generation, startedAt };
+            const submissionTimestampMs = this.monotonicClock();
+            const metadataTimestamp = Number(videoFrameMetadata?.expectedDisplayTime);
+            const captureTimestampMs = Number.isFinite(metadataTimestamp) ? metadataTimestamp : submissionTimestampMs;
+            const timestampSource = Number.isFinite(metadataTimestamp)
+                ? 'VIDEO_FRAME_EXPECTED_DISPLAY_TIME' : 'PERFORMANCE_NOW_AT_SUBMISSION';
+            if (this.pendingFrame) this.droppedResultEstimate += 1;
+            this.pendingFrame = { generation, captureTimestampMs, submissionTimestampMs, timestampSource,
+                frameSequence: ++this.frameSequence, mediaTimeMs: Number.isFinite(videoFrameMetadata?.mediaTime) ? videoFrameMetadata.mediaTime * 1000 : null };
             await this.faceMesh.send({ image: videoElement });
             return generation === this.generation;
         }
 
         _handleResults(results) {
             const pending = this.pendingFrame;
-            if (!pending || pending.generation !== this.generation || !this.callback) return;
+            const resultCallbackTimestampMs = this.monotonicClock();
+            if (!pending || pending.generation !== this.generation || !this.callback) {
+                this.duplicateResultCount += 1;
+                return;
+            }
             this.pendingFrame = null;
+            this.resultSequence += 1;
             const faces = Array.isArray(results?.multiFaceLandmarks) ? results.multiFaceLandmarks : [];
             const landmarks = faces.length > 0 ? faces[0] : null;
             this.callback(Object.freeze({
-                timestamp: new Date(this.clock()).toISOString(),
+                timestamp: new Date(this.timeOrigin + pending.captureTimestampMs).toISOString(),
+                captureTimestampMs: pending.captureTimestampMs,
+                submissionTimestampMs: pending.submissionTimestampMs,
+                resultCallbackTimestampMs,
+                timestampSource: pending.timestampSource,
+                callbackLatencyMs: Math.max(0, resultCallbackTimestampMs - pending.submissionTimestampMs),
+                frameSequence: pending.frameSequence,
+                mediaTimeMs: pending.mediaTimeMs,
+                duplicateResult: false,
+                duplicateResultCount: this.duplicateResultCount,
+                droppedResultEstimate: this.droppedResultEstimate,
                 cameraId: this.cameraId,
                 faceDetected: Boolean(landmarks),
                 landmarks: landmarks || null,
                 imageWidth: this.imageSize.width,
                 imageHeight: this.imageSize.height,
-                processingTimeMs: Math.max(0, this.clock() - pending.startedAt),
+                processingTimeMs: Math.max(0, resultCallbackTimestampMs - pending.submissionTimestampMs),
                 status: landmarks ? 'LANDMARKS_AVAILABLE' : 'FACE_NOT_DETECTED'
             }));
         }

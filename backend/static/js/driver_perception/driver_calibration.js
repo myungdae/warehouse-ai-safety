@@ -37,11 +37,18 @@
 
     class DriverCalibration {
         constructor(config = {}) {
-            this.config = config;
+            this.config = { calibrationMode: 'BOUNDED_ADAPTIVE',
+                minimumCollectionMs: config.durationMs ?? 3000, maximumCollectionMs: 10000,
+                rollingEvaluationWindowMs: 3000, passingConfirmationMs: 500,
+                minimumPassingEvaluations: 3, ...config };
             this.calibrationGeneration = 0;
             this.calibrationSessionId = null;
             this.auditHistory = [];
             this.lastResetSource = null;
+            this.lastStartSource = null;
+            this.lastAcceptedFrameSequence = null;
+            this.lastRejectedFrameSequence = null;
+            this.lastRejectReason = null;
             this.lastStateWriter = 'CONSTRUCTOR';
             this.lastStateTransition = 'NONE';
             this.reset(false);
@@ -61,6 +68,12 @@
             if (eventType) this._audit(eventType, { previousState: previous, state });
         }
 
+        bindRuntimeGeneration(runtimeGeneration) {
+            if (!Number.isInteger(runtimeGeneration) || runtimeGeneration < 0) return this.getState();
+            this.runtimeGeneration = runtimeGeneration;
+            return this.getState();
+        }
+
         start(timestamp = Date.now(), identity = {}) {
             if (![CalibrationStates.NOT_STARTED, CalibrationStates.RESETTING].includes(this.state)) {
                 this._audit('CALIBRATION_START_IGNORED', { source: identity.source || 'START_CALIBRATION', reason: 'EXPLICIT_RESET_REQUIRED' });
@@ -71,6 +84,7 @@
             this.canonicalTargetId = identity.canonicalTargetId ?? this.canonicalTargetId ?? null;
             this.assignmentId = identity.assignmentId ?? this.assignmentId ?? null;
             this.runtimeGeneration = Number.isInteger(identity.runtimeGeneration) ? identity.runtimeGeneration : (this.runtimeGeneration || 0);
+            this.lastStartSource = identity.source || 'START_CALIBRATION';
             this.baselineSourceSessionId = null;
             this.baselineSourceGeneration = null;
             this._audit('CALIBRATION_SESSION_CREATED', { source: identity.source || 'START_CALIBRATION' });
@@ -78,6 +92,7 @@
             this.startedAt = Number(timestamp);
             this.completedAt = null;
             this.samples = [];
+            this.acceptedFrames = [];
             this.leftSamples = [];
             this.rightSamples = [];
             this.pitchSamples = [];
@@ -92,6 +107,11 @@
             this.rightRejectedSampleCount = 0;
             this.eyeCalibrationReasonCodes = [];
             this.calibrationQualityState = 'COLLECTING';
+            this.passingStartedAt = null;
+            this.consecutivePassingEvaluations = 0;
+            this.selectedAcceptedInterval = null;
+            this.timeoutReason = null;
+            this.earlyCompletionReason = null;
             this.baseline = null;
             this.threshold = null;
             return this.getState(timestamp);
@@ -99,10 +119,14 @@
 
         addSample(ear, { valid = true, leftEAR = null, rightEAR = null, pitch = null, yaw = null, roll = null,
             mar = null, marValid = false, marRejectReason = null, timestamp = Date.now(),
+            frameSequence = null,
             expectedCalibrationSessionId = this.calibrationSessionId,
             expectedCalibrationGeneration = this.calibrationGeneration } = {}) {
             if (expectedCalibrationSessionId !== this.calibrationSessionId || expectedCalibrationGeneration !== this.calibrationGeneration) {
                 this.lastStateWriter = 'STALE_CALLBACK_REJECTED';
+                this.lastRejectedFrameSequence = frameSequence;
+                this.lastRejectReason = expectedCalibrationSessionId !== this.calibrationSessionId
+                    ? 'CALIBRATION_SESSION_MISMATCH' : 'CALIBRATION_GENERATION_MISMATCH';
                 this._audit('STALE_CALIBRATION_CALLBACK_REJECTED', { expectedCalibrationSessionId, expectedCalibrationGeneration });
                 return this.getState(timestamp);
             }
@@ -113,9 +137,21 @@
             const openCandidate = geometryV2
                 ? finite && finitePositive(leftEAR) && finitePositive(rightEAR)
                 : finite && value >= (this.config.minimumOpenEar || 0);
-            if (!valid || !openCandidate) this.rejectedSampleCount += 1;
+            if (!valid || !openCandidate) {
+                this.rejectedSampleCount += 1;
+                this.lastRejectedFrameSequence = frameSequence;
+                this.lastRejectReason = !valid ? 'FACE_OR_EAR_INVALID' : 'OPEN_EYE_SAMPLE_INVALID';
+            }
             else {
                 this.samples.push(value);
+                this.acceptedFrames.push(Object.freeze({ timestamp: Number(timestamp), ear: value,
+                    leftEAR: finitePositive(leftEAR) ? Number(leftEAR) : null,
+                    rightEAR: finitePositive(rightEAR) ? Number(rightEAR) : null,
+                    pitch: Number.isFinite(pitch) ? Number(pitch) : null,
+                    yaw: Number.isFinite(yaw) ? Number(yaw) : null,
+                    roll: Number.isFinite(roll) ? Number(roll) : null }));
+                this.lastAcceptedFrameSequence = frameSequence;
+                this.lastRejectReason = null;
                 if (this.config.profileVersion === 'PERCEPTION_GEOMETRY_V2' && finitePositive(leftEAR) && finitePositive(rightEAR)) {
                     this.leftSamples.push(leftEAR);
                     this.rightSamples.push(rightEAR);
@@ -136,14 +172,60 @@
                 this.lastMouthRejectReason = mouthRejectReason;
                 this.mouthRejectReasons[mouthRejectReason] = (this.mouthRejectReasons[mouthRejectReason] || 0) + 1;
             }
-            if (Number(timestamp) - this.startedAt >= this.config.durationMs) this.complete(timestamp);
+            const at = Number(timestamp), elapsedMs = at - this.startedAt;
+            if (elapsedMs >= this.config.minimumCollectionMs) {
+                const diagnostics = this._completionDiagnostics(at);
+                const currentEvidenceValid = valid && openCandidate;
+                if (currentEvidenceValid && diagnostics.readyIfCompletedNow) {
+                    if (this.passingStartedAt === null) this.passingStartedAt = at;
+                    this.consecutivePassingEvaluations += 1;
+                    const confirmationMs = at - this.passingStartedAt;
+                    if (confirmationMs >= this.config.passingConfirmationMs &&
+                        this.consecutivePassingEvaluations >= this.config.minimumPassingEvaluations) {
+                        this.earlyCompletionReason = 'SUSTAINED_SIMULTANEOUS_ALL_GATES_PASS';
+                        this.complete(at, { interval: diagnostics.rollingWindow, diagnostics });
+                    }
+                } else {
+                    this.passingStartedAt = null;
+                    this.consecutivePassingEvaluations = 0;
+                }
+                if (this.state === CalibrationStates.COLLECTING && elapsedMs >= this.config.maximumCollectionMs) {
+                    this.timeoutReason = 'MAXIMUM_COLLECTION_DURATION_REACHED';
+                    this.complete(at, { interval: diagnostics.rollingWindow, diagnostics, timeout: true });
+                }
+            }
             return this.getState(timestamp);
         }
 
-        complete(timestamp = Date.now()) {
+        complete(timestamp = Date.now(), { interval = null, diagnostics = null, timeout = false } = {}) {
             if (this.state !== CalibrationStates.COLLECTING) return this.getState(timestamp);
+            if (!timeout && (Number(timestamp) - this.startedAt < this.config.minimumCollectionMs || !diagnostics ||
+                diagnostics.persistentBlockers.length || this.consecutivePassingEvaluations < this.config.minimumPassingEvaluations ||
+                Number(timestamp) - this.passingStartedAt < this.config.passingConfirmationMs)) return this.getState(timestamp);
             this.completedAt = Number(timestamp);
-            if (this.samples.length < this.config.minimumSamples) {
+            const frames = interval ? this.acceptedFrames.filter(frame => frame.timestamp >= interval.startAt && frame.timestamp <= interval.endAt)
+                : this.acceptedFrames.slice();
+            const samples = frames.map(frame => frame.ear).filter(finitePositive);
+            const leftSamples = frames.map(frame => frame.leftEAR).filter(finitePositive);
+            const rightSamples = frames.map(frame => frame.rightEAR).filter(finitePositive);
+            const pitchSamples = frames.map(frame => frame.pitch).filter(Number.isFinite);
+            const yawSamples = frames.map(frame => frame.yaw).filter(Number.isFinite);
+            const rollSamples = frames.map(frame => frame.roll).filter(Number.isFinite);
+            this.selectedAcceptedInterval = interval ? Object.freeze({ ...interval, sampleCount: frames.length }) : null;
+            if (timeout && diagnostics && !diagnostics.readyIfCompletedNow) {
+                const blockers = diagnostics.persistentBlockers || diagnostics.blockers || [];
+                const reasonMap = { leftStabilityAcceptable: 'LEFT_EYE_STABILITY_UNACCEPTABLE',
+                    rightStabilityAcceptable: 'RIGHT_EYE_STABILITY_UNACCEPTABLE',
+                    leftOpenSampleMinimum: 'INSUFFICIENT_LEFT_OPEN_EYE_SAMPLES',
+                    rightOpenSampleMinimum: 'INSUFFICIENT_RIGHT_OPEN_EYE_SAMPLES',
+                    combinedSampleMinimum: 'INSUFFICIENT_OPEN_EYE_SAMPLES',
+                    combinedBaselineAcceptable: 'BASELINE_UNACCEPTABLE', poseBaselinesFinite: 'POSE_BASELINE_UNAVAILABLE' };
+                this.eyeCalibrationReasonCodes.push(...blockers.map(blocker => reasonMap[blocker] || blocker));
+                this.calibrationQualityState = 'CALIBRATION_DEGRADED';
+                this._transition(CalibrationStates.INVALID, 'DRIVER_CALIBRATION_TIMEOUT', 'CALIBRATION_COMPLETED_INVALID');
+                return this.getState(timestamp);
+            }
+            if (samples.length < this.config.minimumSamples) {
                 if (this.config.profileVersion === 'PERCEPTION_GEOMETRY_V2') {
                     this.calibrationQualityState = 'CALIBRATION_DEGRADED';
                     this.eyeCalibrationReasonCodes.push('INSUFFICIENT_OPEN_EYE_SAMPLES');
@@ -151,7 +233,7 @@
                 this._transition(CalibrationStates.INVALID, 'DRIVER_CALIBRATION_COMPLETE', 'CALIBRATION_COMPLETED_INVALID');
                 return this.getState(timestamp);
             }
-            const sorted = [...this.samples].sort((a, b) => a - b);
+            const sorted = [...samples].sort((a, b) => a - b);
             const middle = Math.floor(sorted.length / 2);
             const baseline = sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
             if (!Number.isFinite(baseline) || (this.config.profileVersion !== 'PERCEPTION_GEOMETRY_V2' && baseline < this.config.minimumBaseline)) {
@@ -161,7 +243,7 @@
             this.baseline = baseline;
             this.threshold = baseline * this.config.thresholdRatio;
             if (this.config.profileVersion === 'PERCEPTION_GEOMETRY_V2') {
-                const left = neutralEyeSamples(this.leftSamples), right = neutralEyeSamples(this.rightSamples);
+                const left = neutralEyeSamples(leftSamples), right = neutralEyeSamples(rightSamples);
                 this.leftRejectedSampleCount = left.rejected.length;
                 this.rightRejectedSampleCount = right.rejected.length;
                 if (left.rejected.length || right.rejected.length) this.eyeCalibrationReasonCodes.push('EYE_SAMPLE_TOO_LOW');
@@ -175,9 +257,9 @@
                 this.rightNoise = right.statistics;
                 this.leftBaseline = this.leftNoise.median;
                 this.rightBaseline = this.rightNoise.median;
-                this.neutralPitch = median(this.pitchSamples);
-                this.neutralYaw = median(this.yawSamples);
-                this.neutralRoll = median(this.rollSamples);
+                this.neutralPitch = median(pitchSamples);
+                this.neutralYaw = median(yawSamples);
+                this.neutralRoll = median(rollSamples);
                 if (![this.leftBaseline, this.rightBaseline, this.neutralPitch, this.neutralYaw, this.neutralRoll].every(Number.isFinite)) {
                     this.eyeCalibrationReasonCodes.push('LANDMARK_UNSTABLE');
                     this.calibrationQualityState = 'CALIBRATION_DEGRADED';
@@ -216,8 +298,12 @@
         _completionDiagnostics(timestamp = Date.now()) {
             const geometryV2 = this.config.profileVersion === 'PERCEPTION_GEOMETRY_V2';
             const minimumSamples = this.config.minimumSamples;
-            const left = geometryV2 ? neutralEyeSamples(this.leftSamples) : null;
-            const right = geometryV2 ? neutralEyeSamples(this.rightSamples) : null;
+            const evaluatedAt = this.completedAt ?? Number(timestamp), windowStartAt = this.startedAt === null ? evaluatedAt
+                : Math.max(this.startedAt, evaluatedAt - this.config.rollingEvaluationWindowMs);
+            const windowFrames = this.acceptedFrames.filter(frame => frame.timestamp >= windowStartAt && frame.timestamp <= evaluatedAt);
+            const windowSamples = windowFrames.map(frame => frame.ear).filter(finitePositive);
+            const left = geometryV2 ? neutralEyeSamples(windowFrames.map(frame => frame.leftEAR)) : null;
+            const right = geometryV2 ? neutralEyeSamples(windowFrames.map(frame => frame.rightEAR)) : null;
             const leftBaseline = left?.statistics.median ?? null;
             const rightBaseline = right?.statistics.median ?? null;
             const leftStability = finitePositive(leftBaseline) && Number.isFinite(left?.statistics.mad)
@@ -225,13 +311,14 @@
             const rightStability = finitePositive(rightBaseline) && Number.isFinite(right?.statistics.mad)
                 ? right.statistics.mad / rightBaseline : null;
             const pose = {
-                pitch: median(this.pitchSamples), yaw: median(this.yawSamples), roll: median(this.rollSamples)
+                pitch: median(windowFrames.map(frame => frame.pitch)), yaw: median(windowFrames.map(frame => frame.yaw)),
+                roll: median(windowFrames.map(frame => frame.roll))
             };
             const gates = {
-                durationReached: this.startedAt !== null && Number(timestamp) - this.startedAt >= this.config.durationMs,
-                combinedSampleMinimum: this.samples.length >= minimumSamples,
-                combinedBaselineAcceptable: finitePositive(median(this.samples)) &&
-                    (geometryV2 || median(this.samples) >= this.config.minimumBaseline),
+                durationReached: this.startedAt !== null && evaluatedAt - this.startedAt >= this.config.minimumCollectionMs,
+                combinedSampleMinimum: windowSamples.length >= minimumSamples,
+                combinedBaselineAcceptable: finitePositive(median(windowSamples)) &&
+                    (geometryV2 || median(windowSamples) >= this.config.minimumBaseline),
                 leftOpenSampleMinimum: !geometryV2 || left.accepted.length >= minimumSamples,
                 rightOpenSampleMinimum: !geometryV2 || right.accepted.length >= minimumSamples,
                 poseBaselinesFinite: !geometryV2 || [pose.pitch, pose.yaw, pose.roll].every(Number.isFinite),
@@ -239,14 +326,31 @@
                 rightStabilityAcceptable: !geometryV2 || (Number.isFinite(rightStability) && rightStability <= .15)
             };
             const blockers = Object.entries(gates).filter(([, passed]) => !passed).map(([name]) => name);
+            const persistentBlockers = blockers.filter(name => name !== 'durationReached');
+            const passingConfirmationDurationMs = this.passingStartedAt === null ? 0 : Math.max(0, evaluatedAt - this.passingStartedAt);
             return Object.freeze({
-                evaluatedAt: Number(timestamp), readyIfCompletedNow: blockers.filter(name => name !== 'durationReached').length === 0,
+                calibrationMode: this.config.calibrationMode, minimumCollectionMs: this.config.minimumCollectionMs,
+                maximumCollectionMs: this.config.maximumCollectionMs,
+                rollingEvaluationWindowMs: this.config.rollingEvaluationWindowMs,
+                evaluatedAt, currentElapsedMs: this.startedAt === null ? 0 : Math.max(0, evaluatedAt - this.startedAt),
+                rollingWindow: Object.freeze({ startAt: windowStartAt, endAt: evaluatedAt, sampleCount: windowFrames.length }),
+                readyIfCompletedNow: persistentBlockers.length === 0,
                 allCompletionGatesPassed: blockers.length === 0, blockers: Object.freeze(blockers), gates: Object.freeze(gates),
+                passingGates: Object.freeze(Object.entries(gates).filter(([, passed]) => passed).map(([name]) => name)),
+                consecutivePassingEvaluations: this.consecutivePassingEvaluations,
+                passingConfirmationDurationMs,
+                requiredPassingConfirmationMs: this.config.passingConfirmationMs,
+                requiredPassingEvaluations: this.config.minimumPassingEvaluations,
+                persistentBlockers: Object.freeze(persistentBlockers),
+                selectedAcceptedInterval: this.selectedAcceptedInterval,
+                timeoutReason: this.timeoutReason,
+                earlyCompletionReason: this.earlyCompletionReason,
                 counts: Object.freeze({
                     observed: this.samples.length + this.rejectedSampleCount, combinedAccepted: this.samples.length,
                     combinedRejected: this.rejectedSampleCount, requiredPerEye: minimumSamples,
-                    leftRaw: this.leftSamples.length, leftNeutralAccepted: left?.accepted.length ?? null,
-                    leftNeutralRejected: left?.rejected.length ?? null, rightRaw: this.rightSamples.length,
+                    currentWindowSampleCount: windowFrames.length,
+                    leftRaw: windowFrames.length, leftNeutralAccepted: left?.accepted.length ?? null,
+                    leftNeutralRejected: left?.rejected.length ?? null, rightRaw: windowFrames.length,
                     rightNeutralAccepted: right?.accepted.length ?? null, rightNeutralRejected: right?.rejected.length ?? null
                 }),
                 quality: Object.freeze({
@@ -255,7 +359,7 @@
                     leftMedian: leftBaseline, rightMedian: rightBaseline, neutralPose: Object.freeze(pose)
                 }),
                 semantics: Object.freeze({
-                    samples: 'COMBINED_EAR_ACCEPTED_FRAMES', progress: 'CALIBRATION_DURATION',
+                    samples: 'COHERENT_ROLLING_COMBINED_EAR_ACCEPTED_FRAMES', progress: 'BOUNDED_ADAPTIVE_DURATION',
                     guidedCounter: 'SEPARATE_GUIDED_TUNING_STEP_INDEX'
                 })
             });
@@ -271,6 +375,7 @@
             this.startedAt = null;
             this.completedAt = null;
             this.samples = [];
+            this.acceptedFrames = [];
             this.leftSamples = [];
             this.rightSamples = [];
             this.pitchSamples = [];
@@ -285,6 +390,11 @@
             this.rightRejectedSampleCount = 0;
             this.eyeCalibrationReasonCodes = [];
             this.calibrationQualityState = 'NOT_EVALUATED';
+            this.passingStartedAt = null;
+            this.consecutivePassingEvaluations = 0;
+            this.selectedAcceptedInterval = null;
+            this.timeoutReason = null;
+            this.earlyCompletionReason = null;
             this.baseline = null;
             this.threshold = null;
             this.leftBaseline = null;
@@ -302,11 +412,16 @@
             this.mouthOpenThreshold = null;
             this.baselineSourceSessionId = null;
             this.baselineSourceGeneration = null;
+            this.lastAcceptedFrameSequence = null;
+            this.lastRejectedFrameSequence = null;
+            this.lastRejectReason = null;
+            if (markReset) this._transition(CalibrationStates.NOT_STARTED, source, 'CALIBRATION_RESET_COMPLETED');
             return this.getState();
         }
 
         getState(timestamp = Date.now()) {
-            const elapsedMs = this.startedAt === null ? 0 : Math.max(0, Number(timestamp) - this.startedAt);
+            const elapsedEnd = this.completedAt ?? Number(timestamp);
+            const elapsedMs = this.startedAt === null ? 0 : Math.max(0, elapsedEnd - this.startedAt);
             const completionDiagnostics = this._completionDiagnostics(timestamp);
             return Object.freeze({
                 state: this.state,
@@ -322,7 +437,13 @@
                 sampleCount: this.samples.length,
                 rejectedSampleCount: this.rejectedSampleCount,
                 elapsedMs,
-                progress: this.startedAt === null ? 0 : Math.min(1, elapsedMs / this.config.durationMs),
+                calibrationMode: this.config.calibrationMode,
+                minimumCollectionMs: this.config.minimumCollectionMs,
+                maximumCollectionMs: this.config.maximumCollectionMs,
+                rollingEvaluationWindowMs: this.config.rollingEvaluationWindowMs,
+                passingConfirmationMs: this.config.passingConfirmationMs,
+                minimumPassingEvaluations: this.config.minimumPassingEvaluations,
+                progress: this.startedAt === null ? 0 : Math.min(1, elapsedMs / this.config.maximumCollectionMs),
                 baseline: this.baseline,
                 threshold: this.threshold,
                 leftBaseline: this.leftBaseline,
@@ -355,8 +476,12 @@
                 mouthCalibrationState: Number.isFinite(this.mouthBaseline) ? 'READY' : (this.state === CalibrationStates.COLLECTING ? 'COLLECTING' : 'UNAVAILABLE'),
                 completionDiagnostics,
                 lastResetSource: this.lastResetSource,
+                lastStartSource: this.lastStartSource,
                 lastStateWriter: this.lastStateWriter,
                 lastStateTransition: this.lastStateTransition,
+                lastAcceptedFrameSequence: this.lastAcceptedFrameSequence,
+                lastRejectedFrameSequence: this.lastRejectedFrameSequence,
+                lastRejectReason: this.lastRejectReason,
                 auditHistory: this.auditHistory.slice(),
                 notice: 'DEVELOPMENT_UNVALIDATED_CALIBRATION'
             });

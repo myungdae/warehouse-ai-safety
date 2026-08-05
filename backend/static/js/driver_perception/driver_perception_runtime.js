@@ -18,6 +18,8 @@
             this.snapshotFactory = snapshotFactory || namespace.createDriverMetricSnapshot;
             this.scheduler = scheduler || global.requestAnimationFrame.bind(global);
             this.cancelScheduler = cancelScheduler || global.cancelAnimationFrame.bind(global);
+            this.usesInjectedScheduler = typeof scheduler === 'function';
+            this.frameRequestKind = null;
             this.state = States.IDLE;
             this.videoElement = null;
             this.frameRequest = null;
@@ -30,11 +32,57 @@
             this.canonicalTargetId = canonicalTargetId;
             this.assignmentId = assignmentId;
             this.guidedState = null;
+            this.videoFrameCallbackCount = 0;
+            this.schedulerWatchdog = null;
+            this.schedulerHealth = { state: 'NOT_STARTED', reason: null, message: null,
+                nextCallbackScheduled: false, videoOutsideViewport: null, callbackGapMs: null, lastCallbackAt: null };
         }
 
         subscribe(listener) { this.listeners.add(listener); return () => this.listeners.delete(listener); }
         onMetricSnapshot(listener) { this.metricListeners.add(listener); return () => this.metricListeners.delete(listener); }
         getLatestMetricSnapshot() { return this.latestMetricSnapshot; }
+        _videoViewportState() {
+            const video = this.videoElement, rect = video?.getBoundingClientRect?.();
+            const outside = !rect || rect.width <= 0 || rect.height <= 0 || rect.bottom <= 0 || rect.right <= 0 ||
+                rect.top >= (global.innerHeight || 0) || rect.left >= (global.innerWidth || 0);
+            return Object.freeze({ videoOutsideViewport: outside, pageVisible: global.document?.visibilityState === 'visible',
+                pageFocused: global.document?.hasFocus?.() === true, videoCurrentTime: Number(video?.currentTime) || 0,
+                videoReadyState: video?.readyState ?? null });
+        }
+        getSchedulerHealth() { return Object.freeze({ ...this.schedulerHealth, ...this._videoViewportState(),
+            videoFrameCallbackCount: this.videoFrameCallbackCount, scheduler: this.frameRequestKind || 'NONE' }); }
+        _clearSchedulerWatchdog() { if (this.schedulerWatchdog !== null) global.clearTimeout(this.schedulerWatchdog); this.schedulerWatchdog = null; }
+        _armSchedulerWatchdog(token, requestId, scheduledAt, scheduledVideoTime) {
+            this._clearSchedulerWatchdog();
+            this.schedulerWatchdog = global.setTimeout(() => {
+                if (token !== this.runToken || this.frameRequest !== requestId) return;
+                const viewport = this._videoViewportState(), callbackGapMs = Math.max(0, (global.performance?.now?.() ?? Date.now()) - scheduledAt);
+                if (viewport.videoCurrentTime <= scheduledVideoTime + .1) return;
+                this.schedulerHealth = { ...this.schedulerHealth, state: 'LIVE_CAMERA_THROTTLED',
+                    reason: viewport.videoOutsideViewport ? 'VIDEO_PREVIEW_OUTSIDE_VIEWPORT' : 'VIDEO_FRAME_CALLBACK_STALLED',
+                    message: viewport.videoOutsideViewport ? 'Video preview is outside the visible viewport. Bring the camera preview into view.'
+                        : 'Live camera frame callbacks are throttled.', nextCallbackScheduled: true,
+                    videoOutsideViewport: viewport.videoOutsideViewport, callbackGapMs };
+                this._publish({ frameStatus: 'LIVE_CAMERA_THROTTLED', schedulerHealth: this.getSchedulerHealth() });
+                global.dispatchEvent(new CustomEvent('driver-camera-throttled', { detail: this.getSchedulerHealth() }));
+            }, 1000);
+        }
+        getLiveBridgeReadiness(expectedRuntimeGeneration = this.runtimeGeneration) {
+            const camera = this.cameraManager.getLiveReadiness({ role: 'primary', videoElement: this.videoElement });
+            const runtimeActive = [States.RUNNING, States.FACE_NOT_DETECTED].includes(this.state);
+            const generationMatch = expectedRuntimeGeneration === this.runtimeGeneration;
+            let blockedReason = null;
+            if (!runtimeActive) blockedReason = 'RUNTIME_NOT_RUNNING';
+            else if (camera.permission !== 'GRANTED') blockedReason = 'CAMERA_STREAM_UNAVAILABLE';
+            else if (!camera.streamPresent) blockedReason = 'CAMERA_STREAM_UNAVAILABLE';
+            else if (camera.videoTrackState !== 'live') blockedReason = 'VIDEO_TRACK_NOT_LIVE';
+            else if (camera.trackEnabled !== true) blockedReason = 'VIDEO_TRACK_DISABLED';
+            else if (!generationMatch) blockedReason = 'GENERATION_MISMATCH';
+            return Object.freeze({ ...camera, runtimeState: this.state, runtimeGeneration: this.runtimeGeneration,
+                expectedRuntimeGeneration, generationMatch, runtimeActive,
+                readyForLiveBridge: blockedReason === null, blockedReason,
+                stateSource: 'DRIVER_PERCEPTION_RUNTIME_LIVE_BRIDGE_READINESS-v1' });
+        }
         startCalibration(timestamp = Date.now(), source = 'CALIBRATION_START_BUTTON') {
             let current = this.calibration.getState(timestamp);
             if (source === 'POC_EYE_CALIBRATION' && ![namespace.CalibrationStates.NOT_STARTED, namespace.CalibrationStates.RESETTING].includes(current.state)) {
@@ -46,7 +94,15 @@
                 canonicalTargetId: this.canonicalTargetId, assignmentId: this.assignmentId, source });
         }
         resetCalibration(source = 'CALIBRATION_RESET_BUTTON') { this.metricCalculator.reset(); return this.calibration.reset(true, source); }
-        getCalibrationState(timestamp = Date.now()) { return this.calibration.getState(timestamp); }
+        getCalibrationState(timestamp = Date.now()) {
+            const state = this.calibration.getState(timestamp);
+            const generationMatch = state.runtimeGeneration === this.runtimeGeneration;
+            return Object.freeze({ ...state, boundRuntimeGeneration: state.runtimeGeneration,
+                currentRuntimeGeneration: this.runtimeGeneration, generationMatch,
+                calibrationState: state.state,
+                frameIngestionActive: [States.RUNNING, States.FACE_NOT_DETECTED].includes(this.state) &&
+                    state.state === namespace.CalibrationStates.COLLECTING && generationMatch });
+        }
         setGuidedState(state) { this.guidedState = state || null; return this.getSynchronizationSnapshot(); }
         getSynchronizationSnapshot(timestamp = Date.now()) {
             const calibration = this.getCalibrationState(timestamp), guided = this.guidedState || {};
@@ -91,6 +147,7 @@
                 }
                 const track = this.cameraManager.streams.get('primary')?.getVideoTracks?.()[0];
                 const settings = track?.getSettings?.() || {};
+                this.calibration.bindRuntimeGeneration?.(this.runtimeGeneration);
                 this.landmarkAdapter.start({
                     cameraId: settings.deviceId || deviceId || 'primary',
                     imageWidth: videoElement.videoWidth || settings.width || 0,
@@ -111,11 +168,26 @@
 
         _schedule(token) {
             if (token !== this.runToken || ![States.RUNNING, States.FACE_NOT_DETECTED].includes(this.state)) return;
-            this.frameRequest = this.scheduler(async () => {
-                try { await this.landmarkAdapter.process(this.videoElement); }
+            const process = async metadata => {
+                this._clearSchedulerWatchdog();
+                this.videoFrameCallbackCount += 1;
+                const callbackAt = global.performance?.now?.() ?? Date.now(), previousAt = this.schedulerHealth.lastCallbackAt;
+                this.schedulerHealth = { state: 'ACTIVE', reason: null, message: null, nextCallbackScheduled: false,
+                    videoOutsideViewport: this._videoViewportState().videoOutsideViewport,
+                    callbackGapMs: previousAt == null ? null : callbackAt - previousAt, lastCallbackAt: callbackAt };
+                try { await this.landmarkAdapter.process(this.videoElement, metadata); }
                 catch (error) { this.state = States.ERROR; this._publish({ error: error.message }); return; }
                 this._schedule(token);
-            });
+            };
+            if (!this.usesInjectedScheduler && typeof this.videoElement?.requestVideoFrameCallback === 'function') {
+                this.frameRequestKind = 'VIDEO_FRAME_CALLBACK';
+                this.frameRequest = this.videoElement.requestVideoFrameCallback((_now, metadata) => process(metadata));
+                this.schedulerHealth = { ...this.schedulerHealth, nextCallbackScheduled: true };
+                this._armSchedulerWatchdog(token, this.frameRequest, global.performance?.now?.() ?? Date.now(), Number(this.videoElement.currentTime) || 0);
+            } else {
+                this.frameRequestKind = 'ANIMATION_FRAME';
+                this.frameRequest = this.scheduler(() => process(null));
+            }
         }
 
         _handleLandmarkFrame(token, frame) {
@@ -130,6 +202,7 @@
                     leftEAR: metrics.leftEAR, rightEAR: metrics.rightEAR,
                     pitch: metrics.pitch, yaw: metrics.yaw, roll: metrics.roll,
                     mar: metrics.marRaw, marValid: metrics.marValid, marRejectReason: metrics.marInvalidReason,
+                    frameSequence: frame.frameSequence ?? null,
                     timestamp: Date.parse(frame.timestamp), expectedCalibrationSessionId: callbackSessionId,
                     expectedCalibrationGeneration: callbackGeneration });
             }
@@ -144,8 +217,16 @@
             this.state = States.STOPPING;
             this._publish();
             this.runToken += 1;
-            if (this.frameRequest !== null) this.cancelScheduler(this.frameRequest);
+            if (this.frameRequest !== null) {
+                if (this.frameRequestKind === 'VIDEO_FRAME_CALLBACK' && typeof this.videoElement?.cancelVideoFrameCallback === 'function')
+                    this.videoElement.cancelVideoFrameCallback(this.frameRequest);
+                else this.cancelScheduler(this.frameRequest);
+            }
             this.frameRequest = null;
+            this.frameRequestKind = null;
+            this._clearSchedulerWatchdog();
+            this.schedulerHealth = { state: 'STOPPED', reason: null, message: null, nextCallbackScheduled: false,
+                videoOutsideViewport: null, callbackGapMs: null, lastCallbackAt: null };
             this.landmarkAdapter.stop();
             const count = await this.cameraManager.stop('primary', this.videoElement);
             this.videoElement = null;
@@ -188,6 +269,26 @@
             display('threshold', calibrationState.threshold);
             const diagnostics = field('calibration-completion-diagnostics');
             if (diagnostics) diagnostics.textContent = JSON.stringify(calibrationState.completionDiagnostics, null, 2);
+            const adaptive = calibrationState.completionDiagnostics || {};
+            const guidedStep = root.querySelector('[data-guided-step]');
+            const guidedInstruction = root.querySelector('[data-guided-instruction]');
+            const qualityProgress = `${Object.values(gates).filter(Boolean).length} / ${Object.keys(gates).length} gates; ` +
+                `${adaptive.consecutivePassingEvaluations || 0} / ${adaptive.requiredPassingEvaluations || 0} confirmations; ` +
+                `${adaptive.passingConfirmationDurationMs || 0} / ${adaptive.requiredPassingConfirmationMs || 0} ms`;
+            if (calibrationState.state === namespace.CalibrationStates.COLLECTING) {
+                if (guidedStep) guidedStep.textContent = 'Collecting stable neutral samples';
+                if (guidedInstruction) guidedInstruction.textContent = calibrationState.elapsedMs < calibrationState.minimumCollectionMs
+                    ? `Current quality progress: ${qualityProgress}`
+                    : adaptive.persistentBlockers?.length
+                        ? `Quality is marginal; collection extends automatically. Current blockers: ${adaptive.persistentBlockers.join(', ')}`
+                        : `All gates pass together; confirming sustained quality. ${qualityProgress}`;
+            } else if (calibrationState.state === namespace.CalibrationStates.READY) {
+                if (guidedStep) guidedStep.textContent = 'READY — sustained simultaneous quality achieved';
+                if (guidedInstruction) guidedInstruction.textContent = `Accepted interval: ${JSON.stringify(adaptive.selectedAcceptedInterval)}`;
+            } else if (calibrationState.state === namespace.CalibrationStates.INVALID) {
+                if (guidedStep) guidedStep.textContent = 'Calibration timed out';
+                if (guidedInstruction) guidedInstruction.textContent = `Persistent blockers: ${(adaptive.persistentBlockers || []).join(', ') || 'UNKNOWN'}`;
+            }
             const synchronization = field('calibration-synchronization');
             if (synchronization) synchronization.textContent = JSON.stringify(runtime.getSynchronizationSnapshot(), null, 2);
         };
@@ -260,6 +361,11 @@
             if (field('camera-error')) field('camera-error').textContent = camera.lastCameraError
                 ? `${camera.lastCameraError.name}: ${camera.lastCameraError.message}` : 'NONE';
             if (field('camera-error-stack')) field('camera-error-stack').textContent = camera.lastCameraError?.stack || 'NONE';
+            const scheduler = runtime.getSchedulerHealth();
+            if (field('scheduler-health')) field('scheduler-health').textContent = scheduler.state;
+            if (field('scheduler-reason')) field('scheduler-reason').textContent = scheduler.reason || 'NONE';
+            if (field('scheduler-message')) field('scheduler-message').textContent = scheduler.message || 'NONE';
+            if (field('video-viewport')) field('video-viewport').textContent = scheduler.videoOutsideViewport ? 'OUTSIDE VIEWPORT' : 'VISIBLE';
             if (field('camera-constraints')) field('camera-constraints').textContent = JSON.stringify(camera.requestedConstraints || {}, null, 2);
             if (field('camera-stop-verification')) field('camera-stop-verification').textContent = JSON.stringify(camera.trackStopVerification || [], null, 2);
             if (snapshot.landmarkFrame) drawOverlay(snapshot.landmarkFrame);
@@ -280,8 +386,14 @@
             catch (_) { /* Runtime state presents the error without creating observations. */ }
         });
         stop.addEventListener('click', () => runtime.stop());
-        root.querySelector('[data-calibration-start]')?.addEventListener('click', () => renderCalibration(runtime.startCalibration()));
-        root.querySelector('[data-calibration-reset]')?.addEventListener('click', () => renderCalibration(runtime.resetCalibration()));
+        root.querySelector('[data-calibration-start]')?.addEventListener('click', () => {
+            const state = runtime.startCalibration(); renderCalibration(state);
+            root.dispatchEvent(new CustomEvent('driver-calibration-started', { detail: state }));
+        });
+        root.querySelector('[data-calibration-reset]')?.addEventListener('click', () => {
+            const state = runtime.resetCalibration(); renderCalibration(state);
+            root.dispatchEvent(new CustomEvent('driver-calibration-reset', { detail: state }));
+        });
         runtime.onMetricSnapshot(snapshot => {
             const metrics = snapshot.metrics; const quality = snapshot.quality; const debug = snapshot.diagnostics; const calibrationState = runtime.getCalibrationState();
             latestMouthMetrics = metrics;

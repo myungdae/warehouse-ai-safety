@@ -73,6 +73,12 @@
         calibration: Object.freeze({
             profileVersion: 'PERCEPTION_GEOMETRY_V2',
             durationMs: 3000,
+            calibrationMode: 'BOUNDED_ADAPTIVE',
+            minimumCollectionMs: 3000,
+            maximumCollectionMs: 10000,
+            rollingEvaluationWindowMs: 3000,
+            passingConfirmationMs: 500,
+            minimumPassingEvaluations: 3,
             minimumSamples: 8,
             minimumOpenEar: 0.18,
             minimumBaseline: 0.18,

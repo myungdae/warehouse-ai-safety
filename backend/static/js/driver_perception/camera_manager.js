@@ -207,6 +207,32 @@
             });
         }
 
+        getLiveReadiness({ role = 'primary', videoElement = null } = {}) {
+            const managedStream = this.streams.get(role) || null;
+            const attachedStream = videoElement?.srcObject || null;
+            const diagnosticStreamId = this.diagnostics.streamId || null;
+            const attachedIsAuthoritative = Boolean(attachedStream && (!diagnosticStreamId || attachedStream.id === diagnosticStreamId));
+            const stream = managedStream || (attachedIsAuthoritative ? attachedStream : null);
+            const track = stream?.getVideoTracks?.()[0] || null;
+            const streamPresent = Boolean(stream);
+            const videoTrackState = track?.readyState || null;
+            const trackEnabled = typeof track?.enabled === 'boolean' ? track.enabled : null;
+            const trackMuted = typeof track?.muted === 'boolean' ? track.muted : null;
+            return Object.freeze({
+                permission: this.permissionState,
+                cameraOpenState: this.diagnostics.cameraOpenState,
+                streamPresent,
+                streamSource: managedStream ? 'CAMERA_MANAGER_PRIMARY_STREAM' : (attachedIsAuthoritative ? 'VIDEO_ELEMENT_SRC_OBJECT' : 'NONE'),
+                streamId: stream?.id || null,
+                managedStreamPresent: Boolean(managedStream),
+                attachedStreamPresent: Boolean(attachedStream),
+                videoTrackState,
+                trackEnabled,
+                trackMuted,
+                cameraReady: this.permissionState === 'GRANTED' && streamPresent && videoTrackState === 'live' && trackEnabled === true
+            });
+        }
+
         getDiagnostics() {
             return Object.freeze({ ...this.diagnostics,
                 requestedConstraints: this.diagnostics.requestedConstraints

@@ -2,6 +2,8 @@
     'use strict';
 
     const clone = value => value == null ? value : JSON.parse(JSON.stringify(value));
+    const deepFreeze = value => { if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
+        Object.values(value).forEach(deepFreeze); return Object.freeze(value); };
 
     class DriverRuntimePageFacade {
         constructor({ driverStatePage = null, policyPage = null, actionPage = null, inputModeController = null } = {}) {
@@ -14,6 +16,12 @@
             this.contextByTarget = new Map();
             this.ingestedRiskStates = new Map();
             this.lastResultByTarget = new Map();
+            this.resultListeners = new Set();
+            this.resultNotificationSequence = 0;
+            this.latestResultGeneration = new Map();
+            this.notifiedObservationIds = new Set();
+            this.notifiedObservationOrder = [];
+            this.emittingResult = false;
         }
 
         attach({ driverStatePage, policyPage, actionPage }) {
@@ -27,6 +35,43 @@
         getPolicyEngine() { return this.policyPage?.engine || null; }
         getActionDispatcher() { return this.actionPage?.dispatcher || null; }
         getInputModeController() { return this.inputModeController; }
+        subscribeToResults(listener) {
+            if (typeof listener !== 'function') throw new TypeError('Result listener must be a function');
+            if (!this.resultListeners.has(listener) && this.resultListeners.size >= 32) throw new RangeError('RESULT_LISTENER_LIMIT_REACHED');
+            this.resultListeners.add(listener); return () => this.unsubscribeFromResults(listener);
+        }
+        unsubscribeFromResults(listener) { return this.resultListeners.delete(listener); }
+        _sourceEvidenceType(metadata) {
+            if (metadata.sourceEvidenceType) return metadata.sourceEvidenceType;
+            if (metadata.source === 'live-webcam') return 'LIVE_CAMERA';
+            if (metadata.simulation === true) return 'DETERMINISTIC_FIXTURE';
+            return 'UNKNOWN';
+        }
+        _notifyResult(observation, result, context, riskRuntime) {
+            if (this.emittingResult || this.notifiedObservationIds.has(observation.observationId)) return null;
+            const metadata = observation.metadata || {}, generation = metadata.runtime?.runtimeGeneration ?? null;
+            const generationKey = `${observation.targetId}|${context.driverAssignmentId}`;
+            const latest = this.latestResultGeneration.get(generationKey);
+            if (Number.isInteger(generation) && Number.isInteger(latest) && generation < latest) return null;
+            if (Number.isInteger(generation)) this.latestResultGeneration.set(generationKey, generation);
+            this.notifiedObservationIds.add(observation.observationId); this.notifiedObservationOrder.push(observation.observationId);
+            while (this.notifiedObservationOrder.length > 1024) this.notifiedObservationIds.delete(this.notifiedObservationOrder.shift());
+            const riskEvents = riskRuntime?.toJSON?.().filter(item => item.targetId === observation.targetId && !['CLEARED', 'CANCELLED'].includes(item.state)) || [];
+            const notification = deepFreeze({ notificationId: `runtime-result-${++this.resultNotificationSequence}`,
+                timestamp: new Date().toISOString(), canonicalTargetId: observation.targetId,
+                assignmentId: context.driverAssignmentId, runtimeGeneration: generation,
+                sourceObservationId: observation.observationId, sourceObservationType: observation.observationType,
+                sourceEvidenceType: this._sourceEvidenceType(metadata), riskEvents: clone(riskEvents),
+                policyResult: clone(result.policyDecision), actionResult: clone({ requests: result.actionRequests, executions: result.actionExecutions }),
+                confidence: clone(metadata.quality?.confidence ?? null), lineage: clone({ driverMetricSnapshotId: metadata.driverMetricSnapshotId || null,
+                    evidenceCodes: metadata.policy?.evidenceCodes || [], episodeId: metadata.policy?.episodeId || null,
+                    riskEventId: result.riskEvent?.eventId || null, policyDecisionId: result.policyDecision?.decisionId || null }),
+                operationalUseAllowed: false });
+            this.emittingResult = true;
+            try { [...this.resultListeners].forEach(listener => { try { listener(notification); } catch (_) {} }); }
+            finally { this.emittingResult = false; }
+            return notification;
+        }
 
         _contextFromObservation(observation) {
             const metadata = observation.metadata || {};
@@ -73,6 +118,7 @@
             if (riskOutput) riskOutput.textContent = JSON.stringify(riskRuntime.toJSON(), null, 2);
             if (signalOutput) signalOutput.textContent = JSON.stringify(result.riskSignal, null, 2);
             this.lastResultByTarget.set(observation.targetId, result);
+            this._notifyResult(observation, result, context, riskRuntime);
             return clone(result);
         }
 
@@ -128,6 +174,7 @@
                 observationType: options.observationType || 'DROWSINESS', reason: options.reason || 'TARGET_RESET', preserveAuditHistory: true });
             this.getPolicyEngine()?.resetTarget(targetId, new Date());
             const cancelledExecutions = this.getActionDispatcher()?.resetTarget(targetId, new Date()) || [];
+            for (const key of [...this.latestResultGeneration.keys()]) if (key.startsWith(`${targetId}|`)) this.latestResultGeneration.delete(key);
             return { targetId, released, cancelledRun, cancelledExecutionIds: cancelledExecutions.map(item => item.executionId) };
         }
         getRuntimeSnapshot(targetId) {
@@ -152,6 +199,8 @@
         getPolicyEngine: () => facade.getPolicyEngine(),
         getActionDispatcher: () => facade.getActionDispatcher(),
         getInputModeController: () => facade.getInputModeController(),
+        subscribeToResults: listener => facade.subscribeToResults(listener),
+        unsubscribeFromResults: listener => facade.unsubscribeFromResults(listener),
         ingestObservation: observation => facade.ingestObservation(observation),
         ingestRiskEvent: (event, context) => facade.ingestRiskEvent(event, context),
         ingestActionRequest: (action, context) => facade.ingestActionRequest(action, context),
