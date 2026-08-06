@@ -1,0 +1,1288 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>시나리오별 코디 가이드 — Digital Police Response</title>
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --panel: #0f1525;
+    --border: #1e2d4a;
+    --accent: #00c8ff;
+    --green: #00ff88;
+    --orange: #ff8c00;
+    --red: #ff3b5c;
+    --yellow: #ffd700;
+    --text: #c8d8f0;
+    --dim: #5a7090;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', 'Malgun Gothic', sans-serif;
+    font-size: 14px;
+    min-height: 100vh;
+    padding: 24px;
+  }
+
+  /* ── 헤더 ── */
+  .page-header {
+    text-align: center;
+    margin-bottom: 36px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .page-header .badge {
+    display: inline-block;
+    background: linear-gradient(135deg, #00c8ff22, #00c8ff44);
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    padding: 4px 14px;
+    border-radius: 20px;
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  .page-header h1 {
+    font-size: 28px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: 1px;
+  }
+  .page-header h1 span { color: var(--accent); }
+  .page-header p {
+    margin-top: 8px;
+    color: var(--dim);
+    font-size: 13px;
+  }
+
+  /* ── 시나리오 카드 ── */
+  .scenario-section {
+    margin-bottom: 48px;
+  }
+  .scenario-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 20px;
+    padding: 14px 20px;
+    border-radius: 10px;
+    border-left: 4px solid;
+  }
+  .sc1 .scenario-header { border-color: var(--red);   background: linear-gradient(90deg, #ff3b5c18, transparent); }
+  .sc2 .scenario-header { border-color: var(--orange); background: linear-gradient(90deg, #ff8c0018, transparent); }
+  .sc3 .scenario-header { border-color: var(--green);  background: linear-gradient(90deg, #00ff8818, transparent); }
+
+  .scenario-num {
+    font-size: 32px;
+    font-weight: 900;
+    opacity: 0.3;
+    line-height: 1;
+  }
+  .sc1 .scenario-num { color: var(--red); }
+  .sc2 .scenario-num { color: var(--orange); }
+  .sc3 .scenario-num { color: var(--green); }
+
+  .scenario-title-block h2 {
+    font-size: 20px;
+    font-weight: 700;
+    color: #fff;
+  }
+  .sc1 .scenario-title-block h2 { color: var(--red); }
+  .sc2 .scenario-title-block h2 { color: var(--orange); }
+  .sc3 .scenario-title-block h2 { color: var(--green); }
+
+  .scenario-title-block .sub {
+    font-size: 12px;
+    color: var(--dim);
+    margin-top: 3px;
+    letter-spacing: 1px;
+  }
+  .scenario-tag {
+    margin-left: auto;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+  }
+  .sc1 .scenario-tag { background: var(--red);    color: #fff; }
+  .sc2 .scenario-tag { background: var(--orange); color: #fff; }
+  .sc3 .scenario-tag { background: var(--green);  color: #000; }
+
+  /* ── 역할 그리드 ── */
+  .roles-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+
+  .role-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .role-card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    background: #ffffff06;
+  }
+  .role-icon { font-size: 22px; }
+  .role-name { font-weight: 700; font-size: 14px; color: #fff; }
+  .role-sub  { font-size: 11px; color: var(--dim); margin-top: 1px; }
+
+  .role-card-body { padding: 14px; }
+
+  .costume-section { margin-bottom: 12px; }
+  .costume-section h4 {
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--dim);
+    margin-bottom: 6px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--border);
+  }
+  .costume-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 5px;
+    font-size: 12.5px;
+  }
+  .costume-item .dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    margin-top: 5px;
+    flex-shrink: 0;
+  }
+  .c-red    { background: var(--red); }
+  .c-orange { background: var(--orange); }
+  .c-green  { background: var(--green); }
+  .c-blue   { background: var(--accent); }
+  .c-yellow { background: var(--yellow); }
+  .c-gray   { background: #607080; }
+
+  .color-chips {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 6px;
+  }
+  .chip {
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    border: 1px solid transparent;
+  }
+  .chip-black  { background: #111; color: #aaa; border-color: #333; }
+  .chip-navy   { background: #0a1628; color: #6080b0; border-color: #1e3060; }
+  .chip-gray   { background: #2a3040; color: #8090a0; border-color: #3a4050; }
+  .chip-khaki  { background: #2a2e1a; color: #8a9060; border-color: #4a5030; }
+  .chip-orange { background: #ff8c0022; color: var(--orange); border-color: var(--orange); }
+  .chip-red    { background: #ff3b5c22; color: var(--red); border-color: var(--red); }
+  .chip-green  { background: #00ff8822; color: var(--green); border-color: var(--green); }
+  .chip-white  { background: #e0e8f0; color: #333; border-color: #bbb; }
+  .chip-hi-vis { background: #ffd70033; color: var(--yellow); border-color: var(--yellow); }
+
+  /* ── 소품 & 장비 테이블 ── */
+  .props-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 16px;
+    font-size: 12.5px;
+  }
+  .props-table th {
+    background: #ffffff08;
+    color: var(--dim);
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    padding: 7px 10px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  .props-table td {
+    padding: 7px 10px;
+    border-bottom: 1px solid #ffffff06;
+    vertical-align: top;
+  }
+  .props-table tr:last-child td { border-bottom: none; }
+  .props-table .item-name { color: #fff; font-weight: 600; }
+  .props-table .item-note { color: var(--dim); font-size: 11px; }
+
+  /* ── 씬 흐름 타임라인 ── */
+  .timeline {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-bottom: 16px;
+  }
+  .timeline h3 {
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--dim);
+    margin-bottom: 14px;
+  }
+  .tl-item {
+    display: flex;
+    gap: 14px;
+    margin-bottom: 12px;
+    align-items: flex-start;
+  }
+  .tl-item:last-child { margin-bottom: 0; }
+  .tl-time {
+    font-size: 11px;
+    font-weight: 700;
+    min-width: 44px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    text-align: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .tl-content .tl-title { font-weight: 600; font-size: 13px; color: #fff; }
+  .tl-content .tl-desc  { font-size: 12px; color: var(--dim); margin-top: 2px; }
+
+  /* ── 촬영 팁 박스 ── */
+  .tip-box {
+    background: #00c8ff08;
+    border: 1px solid #00c8ff33;
+    border-radius: 8px;
+    padding: 12px 16px;
+  }
+  .tip-box h4 {
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 8px;
+  }
+  .tip-box ul { padding-left: 16px; }
+  .tip-box li {
+    font-size: 12.5px;
+    color: var(--text);
+    margin-bottom: 4px;
+    line-height: 1.5;
+  }
+
+  /* ── 전체 세팅 요약 ── */
+  .summary-section {
+    margin-top: 48px;
+    padding-top: 32px;
+    border-top: 1px solid var(--border);
+  }
+  .summary-section h2 {
+    font-size: 18px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 20px;
+    text-align: center;
+  }
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 12px;
+  }
+  .summary-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+  }
+  .summary-card h4 {
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--dim);
+    margin-bottom: 8px;
+  }
+  .summary-card p {
+    font-size: 13px;
+    color: var(--text);
+    line-height: 1.6;
+  }
+
+  /* ── PDF / 인쇄 버튼 그룹 ── */
+  .btn-group {
+    position: fixed;
+    bottom: 24px; right: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 999;
+  }
+  .action-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    font-size: 13px;
+    padding: 11px 20px;
+    border: none;
+    border-radius: 24px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all .2s;
+  }
+  .btn-pdf {
+    background: var(--accent);
+    color: #000;
+    box-shadow: 0 4px 20px #00c8ff44;
+  }
+  .btn-pdf:hover { background: #40d8ff; transform: translateY(-1px); }
+  .btn-pdf:disabled {
+    background: #1e3a50;
+    color: #5a7090;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+  }
+  .btn-print {
+    background: #1e2d4a;
+    color: var(--text);
+    border: 1px solid var(--border);
+    box-shadow: 0 2px 10px #00000044;
+  }
+  .btn-print:hover { background: #263d5a; transform: translateY(-1px); }
+
+  /* 진행 오버레이 */
+  #pdf-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: #000000cc;
+    z-index: 9999;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+  }
+  #pdf-overlay.show { display: flex; }
+  #pdf-overlay p {
+    color: var(--accent);
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 1px;
+  }
+  #pdf-overlay .spinner {
+    width: 44px; height: 44px;
+    border: 4px solid #1e2d4a;
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  @media print {
+    body { background: #fff; color: #000; font-size: 12px; }
+    .btn-group { display: none; }
+    #pdf-overlay { display: none; }
+    .scenario-section { page-break-inside: avoid; }
+  }
+
+  /* ── 구분선 ── */
+  .divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border), transparent);
+    margin: 24px 0;
+  }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════ 헤더 ══════════════════ -->
+<div class="page-header">
+  <div class="badge">🎬 Production Guide</div>
+  <h1>Digital Police Response<br><span>시나리오별 코디 & 연출 가이드</span></h1>
+  <p>영상 제작용 — 역할별 의상 / 소품 / 씬 흐름 / 촬영 팁</p>
+</div>
+
+
+<!-- ══════════════════════════════════════════
+     SCENARIO 1 — 비상벨 침입자 탐지
+══════════════════════════════════════════ -->
+<div class="scenario-section sc1">
+  <div class="scenario-header">
+    <div class="scenario-num">01</div>
+    <div class="scenario-title-block">
+      <h2>🚨 비상벨 — 야간 침입자 탐지</h2>
+      <div class="sub">INTRUSION DETECTION · NIGHT OPERATION · HIGH THREAT</div>
+    </div>
+    <div class="scenario-tag">RED ALERT</div>
+  </div>
+
+  <!-- 역할 카드들 -->
+  <div class="roles-grid">
+
+    <!-- 침입자 -->
+    <div class="role-card">
+      <div class="role-card-header">
+        <div class="role-icon">🕵️</div>
+        <div>
+          <div class="role-name">침입자 (Intruder)</div>
+          <div class="role-sub">야간 무단 침입 · 불법 침입자</div>
+        </div>
+      </div>
+      <div class="role-card-body">
+        <div class="costume-section">
+          <h4>의상 컬러</h4>
+          <div class="color-chips">
+            <span class="chip chip-black">올블랙</span>
+            <span class="chip chip-gray">다크그레이</span>
+            <span class="chip chip-navy">네이비</span>
+          </div>
+        </div>
+        <div class="costume-section">
+          <h4>상의</h4>
+          <div class="costume-item"><div class="dot c-gray"></div>검정 후드집업 또는 검정 크루넥 맨투맨</div>
+          <div class="costume-item"><div class="dot c-gray"></div>후드를 올려서 얼굴 일부 가림 (YOLOv8 탐지 장면 연출)</div>
+        </div>
+        <div class="costume-section">
+          <h4>하의</h4>
+          <div class="costume-item"><div class="dot c-gray"></div>검정 카고팬츠 또는 검정 조거팬츠</div>
+          <div class="costume-item"><div class="dot c-gray"></div>검정 운동화 (소리 없이 움직임 연출)</div>
+        </div>
+        <div class="costume-section">
+          <h4>소품</h4>
+          <div class="costume-item"><div class="dot c-red"></div>검정 백팩 (의심스러운 가방)</div>
+          <div class="costume-item"><div class="dot c-red"></div>손전등 (야간 씬에서 빛 연출용)</div>
+          <div class="costume-item"><div class="dot c-red"></div>얇은 검정 장갑 (선택)</div>
+        </div>
+        <div class="costume-section">
+          <h4>연기 포인트</h4>
+          <div class="costume-item"><div class="dot c-red"></div>낮게 이동, 빠른 걸음, 주변 두리번거림</div>
+          <div class="costume-item"><div class="dot c-red"></div>비상벨 위치(빨간 박스) 앞에서 멈추는 장면 필요</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 관제 요원 -->
+    <div class="role-card">
+      <div class="role-card-header">
+        <div class="role-icon">🖥️</div>
+        <div>
+          <div class="role-name">관제 요원 (Control Operator)</div>
+          <div class="role-sub">Control Tower · MCP 시스템 운용</div>
+        </div>
+      </div>
+      <div class="role-card-body">
+        <div class="costume-section">
+          <h4>의상 컬러</h4>
+          <div class="color-chips">
+            <span class="chip chip-navy">네이비</span>
+            <span class="chip chip-black">블랙</span>
+            <span class="chip chip-white">화이트셔츠</span>
+          </div>
+        </div>
+        <div class="costume-section">
+          <h4>의상</h4>
+          <div class="costume-item"><div class="dot c-blue"></div>네이비/블랙 폴로셔츠 또는 근무복 스타일 셔츠</div>
+          <div class="costume-item"><div class="dot c-blue"></div>가슴에 "SECURITY" 또는 "관제센터" 로고 패치 (프린트 OK)</div>
+          <div class="costume-item"><div class="dot c-blue"></div>다크 카키 또는 블랙 슬랙스</div>
+        </div>
+        <div class="costume-section">
+          <h4>소품</h4>
+          <div class="costume-item"><div class="dot c-blue"></div>헤드셋 (무선 이어폰 + 마이크붐 스타일이면 최고)</div>
+          <div class="costume-item"><div class="dot c-blue"></div>모니터 앞 자세 — 키보드에 손 올리기</div>
+          <div class="costume-item"><div class="dot c-blue"></div>태블릿 또는 클립보드</div>
+        </div>
+        <div class="costume-section">
+          <h4>연기 포인트</h4>
+          <div class="costume-item"><div class="dot c-blue"></div>알람 울릴 때 화면 응시 + 빠르게 키보드 타이핑</div>
+          <div class="costume-item"><div class="dot c-blue"></div>"침입자 감지, 드론 출동 승인" 대사 (선택)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 드론 파일럿 -->
+    <div class="role-card">
+      <div class="role-card-header">
+        <div class="role-icon">🎮</div>
+        <div>
+          <div class="role-name">드론 파일럿 (Pilot Agent)</div>
+          <div class="role-sub">DJI Mavic3 Pro · RC Pro 조종기</div>
+        </div>
+      </div>
+      <div class="role-card-body">
+        <div class="costume-section">
+          <h4>의상 컬러</h4>
+          <div class="color-chips">
+            <span class="chip chip-black">블랙</span>
+            <span class="chip chip-khaki">택티컬 카키</span>
+          </div>
+        </div>
+        <div class="costume-section">
+          <h4>의상</h4>
+          <div class="costume-item"><div class="dot c-blue"></div>블랙 또는 다크 올리브 택티컬 셔츠 (반팔/긴팔)</div>
+          <div class="costume-item"><div class="dot c-blue"></div>블랙 카고팬츠</div>
+          <div class="costume-item"><div class="dot c-blue"></div>블랙 전술화 또는 워킹화</div>
+          <div class="costume-item"><div class="dot c-blue"></div>가슴/팔에 벨크로 패치 부착 (DJI, 드론파일럿 등)</div>
+        </div>
+        <div class="costume-section">
+          <h4>핵심 소품</h4>
+          <div class="costume-item"><div class="dot c-red"></div>DJI RC Pro 조종기 (실제 또는 모형)</div>
+          <div class="costume-item"><div class="dot c-red"></div>DJI Mavic 3 Pro 드론 (이륙 장면)</div>
+          <div class="costume-item"><div class="dot c-blue"></div>인이어 이어폰 (통신 연결 느낌)</div>
+        </div>
+        <div class="costume-section">
+          <h4>연기 포인트</h4>
+          <div class="costume-item"><div class="dot c-blue"></div>드론 이륙 시 조종기 양손으로 잡고 화면 응시</div>
+          <div class="costume-item"><div class="dot c-blue"></div>야외 이륙 패드 위에서 드론 런칭 장면</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 현장 보안요원 (옵션) -->
+    <div class="role-card">
+      <div class="role-card-header">
+        <div class="role-icon">👮</div>
+        <div>
+          <div class="role-name">현장 보안요원 (Security Guard)</div>
+          <div class="role-sub">드론 유도 후 현장 대응</div>
+        </div>
+      </div>
+      <div class="role-card-body">
+        <div class="costume-section">
+          <h4>의상 컬러</h4>
+          <div class="color-chips">
+            <span class="chip chip-navy">네이비</span>
+            <span class="chip chip-black">블랙</span>
+          </div>
+        </div>
+        <div class="costume-section">
+          <h4>의상</h4>
+          <div class="costume-item"><div class="dot c-blue"></div>네이비 블루 경비복 스타일 (상하 세트)</div>
+          <div class="costume-item"><div class="dot c-blue"></div>반사띠 있는 조끼 위에 착용</div>
+          <div class="costume-item"><div class="dot c-blue"></div>블랙 안전화</div>
+        </div>
+        <div class="costume-section">
+          <h4>소품</h4>
+          <div class="costume-item"><div class="dot c-yellow"></div>무전기 (허리에 클립)</div>
+          <div class="costume-item"><div class="dot c-yellow"></div>손전등 (야간 이동용)</div>
+          <div class="costume-item"><div class="dot c-yellow"></div>안전모 (야간 공장 구역)</div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /roles-grid -->
+
+  <!-- 씬 타임라인 -->
+  <div class="timeline">
+    <h3>📽 씬 흐름 타임라인 — 시나리오 01</h3>
+    <div class="tl-item">
+      <div class="tl-time" style="background:#ff3b5c22;color:var(--red);">00:00</div>
+      <div class="tl-content">
+        <div class="tl-title">야간 공장 외벽 — 침입자 접근</div>
+        <div class="tl-desc">검정 후드 착용 침입자, 담벼락/철문 주변에서 두리번거리며 접근. 야간 조명 최소화, 손전등 빛 연출.</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-time" style="background:#ff3b5c22;color:var(--red);">00:08</div>
+      <div class="tl-content">
+        <div class="tl-title">비상벨 앞 통과 → CCTV 감지</div>
+        <div class="tl-desc">침입자가 비상벨(빨간 박스) 근처 지나감. CCTV 앵글 → 화면에 YOLOv8 바운딩박스 오버레이 편집.</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-time" style="background:#ff3b5c22;color:var(--red);">00:14</div>
+      <div class="tl-content">
+        <div class="tl-title">관제센터 — 알람 수신</div>
+        <div class="tl-desc">관제 요원이 모니터 화면(Digital Police Response UI) 보며 빠르게 반응. 헤드셋 통해 "드론 출동" 승인.</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-time" style="background:#ff3b5c22;color:var(--red);">00:22</div>
+      <div class="tl-content">
+        <div class="tl-title">드론 파일럿 — 이륙 시퀀스</div>
+        <div class="tl-desc">야외 이륙 패드에서 DJI Mavic3 스타트업. 파일럿이 RC Pro 조종기 들고 드론 이륙 확인.</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-time" style="background:#ff3b5c22;color:var(--red);">00:35</div>
+      <div class="tl-content">
+        <div class="tl-title">드론 FPV — 추적 비행</div>
+        <div class="tl-desc">DJI FPV 영상 + CH3 HUD 오버레이 편집. 드론이 침입자 머리 위 호버링. 침입자 위쪽 빛(드론 LED) 인식.</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-time" style="background:#ff3b5c22;color:var(--red);">00:45</div>
+      <div class="tl-content">
+        <div class="tl-title">현장 보안요원 도착 — 해결</div>
+        <div class="tl-desc">경비복 보안요원이 무전기 들고 현장 도착. 침입자 제지 또는 퇴거 장면.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 촬영 팁 -->
+  <div class="tip-box">
+    <h4>🎥 시나리오 01 촬영 팁</h4>
+    <ul>
+      <li>야간 촬영 권장 (22:00 이후) — 공장/창고/주차장 외벽 활용</li>
+      <li>CCTV 앵글 시뮬레이션: 고정 카메라를 위쪽에 설치, 광각으로 촬영 후 후편집으로 YOLOv8 박스 합성</li>
+      <li>드론 이륙 장면은 안전한 개활지에서 촬영, 저고도로 진행</li>
+      <li>관제 씬은 모니터 화면에 실제 UI(warehouse.exko.kr/drone) 띄워놓고 촬영하면 리얼감 UP</li>
+      <li>침입자 얼굴은 모자/후드로 자연스럽게 가려서 인물 식별 불필요하게 처리</li>
+    </ul>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+
+<!-- ══════════════════════════════════════════
+     SCENARIO 2 — 야간 화재 감지
+══════════════════════════════════════════ -->
+<div class="scenario-section sc2">
+  <div class="scenario-header">
+    <div class="scenario-num">02</div>
+    <div class="scenario-title-block">
+      <h2>🔥 야간 화재 — 열화상 긴급 출동</h2>
+      <div class="sub">FIRE DETECTION · THERMAL IMAGING · EMERGENCY DISPATCH</div>
+    </div>
+    <div class="scenario-tag">FIRE ALERT</div>
+  </div>
+
+  <div class="roles-grid">
+
+    <!-- 공장 근무자 (발견자) -->
+    <div class="role-card">
+      <div class="role-card-header">
+        <div class="role-icon">👷</div>
+        <div>
+          <div class="role-name">공장 근무자 (Worker)</div>
+          <div class="role-sub">화재 최초 발견 신고자</div>
+        </div>
+      </div>
+      <div class="role-card-body">
+        <div class="costume-section">
+          <h4>의상 컬러</h4>
+          <div class="color-chips">
+            <span class="chip chip-hi-vis">형광 옐로우</span>
+            <span class="chip chip-orange">오렌지</span>
+            <span class="chip chip-khaki">카키 워크웨어</span>
+          </div>
+        </div>
+        <div class="costume-section">
+          <h4>의상</h4>
+          <div class="costume-item"><div class="dot c-yellow"></div>형광 노란색 안전조끼 (필수)</div>
+          <div class="costume-item"><div class="dot c-orange"></div>그 아래 짙은 카키 또는 블루 워크웨어 상의</div>
+          <div class="costume-item"><div class="dot c-orange"></div>두꺼운 작업바지 (다크 카키/그레이)</div>
+          <div class="costume-item"><div class="dot c-orange"></div>안전화 + 작업장갑</div>
+        </div>
+        <div class="costume-section">
+          <h4>안전 장구</h4>
+          <div class="costume-item"><div class="dot c-yellow"></div>흰색 또는 오렌지 안전모 (헬멧)</div>
+          <div class="costume-item"><div class="dot c-yellow"></div>귀마개 목걸이 (작업현장 디테일)</div>
+        </div>
+        <div class="costume-section">
+          <h4>소품</h4>
+          <div class="costume-item"><div class="dot c-orange"></div>스마트폰 (GPS 신고 연출용)</div>
+          <div class="costume-item"><div class="dot c-orange"></div>무전기 (허리 벨트)</div>
+        </div>
+        <div class="costume-section">
+          <h4>연기 포인트</h4>
+          <div class="costume-item"><div class="dot c-orange"></div>연기/불꽃 발견 후 놀라는 리액션 → 무전기/폰 신고</div>
+          <div class="costume-item"><div class="dot c-orange"></div>소화기 들고 대기하는 장면</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 관제 요원 (긴급 대응) -->
+    <div class="role-card">
+      <div class="role-card-header">
+        <div class="role-icon">🖥️</div>
+        <div>
+          <div class="role-name">관제 요원 (Emergency Ops)</div>
+          <div class="role-sub">화재 신호 수신 · 드론 긴급 출동</div>
+        </div>
+      </div>
+      <div class="role-card-body">
+        <div class="costume-section">
+          <h4>의상 컬러</h4>
+          <div class="color-chips">
+            <span class="chip chip-black">블랙</span>
+            <span class="chip chip-orange">오렌지 포인트</span>
+          </div>
+        </div>
+        <div class="costume-section">
+          <h4>의상</h4>
+          <div class="costume-item"><div class="dot c-orange"></div>블랙 또는 다크네이비 근무복</div>
+          <div class="costume-item"><div class="dot c-orange"></div>오렌지색 포인트 스트라이프 있는 조끼 착용 (소방/긴급 느낌)</div>
+          <div class="costume-item"><div class="dot c-orange"></div>소매에 반사 테이프 (선택)</div>
+        </div>
+        <div class="costume-section">
+          <h4>소품</h4>
+          <div class="costume-item"><div class="dot c-orange"></div>헤드셋 필수 (긴박한 통신 연출)</div>
+          <div class="costume-item"><div class="dot c-orange"></div>2중 모니터 화면 (화재 알람 뜨는 UI)</div>
+          <div class="costume-item"><div class="dot c-orange"></div>긴급 버튼 누르는 제스처</div>
+        </div>
+        <div class="costume-section">
+          <h4>연기 포인트</h4>
+          <div class="costume-item"><div class="dot c-orange"></div>화면 보며 "🔥 화재 신호 수신 — 드론 출동!" 외침</div>
+          <div class="costume-item"><div class="dot c-orange"></div>붉은 빛 조명 아래 긴박하게 타이핑하는 장면</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 드론 파일럿 (화재 출동) -->
+    <div class="role-card">
+      <div class="role-card-header">
+        <div class="role-icon">🚁</div>
+        <div>
+          <div class="role-name">드론 파일럿 (Fire Recon)</div>
+          <div class="role-sub">열화상 정찰 · DJI Mavic3 Pro</div>
+        </div>
+      </div>
+      <div class="role-card-body">
+        <div class="costume-section">
+          <h4>의상 컬러</h4>
+          <div class="color-chips">
+            <span class="chip chip-orange">오렌지 재킷</span>
+            <span class="chip chip-black">블랙 하의</span>
+          </div>
+        </div>
+        <div class="costume-section">
+          <h4>의상</h4>
+          <div class="costume-item"><div class="dot c-orange"></div>오렌지 or 형광 조끼/재킷 (소방/긴급 대응 느낌)</div>
+          <div class="costume-item"><div class="dot c-orange"></div>블랙 카고팬츠 + 안전화</div>
+          <div class="costume-item"><div class="dot c-orange"></div>헬멧 착용 권장 (오렌지/화이트)</div>
+        </div>
+        <div class="costume-section">
+          <h4>핵심 소품</h4>
+          <div class="costume-item"><div class="dot c-red"></div>DJI RC Pro 조종기 (화면 보며 조종)</div>
+          <div class="costume-item"><div class="dot c-orange"></div>조명탄/야광봉 (이륙 구역 표시 — 연출용)</div>
+          <div class="costume-item"><div class="dot c-orange"></div>내화 장갑 스타일 (작업장갑)</div>
+        </div>
+        <div class="costume-section">
+          <h4>연기 포인트</h4>
+          <div class="costume-item"><div class="dot c-orange"></div>연기 피어오르는 배경 앞 드론 이륙 장면 극적 연출</div>
+          <div class="costume-item"><div class="dot c-orange"></div>조종기 화면에 열화상 합성 편집 (후보정)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 소방/안전 담당자 -->
+    <div class="role-card">
+      <div class="role-card-header">
+        <div class="role-icon">🧯</div>
+        <div>
+          <div class="role-name">소방 안전 담당자</div>
+          <div class="role-sub">드론 정찰 후 현장 진압팀 진입</div>
+        </div>
+      </div>
+      <div class="role-card-body">
+        <div class="costume-section">
+          <h4>의상 컬러</h4>
+          <div class="color-chips">
+            <span class="chip chip-orange">오렌지</span>
+            <span class="chip chip-hi-vis">형광 조끼</span>
+          </div>
+        </div>
+        <div class="costume-section">
+          <h4>의상</h4>
+          <div class="costume-item"><div class="dot c-orange"></div>오렌지 안전복 (상하 세트) 또는 방화복 스타일</div>
+          <div class="costume-item"><div class="dot c-orange"></div>형광 반사조끼 + 안전모 + 안전화</div>
+          <div class="costume-item"><div class="dot c-orange"></div>가슴에 "FIRE SAFETY" 또는 안전팀 로고</div>
+        </div>
+        <div class="costume-section">
+          <h4>소품</h4>
+          <div class="costume-item"><div class="dot c-red"></div>ABC 소화기 (실제 또는 훈련용)</div>
+          <div class="costume-item"><div class="dot c-orange"></div>방화 장갑</div>
+          <div class="costume-item"><div class="dot c-yellow"></div>무전기</div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /roles-grid -->
+
+  <!-- 씬 타임라인 -->
+  <div class="timeline">
+    <h3>📽 씬 흐름 타임라인 — 시나리오 02</h3>
+    <div class="tl-item">
+      <div class="tl-time" style="background:#ff8c0022;color:var(--orange);">00:00</div>
+      <div class="tl-content">
+        <div class="tl-title">공장 내부 — 연기/불꽃 발생</div>
+        <div class="tl-desc">근무자가 기계 뒤편 연기 발견 (실제 연기기 or 드라이아이스 연출). 놀라는 리액션, 무전기 꺼내 신고.</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-time" style="background:#ff8c0022;color:var(--orange);">00:07</div>
+      <div class="tl-content">
+        <div class="tl-title">관제센터 — 화재 신호 수신</div>
+        <div class="tl-desc">모니터에 붉은 알람 표시 (UI 화면 촬영). 관제 요원 헤드셋 착용, 긴박하게 드론 출동 승인.</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-time" style="background:#ff8c0022;color:var(--orange);">00:15</div>
+      <div class="tl-content">
+        <div class="tl-title">야외 스탠바이 구역 — 드론 긴급 이륙</div>
+        <div class="tl-desc">오렌지 재킷 파일럿이 드론 이륙. 배경에 연기 기둥 보이면 최고. 드론이 공장 방향으로 날아가는 장면.</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-time" style="background:#ff8c0022;color:var(--orange);">00:28</div>
+      <div class="tl-content">
+        <div class="tl-title">드론 FPV + 열화상 합성 편집</div>
+        <div class="tl-desc">DJI 촬영 영상에 열화상 컬러맵 오버레이 후편집. 화재 위치 서클 + 온도 표시 자막 합성.</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-time" style="background:#ff8c0022;color:var(--orange);">00:40</div>
+      <div class="tl-content">
+        <div class="tl-title">소방팀 진입 — 진압 시작</div>
+        <div class="tl-desc">오렌지 안전복 소방팀이 드론 안내에 따라 진압 위치 진입. 소화기 분사 장면.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tip-box">
+    <h4>🎥 시나리오 02 촬영 팁</h4>
+    <ul>
+      <li>연기 연출: 드라이아이스 + 온수, 또는 파티용 연기기(스모크 머신) 활용</li>
+      <li>불꽃 연출: 실제 불 사용 위험 — 후편집으로 불꽃 합성 추천 (Adobe After Effects / CapCut)</li>
+      <li>열화상 효과: 후보정 시 "Inferno" 컬러맵 LUT 필터 적용하면 열화상 카메라 느낌 연출 가능</li>
+      <li>긴박감 UP: 붉은 LED 조명 또는 경광등 비추면서 촬영</li>
+      <li>드론 이륙 배경으로 연기 기둥이 보이면 극적 효과 극대화</li>
+      <li>안전 최우선: 실제 화기 사용 금지, 연기 발생 시 환기 확보</li>
+    </ul>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+
+<!-- ══════════════════════════════════════════
+     SCENARIO 3 — 야간 정기 순찰
+══════════════════════════════════════════ -->
+<div class="scenario-section sc3">
+  <div class="scenario-header">
+    <div class="scenario-num">03</div>
+    <div class="scenario-title-block">
+      <h2>🛸 야간 정기 순찰 — 자율 비행 루틴</h2>
+      <div class="sub">AUTONOMOUS PATROL · SCHEDULED ROUTE · GREEN STATUS</div>
+    </div>
+    <div class="scenario-tag">PATROL</div>
+  </div>
+
+  <div class="roles-grid">
+
+    <!-- 드론 운용 담당자 -->
+    <div class="role-card">
+      <div class="role-card-header">
+        <div class="role-icon">🚁</div>
+        <div>
+          <div class="role-name">드론 운용 담당자 (Drone Ops)</div>
+          <div class="role-sub">자율 순찰 루트 설정 · 모니터링</div>
+        </div>
+      </div>
+      <div class="role-card-body">
+        <div class="costume-section">
+          <h4>의상 컬러</h4>
+          <div class="color-chips">
+            <span class="chip chip-navy">네이비</span>
+            <span class="chip chip-black">블랙</span>
+            <span class="chip chip-green">그린 포인트</span>
+          </div>
+        </div>
+        <div class="costume-section">
+          <h4>의상</h4>
+          <div class="costume-item"><div class="dot c-green"></div>네이비 또는 블랙 기능성 점퍼/자켓 (야간 작업 느낌)</div>
+          <div class="costume-item"><div class="dot c-green"></div>블랙 카고팬츠</div>
+          <div class="costume-item"><div class="dot c-green"></div>가슴에 형광 그린 "PATROL" 또는 "AUTONOMOUS" 로고 패치</div>
+          <div class="costume-item"><div class="dot c-green"></div>블랙 캡모자 또는 택티컬 헤드셋</div>
+        </div>
+        <div class="costume-section">
+          <h4>소품</h4>
+          <div class="costume-item"><div class="dot c-green"></div>DJI RC Pro 조종기 (또는 태블릿 — 루트 플래닝 화면)</div>
+          <div class="costume-item"><div class="dot c-green"></div>클립보드에 "순찰 루트 맵" 출력본</div>
+          <div class="costume-item"><div class="dot c-green"></div>체크리스트 (체크하는 장면)</div>
+        </div>
+        <div class="costume-section">
+          <h4>연기 포인트</h4>
+          <div class="costume-item"><div class="dot c-green"></div>드론 이륙 전 체크리스트 확인하는 전문가적 자세</div>
+          <div class="costume-item"><div class="dot c-green"></div>드론이 자율 비행 중 여유롭게 모니터링하는 장면</div>
+          <div class="costume-item"><div class="dot c-green"></div>"순찰 완료, 이상 없음" 태블릿 확인 후 메모하는 마무리 장면</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 관제 요원 (야간 당직) -->
+    <div class="role-card">
+      <div class="role-card-header">
+        <div class="role-icon">🌙</div>
+        <div>
+          <div class="role-name">야간 당직 관제 요원</div>
+          <div class="role-sub">순찰 루트 확인 · 이상 없음 확인</div>
+        </div>
+      </div>
+      <div class="role-card-body">
+        <div class="costume-section">
+          <h4>의상 컬러</h4>
+          <div class="color-chips">
+            <span class="chip chip-navy">네이비</span>
+            <span class="chip chip-gray">다크그레이</span>
+          </div>
+        </div>
+        <div class="costume-section">
+          <h4>의상</h4>
+          <div class="costume-item"><div class="dot c-green"></div>네이비/다크그레이 근무복 (차분한 야간 당직 느낌)</div>
+          <div class="costume-item"><div class="dot c-green"></div>긴 소매 셔츠 또는 얇은 자켓</div>
+          <div class="costume-item"><div class="dot c-green"></div>회사 로고 배지/명찰 부착</div>
+        </div>
+        <div class="costume-section">
+          <h4>소품</h4>
+          <div class="costume-item"><div class="dot c-green"></div>헤드셋 (한쪽 귀에만 — 여유로운 당직 느낌)</div>
+          <div class="costume-item"><div class="dot c-green"></div>커피잔 (야간 당직 감성)</div>
+          <div class="costume-item"><div class="dot c-green"></div>모니터에 순찰 루트 지도 표시</div>
+        </div>
+        <div class="costume-section">
+          <h4>연기 포인트</h4>
+          <div class="costume-item"><div class="dot c-green"></div>차분하게 모니터 응시, 가끔 체크리스트 기입</div>
+          <div class="costume-item"><div class="dot c-green"></div>"23:00 순찰 — 이상 없음" 로그 입력하는 장면</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 야간 보안요원 (마주침 없는 정상 순찰) -->
+    <div class="role-card">
+      <div class="role-card-header">
+        <div class="role-icon">🦺</div>
+        <div>
+          <div class="role-name">야간 보안요원 (Night Guard)</div>
+          <div class="role-sub">드론과 협업 — 구역 확인</div>
+        </div>
+      </div>
+      <div class="role-card-body">
+        <div class="costume-section">
+          <h4>의상 컬러</h4>
+          <div class="color-chips">
+            <span class="chip chip-navy">네이비</span>
+            <span class="chip chip-hi-vis">형광 반사조끼</span>
+          </div>
+        </div>
+        <div class="costume-section">
+          <h4>의상</h4>
+          <div class="costume-item"><div class="dot c-green"></div>네이비 경비복 상하</div>
+          <div class="costume-item"><div class="dot c-green"></div>형광 반사조끼 (야간 가시성)</div>
+          <div class="costume-item"><div class="dot c-green"></div>안전모 (현장 내 이동 시)</div>
+          <div class="costume-item"><div class="dot c-green"></div>블랙 안전화</div>
+        </div>
+        <div class="costume-section">
+          <h4>소품</h4>
+          <div class="costume-item"><div class="dot c-yellow"></div>손전등 (크고 밝은 것 — 야간 순찰 느낌)</div>
+          <div class="costume-item"><div class="dot c-green"></div>무전기 (허리)</div>
+          <div class="costume-item"><div class="dot c-green"></div>순찰 체크리스트 클립보드</div>
+        </div>
+        <div class="costume-section">
+          <h4>연기 포인트</h4>
+          <div class="costume-item"><div class="dot c-green"></div>공장 외부/내부 천천히 순찰하는 장면</div>
+          <div class="costume-item"><div class="dot c-green"></div>머리 위 드론 지나가면 올려다보며 엄지척 하는 장면 (사람+드론 협업 강조)</div>
+          <div class="costume-item"><div class="dot c-green"></div>문 잠금 확인, CCTV 박스 점검하는 장면</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI 시스템 운용자 (선택) -->
+    <div class="role-card">
+      <div class="role-card-header">
+        <div class="role-icon">🤖</div>
+        <div>
+          <div class="role-name">AI 시스템 운용자 (Tech Lead)</div>
+          <div class="role-sub">MCP 에이전트 상태 확인 · 시스템 관리</div>
+        </div>
+      </div>
+      <div class="role-card-body">
+        <div class="costume-section">
+          <h4>의상 컬러</h4>
+          <div class="color-chips">
+            <span class="chip chip-white">화이트</span>
+            <span class="chip chip-gray">라이트그레이</span>
+            <span class="chip chip-navy">네이비 포인트</span>
+          </div>
+        </div>
+        <div class="costume-section">
+          <h4>의상</h4>
+          <div class="costume-item"><div class="dot c-blue"></div>화이트 또는 라이트그레이 기술직 셔츠 (깔끔한 느낌)</div>
+          <div class="costume-item"><div class="dot c-blue"></div>네이비 카디건 또는 회사 후드</div>
+          <div class="costume-item"><div class="dot c-blue"></div>다크 슬랙스</div>
+          <div class="costume-item"><div class="dot c-blue"></div>사원증/ID 배지 (끈 목걸이)</div>
+        </div>
+        <div class="costume-section">
+          <h4>소품</h4>
+          <div class="costume-item"><div class="dot c-blue"></div>노트북 + 멀티 모니터 (코드/대시보드 화면)</div>
+          <div class="costume-item"><div class="dot c-blue"></div>스마트폰 (알림 확인)</div>
+        </div>
+        <div class="costume-section">
+          <h4>연기 포인트</h4>
+          <div class="costume-item"><div class="dot c-green"></div>MCP 에이전트 상태 화면 보며 "모든 에이전트 정상 작동 중" 확인</div>
+          <div class="costume-item"><div class="dot c-green"></div>순찰 완료 후 로그 데이터 확인하는 전문가 장면</div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /roles-grid -->
+
+  <!-- 씬 타임라인 -->
+  <div class="timeline">
+    <h3>📽 씬 흐름 타임라인 — 시나리오 03</h3>
+    <div class="tl-item">
+      <div class="tl-time" style="background:#00ff8822;color:var(--green);">22:55</div>
+      <div class="tl-content">
+        <div class="tl-title">관제센터 — 정기 순찰 스케줄 확인</div>
+        <div class="tl-desc">야간 당직 요원이 "23:00 정기 순찰 예정" 확인. 여유로운 분위기, 커피 한 모금.</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-time" style="background:#00ff8822;color:var(--green);">23:00</div>
+      <div class="tl-content">
+        <div class="tl-title">드론 자동 이륙 시퀀스</div>
+        <div class="tl-desc">이륙 패드에서 Mavic3 자동 이륙 (파일럿은 모니터링만). 야간 공장 전경 위로 드론 상승 샷.</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-time" style="background:#00ff8822;color:var(--green);">23:03</div>
+      <div class="tl-content">
+        <div class="tl-title">자율 비행 — 공장 외곽 순찰</div>
+        <div class="tl-desc">드론이 설정된 웨이포인트 따라 공장 외곽 비행. 야간 항법등(빨강/초록) 빛이 건물에 반사되는 장면.</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-time" style="background:#00ff8822;color:var(--green);">23:05</div>
+      <div class="tl-content">
+        <div class="tl-title">보안요원 — 드론과 협업 순찰</div>
+        <div class="tl-desc">야간 보안요원이 손전등 들고 순찰 중, 드론이 머리 위 지나가면 올려다보는 장면. 인간-드론 협업 포인트.</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-time" style="background:#00ff8822;color:var(--green);">23:12</div>
+      <div class="tl-content">
+        <div class="tl-title">순찰 완료 — 복귀 착륙</div>
+        <div class="tl-desc">드론 귀환 착륙 장면. 관제 화면에 "이상 없음 — 순찰 완료" 메시지 표시.</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-time" style="background:#00ff8822;color:var(--green);">23:14</div>
+      <div class="tl-content">
+        <div class="tl-title">AI 운용자 — 데이터 확인</div>
+        <div class="tl-desc">Tech Lead가 순찰 로그, 이미지 데이터 확인. "23:00 순찰 완료, 이상 없음" 로그 승인.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tip-box">
+    <h4>🎥 시나리오 03 촬영 팁</h4>
+    <ul>
+      <li>야간 공장 외곽을 드론이 비행하는 항공샷이 핵심 — 저속 셔터로 항법등 빛 궤적을 담으면 시각적으로 아름다움</li>
+      <li>보안요원이 올려다보는 장면: 드론 아래에서 위를 보는 앙각 + 드론 시점(FPV) 교차편집으로 연결</li>
+      <li>분위기: 침착하고 전문적인 루틴 작업 느낌 (Scenario 1/2와 달리 긴박감 없음)</li>
+      <li>배경음악: 차분하고 미래지향적인 BGM (긴박한 타격음 대신 electronic ambient)</li>
+      <li>드론 항법등(적/녹 점멸)이 건물 외벽에 반사되는 장면 → 미래적 분위기 극대화</li>
+      <li>관제센터와 현장을 교차편집 (스플릿스크린 효과 고려)</li>
+    </ul>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════
+     전체 세팅 & 공통 장비 요약
+══════════════════════════════════════════ -->
+<div class="summary-section">
+  <h2>📋 공통 장비 & 전체 세팅 요약</h2>
+
+  <div class="summary-grid">
+
+    <div class="summary-card">
+      <h4>🎬 촬영 장소</h4>
+      <p>
+        <b>관제센터 씬</b>: 어두운 실내 + 모니터 2~3대 (warehouse.exko.kr/drone UI 오픈)<br><br>
+        <b>현장 씬</b>: 공장/창고 외벽, 철문, 야간 주차장<br><br>
+        <b>드론 씬</b>: 개활지 이륙 패드 (반경 30m 이상 안전 공간)
+      </p>
+    </div>
+
+    <div class="summary-card">
+      <h4>💡 공통 조명 세팅</h4>
+      <p>
+        <b>관제센터</b>: 모니터 빛만 (배경 어두울수록 좋음)<br><br>
+        <b>야간 현장</b>: 가로등 + 손전등만 활용<br><br>
+        <b>경보 씬</b>: 빨간 LED/경광등 추가<br><br>
+        <b>순찰 씬</b>: 드론 항법등이 자연 조명
+      </p>
+    </div>
+
+    <div class="summary-card">
+      <h4>🛸 드론 장비</h4>
+      <p>
+        <b>DJI Mavic 3 Pro</b> — 메인 촬영<br><br>
+        <b>DJI RC Pro</b> — 파일럿 핸드 소품<br><br>
+        <b>이륙 패드</b> — 오렌지 패드 권장 (시각적 포인트)<br><br>
+        <b>여분 배터리</b> 2개 이상 필수
+      </p>
+    </div>
+
+    <div class="summary-card">
+      <h4>📱 화면 소품</h4>
+      <p>
+        <b>UI 모니터</b>: warehouse.exko.kr/drone<br><br>
+        <b>GPS 지도</b>: 카카오맵/구글맵 다크모드<br><br>
+        <b>태블릿</b>: 순찰 루트 맵 출력 또는 앱 화면<br><br>
+        <b>클립보드</b>: 체크리스트 출력본
+      </p>
+    </div>
+
+    <div class="summary-card">
+      <h4>🎨 전체 컬러 팔레트</h4>
+      <p>
+        <b>배경</b>: 다크네이비, 블랙<br><br>
+        <b>Sc.01 포인트</b>: 빨간색 (위협/경보)<br><br>
+        <b>Sc.02 포인트</b>: 오렌지 (화재/긴급)<br><br>
+        <b>Sc.03 포인트</b>: 그린 (안전/정상)<br><br>
+        <b>공통</b>: 형광 노란 안전조끼, 반사 테이프
+      </p>
+    </div>
+
+    <div class="summary-card">
+      <h4>✂️ 편집 효과</h4>
+      <p>
+        <b>Sc.01</b>: YOLOv8 바운딩박스 합성, 나이트비전 그린 LUT<br><br>
+        <b>Sc.02</b>: 열화상 Inferno LUT, 불꽃 합성, 빨간 경보 효과<br><br>
+        <b>Sc.03</b>: 항법등 빛 궤적(장노출), 항공샷 색보정<br><br>
+        <b>공통</b>: UI 화면 PIP 삽입, 자막 타이핑 효과
+      </p>
+    </div>
+
+  </div>
+</div>
+
+<!-- 로딩 오버레이 -->
+<div id="pdf-overlay">
+  <div class="spinner"></div>
+  <p id="pdf-status">PDF 생성 중...</p>
+</div>
+
+<!-- 버튼 그룹 -->
+<div class="btn-group">
+  <button class="action-btn btn-pdf" id="btn-pdf" onclick="downloadPDF()">
+    📄 PDF로 저장
+  </button>
+  <button class="action-btn btn-print" onclick="window.print()">
+    🖨 인쇄
+  </button>
+</div>
+
+<!-- jsPDF + html2canvas CDN -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<script>
+async function downloadPDF() {
+  const btn     = document.getElementById('btn-pdf');
+  const overlay = document.getElementById('pdf-overlay');
+  const status  = document.getElementById('pdf-status');
+
+  // 버튼 비활성화 + 오버레이 표시
+  btn.disabled = true;
+  btn.textContent = '⏳ 생성 중...';
+  overlay.classList.add('show');
+
+  try {
+    const { jsPDF } = window.jspdf;
+
+    // A4 사이즈 기준 (mm)
+    const A4_W = 210;
+    const A4_H = 297;
+    const MARGIN = 10; // mm
+    const contentW = A4_W - MARGIN * 2;
+
+    status.textContent = '페이지 캡처 중... (1/3)';
+    await sleep(100);
+
+    // 전체 body를 고해상도로 캡처
+    const canvas = await html2canvas(document.body, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#0a0e1a',
+      logging: false,
+      windowWidth: 1200,
+    });
+
+    status.textContent = 'PDF 페이지 분할 중... (2/3)';
+    await sleep(100);
+
+    const imgData  = canvas.toDataURL('image/jpeg', 0.92);
+    const imgW     = canvas.width;
+    const imgH     = canvas.height;
+
+    // 비율 유지하며 A4 너비에 맞게 축소
+    const pdfImgW  = contentW;
+    const pdfImgH  = (imgH / imgW) * pdfImgW;
+
+    // 필요한 페이지 수 계산
+    const pageContentH = A4_H - MARGIN * 2;
+    const totalPages   = Math.ceil(pdfImgH / pageContentH);
+
+    const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+
+    for (let i = 0; i < totalPages; i++) {
+      if (i > 0) pdf.addPage();
+
+      // 이 페이지에서 잘라낼 이미지의 y 오프셋 (mm)
+      const offsetY = i * pageContentH;
+
+      // mm → px 변환 (72dpi 기준 jsPDF 내부)
+      pdf.addImage(
+        imgData,
+        'JPEG',
+        MARGIN,              // x
+        MARGIN - offsetY,    // y (음수로 올려서 페이지 이동 효과)
+        pdfImgW,
+        pdfImgH
+      );
+
+      // 흰 마스크로 페이지 밖 영역 가리기
+      // 위쪽
+      if (offsetY > 0) {
+        pdf.setFillColor(10, 14, 26);
+        pdf.rect(0, 0, A4_W, MARGIN, 'F');
+      }
+      // 아래쪽
+      pdf.setFillColor(10, 14, 26);
+      pdf.rect(0, A4_H - MARGIN, A4_W, MARGIN + 1, 'F');
+    }
+
+    status.textContent = '파일 저장 중... (3/3)';
+    await sleep(100);
+
+    const today = new Date();
+    const dateStr = `${today.getFullYear()}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}`;
+    pdf.save(`코디가이드_Digital_Police_Response_${dateStr}.pdf`);
+
+  } catch (err) {
+    console.error('PDF 생성 오류:', err);
+    alert('PDF 생성 중 오류가 발생했습니다.\n브라우저의 인쇄(Ctrl+P) 기능으로 PDF 저장을 이용해 주세요.');
+  } finally {
+    overlay.classList.remove('show');
+    btn.disabled = false;
+    btn.textContent = '📄 PDF로 저장';
+  }
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+</script>
+
+</body>
+</html>
