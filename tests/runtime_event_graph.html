@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Runtime Event Graph Regression</title></head>
+<body>
+<pre id="results">RUNNING</pre>
+<script src="../backend/static/js/runtime_event_graph.js"></script>
+<script>
+(function run() {
+    'use strict';
+    const output = document.getElementById('results');
+    const checks = [];
+    const assert = (condition, message) => {
+        if (!condition) throw new Error(message);
+        checks.push(message);
+    };
+    try {
+        const api = window.RuntimeEventGraph;
+        const graph = new api.RuntimeGraph();
+        const targetId = 'F03|DRIVER001|ASSIGNMENT001';
+        const context = { vehicleId: 'F03', driverId: 'DRIVER001',
+            driverAssignmentId: 'ASSIGNMENT001', targetId };
+        const observation = { observationId: 'OBS-GRAPH-001', observationType: 'DROWSINESS',
+            targetId, observedAt: '2026-08-01T00:00:00.000Z', metadata: context };
+        const riskEvent = { eventId: 'RISK-GRAPH-001', eventType: 'DROWSINESS', targetId,
+            state: 'ACTIVE', createdTime: '2026-08-01T00:00:01.000Z', updatedTime: '2026-08-01T00:00:01.000Z' };
+        const policyDecision = { decisionId: 'POLICY-GRAPH-001', sourceEventId: riskEvent.eventId,
+            targetId, reasonCodes: ['DROWSINESS_ACTIVE'], createdTime: '2026-08-01T00:00:02.000Z' };
+        const actionRequest = { actionId: 'ACTION-GRAPH-001', sourceDecisionId: policyDecision.decisionId,
+            sourceEventId: riskEvent.eventId, targetId, createdTime: '2026-08-01T00:00:03.000Z' };
+        const execution = { executionId: 'EXEC-GRAPH-001', actionId: actionRequest.actionId,
+            sourceDecisionId: policyDecision.decisionId, sourceEventId: riskEvent.eventId, targetId,
+            state: 'SIMULATED', requestedTime: '2026-08-01T00:00:04.000Z',
+            startedTime: '2026-08-01T00:00:05.000Z', simulation: true, actuatorConnected: false,
+            metadata: { selectedAdapterType: 'DETERMINISTIC_SIMULATION', relationships: {
+                actionExecutionAppliesToVehicleContext: context } } };
+
+        const path = graph.ingestRuntimeChain({ observation, riskEvent, policyDecision, actionRequest,
+            actionExecution: execution });
+        const pathTypes = path.map(node => node.nodeType);
+        assert(JSON.stringify(pathTypes) === JSON.stringify(['Observation', 'RiskEvent',
+            'PolicyDecision', 'ActionRequest', 'ActionExecution']), 'complete runtime path');
+        const nodeTypes = new Set(graph.getRuntimeNodes().map(node => node.nodeType));
+        ['Observation', 'RiskEvent', 'PolicyDecision', 'ActionRequest', 'ActionExecution',
+            'Vehicle', 'Driver', 'Adapter'].forEach(type => assert(nodeTypes.has(type), `node type ${type}`));
+        const relations = new Set(graph.getRuntimeEdges().map(edge => edge.relation));
+        ['GENERATED', 'TRIGGERED', 'REQUESTED', 'DISPATCHED', 'APPLIES_TO', 'CONCERNS',
+            'PRODUCED_BY', 'DERIVED_FROM', 'EXECUTED'].forEach(relation =>
+            assert(relations.has(relation), `edge relation ${relation}`));
+        const before = graph.getRuntimeGraph();
+        graph.ingestRuntimeChain({ observation, riskEvent, policyDecision, actionRequest, actionExecution: execution });
+        assert(graph.getRuntimeNodes().length === before.nodes.length, 'node upsert is deterministic');
+        assert(graph.getRuntimeEdges().length === before.edges.length, 'edge deduplication is deterministic');
+        assert(graph.findRuntimeNode('Observation:OBS-GRAPH-001').metadata.targetId === targetId,
+            'findRuntimeNode query');
+        assert(JSON.parse(graph.exportRuntimeGraphJSON()).nodes.length === before.nodes.length,
+            'JSON export is serializable');
+
+        const second = new api.RuntimeGraph();
+        second.recordObservation(observation);
+        second.recordPolicyDecision({ ...policyDecision, decisionId: 'POLICY-INFERRED-001',
+            sourceEventId: 'RISK-INFERRED-001' });
+        assert(second.findRuntimePath('Observation:OBS-GRAPH-001',
+            'PolicyDecision:POLICY-INFERRED-001').length === 3, 'out-of-order source inference');
+        output.textContent = `PASS (${checks.length} checks)\n${checks.join('\n')}`;
+        document.title = 'PASS - Runtime Event Graph Regression';
+    } catch (error) {
+        output.textContent = `FAIL\n${error.stack || error.message}`;
+        document.title = 'FAIL - Runtime Event Graph Regression';
+        throw error;
+    }
+}());
+</script>
+</body>
+</html>

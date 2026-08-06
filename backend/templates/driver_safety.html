@@ -1,0 +1,1049 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="data:,">
+  <title>Driver Safety · IMC Agentic AI</title>
+  <link rel="stylesheet" href="/static/css/driver_safety.css">
+  <link rel="stylesheet" href="/static/css/driver_perception.css">
+  <link rel="stylesheet" href="/static/css/runtime_identity.css">
+  <link rel="stylesheet" href="/static/css/multi_hazard_fusion.css">
+  <link rel="stylesheet" href="/static/css/runtime_confidence.css">
+  <link rel="stylesheet" href="/static/css/pedestrian_proximity.css">
+  <link rel="stylesheet" href="/static/css/vehicle_proximity.css">
+  <link rel="stylesheet" href="/static/css/right_turn.css">
+  <link rel="stylesheet" href="/static/css/runtime_calibration.css">
+  <link rel="stylesheet" href="/static/css/alcohol_sensor.css">
+  <link rel="stylesheet" href="/static/css/driver_attention.css">
+  <link rel="stylesheet" href="/static/css/distraction_evidence.css">
+  <link rel="stylesheet" href="/static/css/runtime_replay.css">
+  <link rel="stylesheet" href="/static/css/edge_hardware.css">
+  <link rel="stylesheet" href="/static/css/perception_validation.css">
+  <link rel="stylesheet" href="/static/css/voice_interaction.css">
+<link rel="stylesheet" href="/static/css/driver_runtime_memory.css">
+<link rel="stylesheet" href="/static/css/driver_companion.css">
+<link rel="stylesheet" href="/static/css/driver_stabilization.css">
+<link rel="stylesheet" href="/static/css/unified_edge_runtime.css"><link rel="stylesheet" href="/static/css/field_pilot.css">
+  <style>
+    :root {
+      --bg: #070b14;
+      --panel: #0d1424;
+      --panel-soft: #111a2d;
+      --line: rgba(148, 163, 184, 0.18);
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --cyan: #00d4ff;
+      --orange: #f97316;
+      --green: #22c55e;
+      --yellow: #facc15;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 15% 0%, rgba(0, 212, 255, 0.10), transparent 32%),
+        radial-gradient(circle at 90% 15%, rgba(249, 115, 22, 0.08), transparent 28%),
+        var(--bg);
+      font-family: Inter, Pretendard, "Segoe UI", sans-serif;
+    }
+    a { color: inherit; text-decoration: none; }
+    .shell { width: min(1120px, calc(100% - 40px)); margin: 0 auto; padding-bottom: 64px; }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 22px 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .brand { display: flex; align-items: center; gap: 12px; font-weight: 800; letter-spacing: .02em; }
+    .brand-mark {
+      display: grid;
+      width: 38px;
+      height: 38px;
+      place-items: center;
+      border: 1px solid rgba(0, 212, 255, .35);
+      border-radius: 10px;
+      color: var(--cyan);
+      background: rgba(0, 212, 255, .08);
+    }
+    .nav-link { color: var(--muted); font-size: 14px; }
+    .nav-link:hover { color: var(--cyan); }
+    .hero { padding: 68px 0 38px; }
+    .eyebrow { color: var(--cyan); font-size: 12px; font-weight: 800; letter-spacing: .16em; }
+    h1 { margin: 15px 0 16px; font-size: clamp(36px, 6vw, 64px); line-height: 1.05; }
+    .lead { max-width: 760px; color: #aab6c5; font-size: 17px; line-height: 1.8; }
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      margin-top: 22px;
+      padding: 9px 13px;
+      border: 1px solid rgba(250, 204, 21, .28);
+      border-radius: 999px;
+      color: #fde68a;
+      background: rgba(250, 204, 21, .07);
+      font-size: 13px;
+    }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--yellow); }
+    .tabs { display: flex; gap: 8px; margin: 24px 0 18px; flex-wrap: wrap; }
+    .tab-button {
+      padding: 10px 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--muted);
+      background: var(--panel);
+      font: inherit;
+      cursor: pointer;
+    }
+    .tab-button:hover, .tab-button.active {
+      border-color: rgba(0, 212, 255, .45);
+      color: var(--cyan);
+      background: rgba(0, 212, 255, .08);
+    }
+    .tab-panel {
+      display: none;
+      min-height: 330px;
+      padding: 30px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: linear-gradient(145deg, rgba(17, 26, 45, .96), rgba(10, 16, 29, .96));
+    }
+    .tab-panel.active { display: block; }
+    .panel-title { margin: 0 0 8px; font-size: 22px; }
+    .panel-copy { margin: 0 0 24px; color: var(--muted); line-height: 1.7; }
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    .card { padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: rgba(7, 11, 20, .55); }
+    .card-label { color: var(--cyan); font-size: 11px; font-weight: 800; letter-spacing: .1em; }
+    .card h3 { margin: 10px 0 8px; font-size: 16px; }
+    .card p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.65; }
+    .flow { display: flex; align-items: stretch; gap: 10px; overflow-x: auto; padding-bottom: 8px; }
+    .flow-step { min-width: 155px; flex: 1; padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: rgba(7, 11, 20, .55); }
+    .flow-arrow { display: grid; place-items: center; color: var(--cyan); }
+    .flow-step strong { display: block; margin-bottom: 7px; font-size: 13px; }
+    .flow-step span { color: var(--muted); font-size: 12px; line-height: 1.5; }
+    .checklist { display: grid; gap: 10px; }
+    .check {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: rgba(7, 11, 20, .5);
+    }
+    .check-state { flex: 0 0 auto; color: #fca5a5; font-size: 13px; }
+    .actions { display: flex; gap: 12px; margin-top: 24px; flex-wrap: wrap; }
+    .button { padding: 12px 18px; border-radius: 9px; font-weight: 700; font-size: 14px; }
+    .button-primary { color: #061018; background: linear-gradient(135deg, var(--cyan), #38bdf8); }
+    .button-secondary { border: 1px solid var(--line); color: #bdc7d5; background: var(--panel-soft); }
+    .note { margin-top: 18px; color: #718096; font-size: 12px; line-height: 1.6; }
+    @media (max-width: 760px) {
+      .shell { width: min(100% - 24px, 1120px); }
+      .hero { padding-top: 44px; }
+      .grid { grid-template-columns: 1fr; }
+      .flow { flex-direction: column; }
+      .flow-arrow { transform: rotate(90deg); }
+      .tab-panel { padding: 20px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="header">
+      <a class="brand" href="{{ url_for('landing') }}">
+        <span class="brand-mark">⚡</span>
+        <span>IMC Agentic AI</span>
+      </a>
+      <a class="nav-link" href="{{ url_for('landing') }}">← 모듈 목록</a>
+    </header>
+
+    <section class="hero">
+      <div class="eyebrow">MODULE 02 · DRIVER SAFETY</div>
+      <h1>졸음·졸도 감지<br>Operational Ontology</h1>
+      <p class="lead">
+        이 페이지는 저장소에 정의된 Driver Safety 개념과 현재 구현 준비 상태를 분리해 보여줍니다.
+        카메라 입력, 얼굴 랜드마크, 졸음 판정 모델은 현재 저장소에 없으며 실제 감지 기능으로 표시하지 않습니다.
+      </p>
+      <div class="status"><span class="status-dot"></span> 설계 문서 단계 · 감지 런타임 미구현</div>
+    </section>
+
+    <div class="simulation-banner" role="status">
+      <strong>SIMULATION · 실제 센서 미연결</strong>
+      Deterministic Test Observation 전용이며 운영 판정에 사용 금지입니다.
+    </div>
+
+    <section class="driver-perception" data-driver-perception-root aria-labelledby="liveCameraFoundationTitle">
+      <header class="driver-perception__header">
+        <div>
+          <h2 id="liveCameraFoundationTitle" class="driver-perception__title">Live Camera Foundation</h2>
+          <p class="driver-perception__copy">Camera and FaceMesh landmark lifecycle only. Live frames are not connected to the deterministic Runtime or any risk decision.</p>
+        </div>
+      </header>
+      <div class="driver-perception__controls">
+        <label class="driver-perception__field">Primary camera
+          <select data-camera-select aria-label="Primary camera"><option value="">Checking cameras…</option></select>
+        </label>
+        <button type="button" data-camera-start>Start Camera</button>
+        <button type="button" data-camera-stop disabled>Stop Camera</button>
+      </div>
+      <div class="driver-perception__preview">
+        <video class="driver-perception__video" data-camera-video autoplay muted playsinline aria-label="Browser-local driver camera preview"></video>
+        <canvas class="driver-perception__overlay" data-camera-overlay aria-hidden="true"></canvas>
+      </div>
+      <section id="customerDemoSimpleWarningPanel" class="driver-perception__group" aria-label="Customer simple warning demonstration">
+        <h3>Customer Demo Simple Warning <small>DEMONSTRATION ONLY</small></h3>
+        <div class="driver-perception__controls"><button type="button" data-customer-demo-action="toggle">DEMO ON / OFF</button></div>
+        <div class="driver-perception__status" aria-live="polite">
+          <div class="driver-perception__metric"><span>Demo ON/OFF</span><strong data-customer-demo-mode>OFF</strong></div>
+          <div class="driver-perception__metric"><span>Eye closure duration</span><strong data-customer-demo-eye>0 ms</strong></div>
+          <div class="driver-perception__metric"><span>Yawn open duration</span><strong data-customer-demo-yawn>0 ms</strong></div>
+          <div class="driver-perception__metric"><span>Armed/Re-arm</span><strong data-customer-demo-armed>EYE ARMED / YAWN ARMED</strong></div>
+          <div class="driver-perception__metric"><span>Warning played</span><strong data-customer-demo-played>EYE NO / YAWN NO</strong></div>
+          <div class="driver-perception__metric"><span>Cooldown</span><strong data-customer-demo-cooldown>0 s</strong></div>
+          <div class="driver-perception__metric"><span>Eye State</span><strong data-customer-demo-eye-state>ARMED</strong></div>
+          <div class="driver-perception__metric"><span>Episode ID</span><strong data-customer-demo-eye-episode>-</strong></div>
+          <div class="driver-perception__metric"><span>Playback Active</span><strong data-customer-demo-eye-playback-active>NO</strong></div>
+          <div class="driver-perception__metric"><span>Reopen Detected</span><strong data-customer-demo-eye-reopen>NO</strong></div>
+          <div class="driver-perception__metric"><span>Recovery Complete</span><strong data-customer-demo-eye-recovery>NO</strong></div>
+          <div class="driver-perception__metric"><span>Eye Armed</span><strong data-customer-demo-eye-armed>YES</strong></div>
+          <div class="driver-perception__metric"><span>Left Close Evidence</span><strong data-customer-demo-eye-left-close>NO</strong></div>
+          <div class="driver-perception__metric"><span>Right Close Evidence</span><strong data-customer-demo-eye-right-close>NO</strong></div>
+          <div class="driver-perception__metric"><span>Inter-eye Delay</span><strong data-customer-demo-eye-inter-delay>-</strong></div>
+          <div class="driver-perception__metric"><span>Join Window Remaining</span><strong data-customer-demo-eye-join-remaining>0 ms</strong></div>
+          <div class="driver-perception__metric"><span>Bilateral Joined</span><strong data-customer-demo-eye-bilateral-joined>NO</strong></div>
+          <div class="driver-perception__metric"><span>Wink Rejection Pending</span><strong data-customer-demo-eye-wink-pending>NO</strong></div>
+          <div class="driver-perception__metric"><span>Wink Rejection Confirmed</span><strong data-customer-demo-eye-wink-confirmed>NO</strong></div>
+          <div class="driver-perception__metric"><span>Last reject reason</span><strong data-customer-demo-reject>DEMO_OFF</strong></div>
+        </div>
+        <small>demonstration=true · validated=false · operationalUseAllowed=false · no authoritative Risk or validated count changes</small>
+      </section>
+      <div class="driver-perception__status" aria-live="polite">
+        <div class="driver-perception__metric"><span>Camera permission</span><strong data-perception-permission>UNKNOWN</strong></div>
+        <div class="driver-perception__metric"><span>Runtime state</span><strong data-perception-state>IDLE</strong></div>
+        <div class="driver-perception__metric"><span>Face</span><strong data-perception-face>NOT EVALUATED</strong></div>
+        <div class="driver-perception__metric"><span>Frame processing</span><strong data-perception-frame>IDLE</strong></div>
+        <div class="driver-perception__metric"><span>Last frame</span><strong data-perception-last-frame>-</strong></div>
+        <div class="driver-perception__metric"><span>MediaPipe source</span><strong data-perception-mediapipe-source>LOCAL</strong></div>
+        <div class="driver-perception__metric"><span>MediaPipe version</span><strong data-perception-mediapipe-version>0.4.1633559619</strong></div>
+        <div class="driver-perception__metric"><span>Loader state</span><strong data-perception-mediapipe-loader>NOT_STARTED</strong></div>
+        <div class="driver-perception__metric"><span>Missing local asset</span><strong data-perception-mediapipe-missing>NONE</strong></div>
+        <div class="driver-perception__metric"><span>Initialization error</span><strong data-perception-mediapipe-error>NONE</strong></div>
+      </div>
+      <section class="driver-perception__group" aria-labelledby="cameraDiagnosticsTitle">
+        <h3 id="cameraDiagnosticsTitle">Camera Diagnostics <small>DEVELOPMENT</small></h3>
+        <dl>
+          <div><dt>Camera Open State</dt><dd data-perception-camera-open-state>IDLE</dd></div>
+          <div><dt>Requested Device</dt><dd data-perception-camera-requested-device>DEFAULT</dd></div>
+          <div><dt>Opened Device</dt><dd data-perception-camera-opened-device>NONE</dd></div>
+          <div><dt>Camera Label</dt><dd data-perception-camera-label>UNKNOWN</dd></div>
+          <div><dt>Stream ID</dt><dd data-perception-camera-stream-id>NONE</dd></div>
+          <div><dt>Video Track State</dt><dd data-perception-camera-track-state>NONE</dd></div>
+          <div><dt>Track Enabled</dt><dd data-perception-camera-track-enabled>UNKNOWN</dd></div>
+          <div><dt>Track Muted</dt><dd data-perception-camera-track-muted>UNKNOWN</dd></div>
+          <div><dt>Resolution</dt><dd data-perception-camera-resolution>UNKNOWN</dd></div>
+          <div><dt>FPS</dt><dd data-perception-camera-fps>UNKNOWN</dd></div>
+          <div><dt>Live Camera Scheduler</dt><dd data-perception-scheduler-health>NOT_STARTED</dd></div>
+          <div><dt>Scheduler Blocker</dt><dd data-perception-scheduler-reason>NONE</dd></div>
+          <div><dt>Camera Preview Viewport</dt><dd data-perception-video-viewport>UNKNOWN</dd></div>
+          <div><dt>Required Action</dt><dd data-perception-scheduler-message>NONE</dd></div>
+          <div><dt>Last Camera Error</dt><dd data-perception-camera-error>NONE</dd></div>
+        </dl>
+        <details><summary>Requested constraints</summary><pre data-perception-camera-constraints>{}</pre></details>
+        <details><summary>Track stop verification</summary><pre data-perception-camera-stop-verification>[]</pre></details>
+        <details><summary>Exception stack (development only)</summary><pre data-perception-camera-error-stack>NONE</pre></details>
+      </section>
+      <div class="driver-perception__metric-groups">
+        <section class="driver-perception__group"><h3>Calibration</h3>
+          <div class="driver-perception__controls"><button type="button" data-calibration-start>Start Calibration</button><button type="button" data-calibration-reset>Reset Calibration</button></div>
+          <div class="guided-tuning" data-guided-tuning aria-live="polite">
+            <div class="guided-tuning__heading"><strong data-guided-step>Ready for live tuning</strong><span data-guided-counter>0 / 10</span></div>
+            <p data-guided-instruction>Start the camera, then start calibration. The session advances automatically.</p>
+            <div class="guided-tuning__progress"><span data-guided-progress></span></div>
+            <div class="guided-tuning__status"><span data-guided-samples>Waiting</span><strong data-guided-countdown>--</strong></div>
+          </div>
+          <dl><div><dt>State</dt><dd data-perception-calibration-state>NOT_STARTED</dd></div><div><dt>Observed Frames</dt><dd data-perception-calibration-observed>0</dd></div><div><dt>First-Pass Accepted</dt><dd data-perception-calibration-samples>0</dd></div><div><dt>Neutral Left Accepted</dt><dd data-perception-calibration-left-neutral>0</dd></div><div><dt>Neutral Right Accepted</dt><dd data-perception-calibration-right-neutral>0</dd></div><div><dt>Rejected Frames</dt><dd data-perception-calibration-rejected>0</dd></div><div><dt>Required Minimum Samples</dt><dd data-perception-calibration-required>0</dd></div><div><dt>Completion Gates Passed</dt><dd data-perception-calibration-gates>0 / 8</dd></div><div><dt>Calibration Elapsed Progress</dt><dd data-perception-calibration-progress>0%</dd></div><div><dt>Baseline</dt><dd data-perception-baseline>-</dd></div><div><dt>Threshold</dt><dd data-perception-threshold>-</dd></div></dl>
+          <details open><summary>Calibration completion gates (real time)</summary><pre data-perception-calibration-completion-diagnostics>{}</pre></details>
+          <details open><summary>Calibration Synchronization</summary><pre data-perception-calibration-synchronization>{}</pre></details>
+          <small>DEVELOPMENT / UNVALIDATED. Calibration does not enable a risk decision.</small>
+          <section class="guided-tuning__results" data-guided-results hidden>
+            <h4>Live tuning results</h4>
+            <dl>
+              <div><dt>Left EAR baseline</dt><dd data-guided-result-left>-</dd></div><div><dt>Right EAR baseline</dt><dd data-guided-result-right>-</dd></div>
+              <div><dt>Blink durations</dt><dd data-guided-result-blink-durations>-</dd></div><div><dt>Blink recovery durations</dt><dd data-guided-result-blink-recovery>-</dd></div>
+              <div><dt>Accepted blink count</dt><dd data-guided-result-accepted>0</dd></div><div><dt>Rejected blink count</dt><dd data-guided-result-rejected>0</dd></div>
+              <div><dt>Reject reasons</dt><dd data-guided-result-reasons>None</dd></div><div><dt>MAR baseline</dt><dd data-guided-result-mar>-</dd></div>
+              <div><dt>Yawn durations</dt><dd data-guided-result-yawns>-</dd></div><div><dt>Calibration quality</dt><dd data-guided-result-quality>-</dd></div>
+            </dl>
+            <h4>Recommended DEVELOPMENT_CANDIDATE thresholds</h4>
+            <pre data-guided-result-thresholds>{}</pre>
+            <p data-guided-result-repeat></p>
+            <small>Recommendations only. Thresholds are never applied automatically.</small>
+          </section>
+        </section>
+        <section class="driver-perception__group"><h3>Eye Metrics</h3>
+          <dl><div><dt>Left EAR</dt><dd data-perception-left-ear>-</dd></div><div><dt>Right EAR</dt><dd data-perception-right-ear>-</dd></div><div><dt>EAR</dt><dd data-perception-ear>-</dd></div><div><dt>EAR valid</dt><dd data-perception-ear-valid>false</dd></div><div><dt>Eye state</dt><dd data-perception-eye-state>RAW ONLY</dd></div><div><dt>Closure ms</dt><dd data-perception-closure>0</dd></div><div><dt>Blink count</dt><dd data-perception-blink-count>0</dd></div><div><dt>Blink rate</dt><dd data-perception-blink-rate>0</dd></div><div><dt>PERCLOS</dt><dd data-perception-perclos>-</dd></div></dl>
+          <dl><div><dt>Left Baseline</dt><dd data-perception-left-baseline>-</dd></div><div><dt>Right Baseline</dt><dd data-perception-right-baseline>-</dd></div><div><dt>Left Closure Ratio</dt><dd data-perception-left-closure-ratio>-</dd></div><div><dt>Right Closure Ratio</dt><dd data-perception-right-closure-ratio>-</dd></div></dl>
+          <dl><div><dt>LEFT EYE STATE</dt><dd data-perception-left-eye-state>UNKNOWN</dd></div><div><dt>RIGHT EYE STATE</dt><dd data-perception-right-eye-state>UNKNOWN</dd></div><div><dt>BLINK EPISODE STATE</dt><dd data-perception-blink-episode-state>REARM_PENDING</dd></div><div><dt>ARMED / NOT ARMED</dt><dd data-perception-blink-armed>NOT ARMED</dd></div><div><dt>RE-ARM PENDING</dt><dd data-perception-rearm-pending>true</dd></div><div><dt>BILATERAL CORRELATION</dt><dd data-perception-bilateral-correlation>-</dd></div><div><dt>CALIBRATION QUALITY</dt><dd data-perception-calibration-quality>NOT_EVALUATED</dd></div><div><dt>REJECT REASON</dt><dd data-perception-episode-reject>NONE</dd></div></dl>
+          <div class="driver-perception__notices"><span class="driver-perception__notice">DEVELOPMENT DIAGNOSTIC</span><span class="driver-perception__notice">RELATIVE PER-EYE CALIBRATION</span><span class="driver-perception__notice">BILATERAL SAFETY GATE ACTIVE</span><span class="driver-perception__notice">NOT FOR OPERATIONAL USE</span></div>
+          <dl><div><dt>Calibration Ready</dt><dd data-perception-gate-calibration>false</dd></div><div><dt>Bilateral Eye Valid</dt><dd data-perception-gate-bilateral>false</dd></div><div><dt>One Eye Only</dt><dd data-perception-gate-one-eye>false</dd></div><div><dt>Blink Candidate</dt><dd data-perception-gate-blink-candidate>false</dd></div><div><dt>Blink Accepted</dt><dd data-perception-gate-blink-accepted>false</dd></div><div><dt>Blink Reject Reason</dt><dd data-perception-gate-blink-reason>NONE</dd></div></dl>
+        </section>
+        <section class="driver-perception__group"><h3>Head Pose <small>HEURISTIC</small></h3>
+          <dl><div><dt>Pitch scale</dt><dd data-perception-pitch>-</dd></div><div><dt>Roll °</dt><dd data-perception-roll>-</dd></div><div><dt>Yaw scale</dt><dd data-perception-yaw>-</dd></div><div><dt>State</dt><dd data-perception-pose-state>UNKNOWN</dd></div></dl>
+          <dl><div><dt>Neutral Pitch</dt><dd data-perception-neutral-pitch>-</dd></div><div><dt>Neutral Roll</dt><dd data-perception-neutral-roll>-</dd></div><div><dt>Neutral Yaw</dt><dd data-perception-neutral-yaw>-</dd></div><div><dt>Pitch Delta</dt><dd data-perception-pitch-delta>-</dd></div><div><dt>Roll Delta</dt><dd data-perception-roll-delta>-</dd></div><div><dt>Yaw Delta</dt><dd data-perception-yaw-delta>-</dd></div></dl>
+        </section>
+        <section class="driver-perception__group driver-perception__mouth"><h3>Mouth / Yawn <small>HEURISTIC</small></h3>
+          <dl><div><dt>MAR raw</dt><dd data-perception-mar-raw>-</dd></div><div><dt>MAR smoothed</dt><dd data-perception-mar-smoothed>-</dd></div><div><dt>MAR valid</dt><dd data-perception-mar-valid>false</dd></div><div><dt>Mouth baseline</dt><dd data-perception-mouth-baseline>-</dd></div><div><dt>Open threshold</dt><dd data-perception-mouth-threshold>-</dd></div><div><dt>Mouth state</dt><dd data-perception-mouth-state>INVALID</dd></div><div><dt>Open duration</dt><dd data-perception-mouth-duration>-</dd></div><div><dt>Yawn state</dt><dd data-perception-yawn-state>INVALID</dd></div><div><dt>Candidate</dt><dd data-perception-yawn-candidate>false</dd></div><div><dt>Confirmed</dt><dd data-perception-yawn-confirmed>false</dd></div><div><dt>Count</dt><dd data-perception-yawn-count>0</dd></div><div><dt>Last duration</dt><dd data-perception-last-yawn>-</dd></div></dl>
+          <dl><div><dt>MAR Invalid Reason</dt><dd data-perception-gate-mar-reason>NONE</dd></div><div><dt>Head Pose Allows Mouth</dt><dd data-perception-gate-mouth-pose>false</dd></div><div><dt>Pitch Limit</dt><dd data-perception-gate-pitch>- / ±30</dd></div><div><dt>Yaw Limit</dt><dd data-perception-gate-yaw>- / ±30</dd></div><div><dt>Roll Limit</dt><dd data-perception-gate-roll>- / ±25</dd></div><div><dt>Mouth Calibration Available</dt><dd data-perception-gate-mouth-calibration>false</dd></div></dl>
+          <small>HEURISTIC YAWN CANDIDATE · DEVELOPMENT / UNVALIDATED · NOT A BEHAVIORAL OR MEDICAL DIAGNOSIS</small>
+        </section>
+      </div>
+      <details class="driver-perception__snapshot"><summary>Latest DriverMetricSnapshot · <span data-perception-snapshot-time>-</span></summary><pre data-perception-snapshot-json>{}</pre></details>
+      <details class="driver-perception__debug"><summary>PERCEPTION DEBUG · DEVELOPMENT ONLY</summary>
+        <div class="driver-perception__debug-grid">
+          <section><h3>Eye Debug</h3><dl><div><dt>Raw / Smoothed EAR</dt><dd><span data-perception-debug-ear-raw>-</span> / <span data-perception-debug-ear-smooth>-</span></dd></div><div><dt>Threshold</dt><dd data-perception-debug-ear-threshold>-</dd></div><div><dt>Closure duration</dt><dd data-perception-debug-closure>-</dd></div><div><dt>Blink candidate / accepted</dt><dd><span data-perception-debug-blink-candidate>false</span> / <span data-perception-debug-blink-accepted>false</span></dd></div><div><dt>Blink reject reason</dt><dd data-perception-debug-blink-reason>-</dd></div><div><dt>Frame delta</dt><dd data-perception-debug-frame-delta>-</dd></div></dl></section>
+          <section><h3>Mouth Debug</h3><dl><div><dt>Width</dt><dd data-perception-debug-mouth-width>-</dd></div><div><dt>Vertical distances</dt><dd data-perception-debug-mouth-vertical>-</dd></div><div><dt>Raw / Smoothed MAR</dt><dd><span data-perception-debug-mar-raw>-</span> / <span data-perception-debug-mar-smooth>-</span></dd></div><div><dt>Invalid reason</dt><dd data-perception-debug-mar-reason>-</dd></div><div><dt>Calibration accepted / rejected</dt><dd><span data-perception-debug-mouth-accepted>0</span> / <span data-perception-debug-mouth-rejected>0</span></dd></div><div><dt>Last reject reason</dt><dd data-perception-debug-mouth-reject-reason>-</dd></div><div><dt>Calibration state / baseline</dt><dd><span data-perception-debug-mouth-calibration>UNAVAILABLE</span> / <span data-perception-debug-mouth-baseline-ready>false</span></dd></div></dl></section>
+          <section><h3>Quality Debug</h3><dl><div><dt>Face / landmark</dt><dd><span data-perception-debug-face>false</span> / <span data-perception-debug-landmark>false</span></dd></div><div><dt>Head pose gate</dt><dd data-perception-debug-head-pose>false</dd></div><div><dt>Sample age</dt><dd data-perception-debug-sample-age>-</dd></div><div><dt>Processing time</dt><dd data-perception-debug-processing-time>-</dd></div></dl></section>
+        </div>
+      </details>
+      <section class="driver-perception__recorder" data-recorder-panel>
+        <h3>Perception Dataset Recorder <small>DEVELOPMENT / RESEARCH</small></h3>
+        <div class="driver-perception__notices"><span class="driver-perception__notice">RESEARCH METRICS ONLY</span><span class="driver-perception__notice">NO VIDEO RECORDING</span><span class="driver-perception__notice">NO IMAGE STORAGE</span><span class="driver-perception__notice">NO RAW LANDMARK STORAGE</span><span class="driver-perception__notice">LOCAL BROWSER MEMORY ONLY</span><span class="driver-perception__notice">USER-INITIATED EXPORT</span><span class="driver-perception__notice">NOT FOR OPERATIONAL USE</span></div>
+        <div class="driver-perception__controls"><button type="button" data-recorder-start>START RECORDING</button><button type="button" data-recorder-pause>PAUSE</button><button type="button" data-recorder-resume>RESUME</button><button type="button" data-recorder-stop>STOP</button><button type="button" data-recorder-reset>RESET SESSION</button><button type="button" data-recorder-csv>EXPORT CSV</button><button type="button" data-recorder-json>EXPORT JSON</button></div>
+        <div class="driver-perception__recorder-fields">
+          <label>Participant code<input data-recorder-participant maxlength="16" pattern="[A-Za-z0-9_-]{0,16}"></label>
+          <label>Glasses<select data-recorder-glasses><option>UNKNOWN</option><option>WITH_GLASSES</option><option>WITHOUT_GLASSES</option></select></label>
+          <label>Lighting<select data-recorder-lighting><option>UNKNOWN</option><option>BRIGHT</option><option>NORMAL</option><option>DIM</option><option>NIGHT</option></select></label>
+          <label>Posture<select data-recorder-posture><option>UNKNOWN</option><option>CENTER</option><option>SLIGHT_DOWN</option><option>SLIGHT_UP</option><option>LEFT</option><option>RIGHT</option></select></label>
+          <label>Scenario<select data-recorder-scenario><option>BASELINE</option><option>NATURAL_BLINK</option><option>EYE_CLOSURE</option><option>TALKING</option><option>SHORT_MOUTH_OPEN</option><option>YAWN_SIMULATION</option><option>NATURAL_YAWN</option><option>HEAD_POSE</option><option>FREE_OBSERVATION</option></select></label>
+        </div>
+        <div class="driver-perception__status"><div class="driver-perception__metric"><span>Session ID</span><strong data-recorder-session>-</strong></div><div class="driver-perception__metric"><span>State</span><strong data-recorder-state>IDLE</strong></div><div class="driver-perception__metric"><span>Started time</span><strong data-recorder-started>-</strong></div><div class="driver-perception__metric"><span>Duration</span><strong data-recorder-duration>0</strong></div><div class="driver-perception__metric"><span>Sampling mode</span><strong data-recorder-sampling>-</strong></div><div class="driver-perception__metric"><span>Rows / Metrics / Markers</span><strong data-recorder-counts>0 / 0 / 0</strong></div><div class="driver-perception__metric"><span>Memory estimate</span><strong data-recorder-memory>0</strong></div><div class="driver-perception__metric"><span>Last record</span><strong data-recorder-last>-</strong></div><div class="driver-perception__metric"><span>Stop reason</span><strong data-recorder-reason>-</strong></div></div>
+        <div class="driver-perception__markers"><span>User annotation, not ground truth:</span><button type="button" data-marker="NORMAL">NORMAL</button><button type="button" data-marker="BLINK">BLINK</button><button type="button" data-marker="EYE_CLOSURE">EYE CLOSURE</button><button type="button" data-marker="TALKING">TALKING</button><button type="button" data-marker="SHORT_MOUTH_OPEN">SHORT MOUTH OPEN</button><button type="button" data-marker="YAWN">YAWN</button><button type="button" data-marker="HEAD_DOWN">HEAD DOWN</button><button type="button" data-marker="QUALITY_ISSUE">QUALITY ISSUE</button></div>
+        <div class="driver-perception__status"><div class="driver-perception__metric"><span>Current EAR</span><strong data-recorder-ear>-</strong></div><div class="driver-perception__metric"><span>Current MAR</span><strong data-recorder-mar>-</strong></div><div class="driver-perception__metric"><span>Pitch / Roll / Yaw</span><strong data-recorder-pose>- / - / -</strong></div><div class="driver-perception__metric"><span>Blink / Yawn state</span><strong data-recorder-episodes>- / -</strong></div><div class="driver-perception__metric"><span>Current reject reason</span><strong data-recorder-reject>-</strong></div></div>
+        <details class="driver-perception__snapshot"><summary>Last metric-only row</summary><pre data-recorder-preview>{}</pre></details>
+      </section>
+      <section class="driver-perception__bridge" data-live-bridge-panel>
+        <h3>Live Runtime Bridge</h3>
+        <p class="driver-perception__copy">Published metrics use the public Runtime facade. Quality loss never clears an active risk.</p>
+        <div class="driver-perception__controls">
+          <button type="button" data-live-bridge-start>START LIVE BRIDGE</button>
+          <button type="button" data-live-bridge-stop>STOP LIVE BRIDGE</button>
+          <button type="button" data-live-bridge-ack>ACK RISK</button>
+          <button type="button" data-live-bridge-reset>RESET LIVE TARGET</button>
+          <button type="button" data-live-bridge-simulation>SWITCH TO SIMULATION</button>
+        </div>
+        <div class="driver-perception__status" aria-live="polite">
+          <div class="driver-perception__metric"><span>Input mode</span><strong data-live-mode>STOPPED</strong></div>
+          <div class="driver-perception__metric"><span>Bridge status</span><strong data-live-status>STOPPED</strong></div>
+          <div class="driver-perception__metric"><span>Ownership</span><strong data-live-ownership>INACTIVE</strong></div>
+          <div class="driver-perception__metric"><span>Camera Runtime State</span><strong data-live-camera-state>STOPPED</strong></div>
+          <div class="driver-perception__metric"><span>Live Bridge Owner</span><strong data-live-owner>-</strong></div>
+          <div class="driver-perception__metric"><span>Subscription Active</span><strong data-live-subscription>NO</strong></div>
+          <div class="driver-perception__metric"><span>Runtime Generation</span><strong data-live-generation>0</strong></div>
+          <div class="driver-perception__metric"><span>Runtime Notification</span><strong data-live-notification>-</strong></div>
+          <div class="driver-perception__metric"><span>Scenario / Message</span><strong data-live-scenario>- / -</strong></div>
+          <div class="driver-perception__metric"><span>Playback</span><strong data-live-playback>IDLE</strong></div>
+          <div class="driver-perception__metric"><span>Lifecycle Reasons</span><strong data-live-reasons>- / -</strong></div>
+          <div class="driver-perception__metric"><span>Automatic Status</span><strong data-live-automatic>NOT_READY</strong></div>
+          <div class="driver-perception__metric"><span>Start Attempted</span><strong data-live-start-attempted>NO</strong></div>
+          <div class="driver-perception__metric"><span>Start Result</span><strong data-live-start-result>NOT_ATTEMPTED</strong></div>
+          <div class="driver-perception__metric"><span>Blocked Reason</span><strong data-live-blocked-reason>-</strong></div>
+          <div class="driver-perception__metric"><span>Camera State Source</span><strong data-live-camera-source>-</strong></div>
+          <div class="driver-perception__metric"><span>Bridge Readiness Source</span><strong data-live-readiness-source>-</strong></div>
+          <div class="driver-perception__metric"><span>Authoritative Stream</span><strong data-live-authoritative-stream>NO / -</strong></div>
+          <div class="driver-perception__metric"><span>Authoritative Track State</span><strong data-live-authoritative-track>-</strong></div>
+          <div class="driver-perception__metric"><span>Synchronization Status</span><strong data-live-synchronization>WAITING_FOR_CAMERA</strong></div>
+          <div class="driver-perception__metric"><span>Target ID</span><strong data-live-target>-</strong></div>
+          <div class="driver-perception__metric"><span>Snapshot ID</span><strong data-live-snapshot>-</strong></div>
+          <div class="driver-perception__metric"><span>Observation</span><strong data-live-observation>-</strong></div>
+          <div class="driver-perception__metric"><span>Risk state</span><strong data-live-risk>NORMAL</strong></div>
+          <div class="driver-perception__metric"><span>Triple count</span><strong data-live-triples>0</strong></div>
+        </div>
+        <details class="driver-perception__snapshot"><summary>Live Runtime Result</summary><pre data-live-result>{}</pre></details>
+        <div class="driver-perception__notices">
+          <span class="driver-perception__notice">LIVE WEBCAM OBSERVATION</span>
+          <span class="driver-perception__notice">OBSERVATION simulation=false</span>
+          <span class="driver-perception__notice">ACTION EXECUTION simulation=true</span>
+          <span class="driver-perception__notice">ACTUATORS DISCONNECTED</span>
+          <span class="driver-perception__notice">BROWSER-LOCAL IMAGE PROCESSING</span>
+          <span class="driver-perception__notice">NO IMAGE STORAGE</span>
+          <span class="driver-perception__notice">NO IMAGE TRANSMISSION</span>
+          <span class="driver-perception__notice">NOT FOR OPERATIONAL USE</span>
+        </div>
+      </section>
+      <section id="webDemoWarningPanel" class="driver-perception__bridge" aria-labelledby="webDemoWarningTitle">
+        <h3 id="webDemoWarningTitle">Web Demonstration Warning</h3>
+        <p><strong>DEMONSTRATION ONLY — NOT VALIDATED FOR DRIVING USE</strong></p>
+        <div class="driver-perception__notices"><span class="driver-perception__notice">DEMONSTRATION ONLY</span><span class="driver-perception__notice">NOT VALIDATED DROWSINESS DETECTION</span><span class="driver-perception__notice">NOT FOR OPERATIONAL USE</span><span class="driver-perception__notice">NOT FIELD EVIDENCE</span><span class="driver-perception__notice">CAMERA-LOCAL / NO IMAGE STORAGE</span></div>
+        <div class="driver-perception__controls"><button type="button" data-demo-action="enable">ENABLE WEB DEMO WARNING</button><button type="button" data-demo-action="disable">DISABLE WEB DEMO WARNING</button><button type="button" data-demo-action="eye">ARM DEMO EYE-CLOSURE</button><button type="button" data-demo-action="yawn">ARM DEMO YAWN</button><button type="button" data-demo-action="cancel">CANCEL DEMO AUDIO</button><button type="button" data-demo-action="reset">RESET DEMO STATE</button><button type="button" data-demo-action="export">EXPORT DEMO JSON</button></div>
+        <div class="driver-perception__status" aria-live="polite">
+          <div class="driver-perception__metric"><span>Demo Mode</span><strong data-demo-mode>OFF</strong></div><div class="driver-perception__metric"><span>Audio Enabled (Voice Runtime)</span><strong data-demo-audio>NO</strong></div><div class="driver-perception__metric"><span>Page Visible</span><strong data-demo-visible>NO</strong></div><div class="driver-perception__metric"><span>Page Focused</span><strong data-demo-focused>NO</strong></div><div class="driver-perception__metric"><span>Calibration</span><strong data-demo-calibration>NOT_STARTED</strong></div><div class="driver-perception__metric"><span>Bilateral Eye Valid</span><strong data-demo-bilateral>INVALID</strong></div><div class="driver-perception__metric"><span>Eye Closure Candidate</span><strong data-demo-eye-candidate>NO</strong></div><div class="driver-perception__metric"><span>Closure Duration</span><strong data-demo-eye-duration>0 ms</strong></div><div class="driver-perception__metric"><span>Demo Warning Armed</span><strong data-demo-eye-armed>NO</strong></div><div class="driver-perception__metric"><span>Demo Warning Played</span><strong data-demo-eye-played>NO</strong></div><div class="driver-perception__metric"><span>Demo Eye Blocker</span><strong data-demo-eye-blocker>DEMO_MODE_OFF</strong></div><div class="driver-perception__metric"><span>Re-arm State</span><strong data-demo-rearm>READY</strong></div><div class="driver-perception__metric"><span>MAR Valid</span><strong data-demo-mar>INVALID</strong></div><div class="driver-perception__metric"><span>Demo Yawn Candidate</span><strong data-demo-yawn-candidate>NO</strong></div><div class="driver-perception__metric"><span>Open Duration</span><strong data-demo-yawn-duration>0 ms</strong></div><div class="driver-perception__metric"><span>Demo Yawn Played</span><strong data-demo-yawn-played>NO</strong></div><div class="driver-perception__metric"><span>Demo Yawn Blocker</span><strong data-demo-yawn-blocker>DEMO_MODE_OFF</strong></div><div class="driver-perception__metric"><span>Existing Runtime Risk</span><strong data-demo-risk>NORMAL</strong></div><div class="driver-perception__metric"><span>Current Message (Voice Runtime)</span><strong data-demo-message>-</strong></div><div class="driver-perception__metric"><span>Playback (Voice Runtime)</span><strong data-demo-playback>IDLE</strong></div><div class="driver-perception__metric"><span>Last Reject Reason</span><strong data-demo-reject>-</strong></div>
+        </div>
+        <details><summary>Bounded RAM-only demo history</summary><pre data-demo-detail>{}</pre></details>
+      </section>
+      <div class="driver-perception__notices">
+        <span class="driver-perception__notice">LIVE CAMERA INPUT</span>
+        <span class="driver-perception__notice">BROWSER-LOCAL PROCESSING</span>
+        <span class="driver-perception__notice">NO IMAGE STORAGE</span>
+        <span class="driver-perception__notice">NO IMAGE TRANSMISSION</span>
+        <span class="driver-perception__notice">NO MOUTH IMAGE STORAGE</span>
+        <span class="driver-perception__notice">HEURISTIC YAWN DETECTION</span>
+        <span class="driver-perception__notice">NOT A MEDICAL DIAGNOSIS</span>
+        <span class="driver-perception__notice">METRICS ONLY</span>
+        <span class="driver-perception__notice">NOT FOR OPERATIONAL USE</span>
+        <span class="driver-perception__notice">DIAGNOSTIC ONLY</span>
+        <span class="driver-perception__notice">THRESHOLDS UNCHANGED</span>
+      </div>
+    </section>
+
+    <section id="perceptionValidationPanel" class="driver-test-panel perception-validation" aria-labelledby="perceptionValidationTitle">
+      <h2 id="perceptionValidationTitle" class="panel-title">Live Perception Validation &amp; Count Stabilization</h2>
+      <div class="perception-validation__badges"><span>LIVE VALIDATION ONLY</span><span>THRESHOLDS NOT AUTOMATICALLY APPLIED</span><span>HUMAN ANNOTATION REQUIRED</span><span>NO IMAGE / FRAME / LANDMARK STORAGE</span><span>DEVELOPMENT / FIELD CANDIDATE</span><span>NOT FOR OPERATIONAL USE</span></div>
+      <div class="perception-validation__summary"><article><span>Validation Session State</span><strong data-validation-state>NOT_STARTED</strong></article><article><span>Total Samples</span><strong data-validation-samples>0</strong></article><article><span>Valid Samples</span><strong data-validation-valid-samples>0</strong></article><article><span>Episode Count</span><strong data-validation-episode-count>0</strong></article><article><span>Threshold Comparison</span><strong data-validation-comparison-state>INSUFFICIENT DATA</strong></article><article><span>Active Episodes</span><strong data-validation-active>0</strong></article><article><span>Accepted Episodes</span><strong data-validation-accepted>0</strong></article><article><span>Rejected Episodes</span><strong data-validation-rejected>0</strong></article><article><span>Human Annotations</span><strong data-validation-annotations>0</strong></article><article><span>Blink Count Mismatch</span><strong data-validation-blink-mismatch>0</strong></article><article><span>Yawn Count Mismatch</span><strong data-validation-yawn-mismatch>0</strong></article><article><span>Head Pose Gate Rejection</span><strong data-validation-head-gate>0</strong></article><article><span>Confidence Review Candidates</span><strong data-validation-confidence-review>0</strong></article><article><span>Operational Use Allowed</span><strong>NO</strong></article></div>
+      <p data-validation-empty>No samples collected. Threshold comparison unavailable. INSUFFICIENT DATA.</p>
+      <div class="perception-validation__controls"><button type="button" data-validation-start>START VALIDATION</button><button type="button" data-validation-pause>PAUSE VALIDATION</button><button type="button" data-validation-complete>COMPLETE VALIDATION</button><button type="button" data-validation-cancel>CANCEL VALIDATION</button><button type="button" data-validation-previous>SELECT PREVIOUS EPISODE</button><button type="button" data-validation-next>SELECT NEXT EPISODE</button></div>
+      <div class="perception-validation__controls"><button type="button" data-validation-annotate="TRUE_BLINK">MARK TRUE BLINK</button><button type="button" data-validation-annotate="FALSE_BLINK">MARK FALSE BLINK</button><button type="button" data-validation-annotate="TRUE_YAWN">MARK TRUE YAWN</button><button type="button" data-validation-annotate="TALKING">MARK TALKING</button><button type="button" data-validation-annotate="SMILE">MARK SMILE</button><button type="button" data-validation-annotate="FACE_OCCLUDED">MARK FACE OCCLUDED</button><button type="button" data-validation-annotate="GLASSES_REFLECTION">MARK GLASSES REFLECTION</button><button type="button" data-validation-annotate="LIGHTING_PROBLEM">MARK LIGHTING PROBLEM</button><button type="button" data-validation-annotate="CAMERA_POSITION_PROBLEM">MARK CAMERA POSITION PROBLEM</button></div>
+      <div class="perception-validation__controls"><button type="button" data-validation-export-json>EXPORT VALIDATION JSON</button><button type="button" data-validation-export-csv>EXPORT VALIDATION CSV</button><button type="button" data-validation-reset>RESET VALIDATION</button></div>
+      <div class="perception-validation__grid"><article><h3>Live Metrics</h3><pre data-validation-live>{}</pre></article><article><h3>Episode Review</h3><pre data-validation-episode>{}</pre></article><article><h3>Threshold Comparison</h3><pre data-validation-thresholds>[]</pre></article><article><h3>Validation Summary / Replay</h3><pre data-validation-detail>{}</pre></article></div>
+    </section>
+
+    <section class="driver-test-panel" aria-labelledby="driverTestTitle">
+      <h2 id="driverTestTitle" class="panel-title">Common Driver State Observation</h2>
+      <p class="panel-copy">Driver State simulation candidate를 Deterministic Test Observation으로만 검증합니다. 실제 법적 기준 또는 운영 판정 기준이 아닙니다.</p>
+      <form id="driverStateTestForm">
+        <div class="driver-form-grid">
+          <label class="driver-field">Vehicle Type
+            <select id="driverVehicleType">
+              <option>FORKLIFT</option><option>BOX_TRUCK</option><option>CARGO_TRUCK</option>
+              <option>BUS</option><option>SPECIAL_VEHICLE</option>
+            </select>
+          </label>
+          <label class="driver-field">Vehicle ID<input id="driverVehicleId" value="F-03" required></label>
+          <label class="driver-field">Driver ID<input id="driverId" value="DRIVER001" required></label>
+          <label class="driver-field">Assignment ID<input id="driverAssignmentId" value="ASSIGNMENT001" required></label>
+          <label class="driver-field">Observation Type
+            <select id="driverObservationType">
+              <option>DROWSINESS</option><option>INCAPACITATION</option><option>ALCOHOL_LEVEL</option>
+            </select>
+          </label>
+          <div class="driver-field">Target ID<strong id="driverTargetId" class="driver-target">-</strong></div>
+        </div>
+        <div class="actions">
+          <button class="button button-primary" type="submit">Deterministic sequence 실행</button>
+          <button id="drowsinessTestButton" class="button button-secondary" type="submit">DROWSINESS TEST</button>
+          <button id="incapacitationTestButton" class="button button-secondary" type="submit">INCAPACITATION TEST</button>
+          <button id="alcoholTestButton" class="button button-secondary" type="submit">ALCOHOL TEST</button>
+        </div>
+      </form>
+      <div id="driverSequenceStatus" class="driver-sequence">NORMAL → ENTRY_PENDING → RISK_CONFIRMED → RISK_MAINTAINED → CLEAR_PENDING → CLEAR</div>
+      <div class="driver-output-grid">
+        <article class="driver-output"><h3>VehicleContext</h3><pre id="vehicleContextOutput">{}</pre></article>
+        <article class="driver-output"><h3>Adapter Status</h3><pre id="driverAdapterStatus">DISCONNECTED</pre></article>
+        <article class="driver-output" style="grid-column: 1 / -1"><h3>Last SensorObservation JSON</h3><pre id="lastDriverObservation">아직 생성되지 않음</pre></article>
+        <article class="driver-output"><h3>Last RiskSignal</h3><pre id="lastDriverRiskSignal">아직 생성되지 않음</pre></article>
+        <article class="driver-output"><h3>RiskEvent History</h3><pre id="driverRiskEventHistory">[]</pre></article>
+        <article class="driver-output"><h3>Current Event ID</h3><pre id="driverCurrentEventId">-</pre></article>
+        <article class="driver-output"><h3>Current State</h3><pre id="driverCurrentEventState">NORMAL</pre></article>
+        <article class="driver-output"><h3>Composite Signal Count</h3><pre id="driverCompositeSignalCount">-</pre></article>
+        <article class="driver-output"><h3>Quality Valid</h3><pre id="driverQualityValid">-</pre></article>
+        <article class="driver-output"><h3>Vehicle Moving</h3><pre id="driverVehicleMoving">-</pre></article>
+        <article class="driver-output"><h3>Runtime Policy</h3><pre>SIMULATION · SENSOR DISCONNECTED · NOT FOR OPERATIONAL USE</pre></article>
+        <article class="driver-output"><h3>Alcohol Measurement Mode</h3><pre id="driverAlcoholMeasurementMode">-</pre></article>
+        <article class="driver-output"><h3>Alcohol Measurement Status</h3><pre id="driverAlcoholMeasurementStatus">-</pre></article>
+        <article class="driver-output"><h3>Alcohol Raw Value / Unit</h3><pre><span id="driverAlcoholRawValue">-</span> <span id="driverAlcoholUnit">-</span></pre></article>
+        <article class="driver-output"><h3>Alcohol Policy Decision</h3><pre id="driverAlcoholPolicyDecision">-</pre></article>
+        <article class="driver-output"><h3>Retry Count</h3><pre id="driverAlcoholRetryCount">-</pre></article>
+        <article class="driver-output"><h3>Identity Verified</h3><pre id="driverAlcoholIdentityVerified">-</pre></article>
+        <article class="driver-output"><h3>Calibration Status</h3><pre id="driverAlcoholCalibrationStatus">-</pre></article>
+        <article class="driver-output"><h3>Sample Quality</h3><pre id="driverAlcoholSampleQuality">-</pre></article>
+      </div>
+    </section>
+
+    <section id="driverPolicySimulation" class="driver-test-panel policy-simulation" aria-labelledby="driverPolicyTitle">
+      <h2 id="driverPolicyTitle" class="panel-title">Driver Runtime Policy Simulation</h2>
+      <p class="panel-copy">RiskEvent 기반 단계적 정책과 ActionRequest JSON만 생성합니다. 실제 차량 제어 또는 외부 통신을 수행하지 않습니다.</p>
+      <div class="simulation-banner">
+        <strong>SIMULATION · ACTUATOR NOT CONNECTED</strong>
+        EXTERNAL NOTIFICATION NOT CONNECTED · NOT FOR OPERATIONAL USE · UNVALIDATED DETERMINISTIC SIMULATION CANDIDATE
+      </div>
+      <div class="actions">
+        <button id="runDrowsinessPolicyTest" class="button button-secondary" type="button">RUN DROWSINESS POLICY TEST</button>
+        <button id="runIncapacitationPolicyTest" class="button button-secondary" type="button">RUN INCAPACITATION POLICY TEST</button>
+        <button id="runAlcoholPolicyTest" class="button button-secondary" type="button">RUN ALCOHOL POLICY TEST</button>
+        <button id="acknowledgeCurrentDriverAction" class="button button-secondary" type="button">ACKNOWLEDGE CURRENT ACTION</button>
+        <button id="completeCurrentDriverAction" class="button button-secondary" type="button">COMPLETE CURRENT ACTION</button>
+        <button id="resetDriverPolicySimulation" class="button button-secondary" type="button">RESET POLICY SIMULATION</button>
+      </div>
+      <div class="driver-output-grid policy-output-grid">
+        <article class="driver-output"><h3>Active Risk Events / Policies</h3><pre id="driverPolicyActiveEvents">[]</pre></article>
+        <article class="driver-output"><h3>Current Highest Priority Risk</h3><pre id="driverPolicyHighestRisk">null</pre></article>
+        <article class="driver-output"><h3>Current Policy Decision</h3><pre id="driverPolicyCurrentDecision">{}</pre></article>
+        <article class="driver-output"><h3>Policy Stage</h3><pre id="driverPolicyStage">-</pre></article>
+        <article class="driver-output"><h3>Recommended Actions</h3><pre id="driverPolicyRecommendedActions">NONE</pre></article>
+        <article class="driver-output"><h3>Pending Action Requests</h3><pre id="driverPolicyPendingActions">[]</pre></article>
+        <article class="driver-output"><h3>Action State</h3><pre id="driverPolicyActionState">NONE</pre></article>
+        <article class="driver-output"><h3>Source Event ID</h3><pre id="driverPolicySourceEventId">-</pre></article>
+        <article class="driver-output"><h3>Decision ID</h3><pre id="driverPolicyDecisionId">-</pre></article>
+        <article class="driver-output"><h3>Action ID</h3><pre id="driverPolicyActionId">-</pre></article>
+        <article class="driver-output policy-audit"><h3>Policy Audit History</h3><pre id="driverPolicyAuditHistory">[]</pre></article>
+      </div>
+    </section>
+
+    <section id="driverActionSimulation" class="driver-test-panel action-simulation" aria-labelledby="driverActionTitle">
+      <h2 id="driverActionTitle" class="panel-title">Driver Action Dispatcher Simulation</h2>
+      <p class="panel-copy">Policy ActionRequest를 deterministic adapter에 전달하고 execution feedback JSON만 생성합니다. 실제 장치나 외부 시스템은 호출하지 않습니다.</p>
+      <div class="simulation-banner">
+        <strong>SIMULATION · ACTUATOR NOT CONNECTED</strong>
+        EXTERNAL SYSTEM NOT CONNECTED · VEHICLE CONTROL NOT CONNECTED · NOT FOR OPERATIONAL USE
+      </div>
+      <div class="actions">
+        <button id="generateDriverPolicyActions" class="button button-secondary" type="button">GENERATE POLICY ACTIONS</button>
+        <button id="dispatchPendingDriverActions" class="button button-secondary" type="button">DISPATCH PENDING ACTIONS</button>
+        <button id="acknowledgeCurrentExecution" class="button button-secondary" type="button">ACKNOWLEDGE CURRENT EXECUTION</button>
+        <button id="completeCurrentExecution" class="button button-secondary" type="button">COMPLETE CURRENT EXECUTION</button>
+        <button id="failCurrentExecution" class="button button-secondary" type="button">FAIL CURRENT EXECUTION</button>
+        <button id="cancelCurrentExecution" class="button button-secondary" type="button">CANCEL CURRENT EXECUTION</button>
+        <button id="resetDriverActionSimulation" class="button button-secondary" type="button">RESET ACTION SIMULATION</button>
+      </div>
+      <div class="driver-output-grid action-output-grid">
+        <article class="driver-output"><h3>Pending Action Requests</h3><pre id="driverDispatcherPendingPolicyActions">[]</pre></article>
+        <article class="driver-output"><h3>Dispatch Queue</h3><pre id="driverDispatchQueue">[]</pre></article>
+        <article class="driver-output"><h3>Selected Adapter</h3><pre id="driverSelectedAdapter">-</pre></article>
+        <article class="driver-output"><h3>Current Execution ID</h3><pre id="driverCurrentExecutionId">-</pre></article>
+        <article class="driver-output"><h3>Current Action ID</h3><pre id="driverCurrentDispatchActionId">-</pre></article>
+        <article class="driver-output"><h3>Execution State / Result</h3><pre><span id="driverExecutionState">NONE</span> / <span id="driverExecutionResult">NONE</span></pre></article>
+        <article class="driver-output"><h3>Priority / Attempt</h3><pre><span id="driverExecutionPriority">-</span> / <span id="driverExecutionAttempt">-</span></pre></article>
+        <article class="driver-output"><h3>Active Executions</h3><pre id="driverActiveExecutions">[]</pre></article>
+        <article class="driver-output"><h3>Completed Executions</h3><pre id="driverCompletedExecutions">[]</pre></article>
+        <article class="driver-output"><h3>Failed Executions</h3><pre id="driverFailedExecutions">[]</pre></article>
+        <article class="driver-output action-audit"><h3>Action Audit History</h3><pre id="driverActionAuditHistory">[]</pre></article>
+      </div>
+      <p class="note">표시는 Request generated · Simulation dispatched · Execution simulated 범위로 제한됩니다.</p>
+    </section>
+
+    <section id="runtimeIdentityPanel" class="driver-test-panel identity-panel" aria-labelledby="identityTitle">
+      <h2 id="identityTitle" class="panel-title">Canonical Operational Identity</h2>
+      <div class="identity-badges"><span>BROWSER MEMORY REGISTRY</span><span>EXPLICIT ASSIGNMENT OWNERSHIP</span><span>NO AUTOMATIC CROSS-ASSIGNMENT MERGE</span><span>NOT FOR OPERATIONAL USE</span></div>
+      <div class="identity-summary"><article><span>Vehicle</span><strong data-identity-vehicle>-</strong></article><article><span>Driver</span><strong data-identity-driver>-</strong></article><article><span>Assignment</span><strong data-identity-assignment>-</strong></article><article><span>Ownership</span><strong data-identity-ownership>INACTIVE</strong></article><article class="identity-wide"><span>Canonical Target</span><strong data-identity-target>-</strong></article><article><span>Conflict</span><strong class="identity-conflict" data-identity-conflict>NO_CONFLICT</strong></article><article><span>Runtime Sources</span><strong data-identity-sources>-</strong></article><article><span>Sensor / Camera Count</span><strong data-identity-counts>0 / 0</strong></article><article class="identity-wide"><span>Context Link</span><strong data-identity-context>-</strong></article></div>
+      <div class="actions"><button type="button" data-identity-register>REGISTER IDENTITY</button><button type="button" data-identity-warehouse>LINK WAREHOUSE FIXTURE</button><button type="button" data-identity-release>RELEASE IDENTITY</button><button type="button" data-identity-export>EXPORT IDENTITY JSON</button></div>
+      <details><summary>Identity Registry Audit / Observer</summary><pre data-identity-detail>{}</pre></details>
+    </section>
+
+    <section id="multiHazardFusion" class="driver-test-panel fusion-panel" aria-labelledby="fusionTitle">
+      <h2 id="fusionTitle" class="panel-title">Multi-Hazard Runtime Fusion</h2>
+      <div class="fusion-badges"><span>DETERMINISTIC / LIVE SOURCE MIX</span><span>FUSION CONFIGURATION UNVALIDATED</span><span>ACTIONS SIMULATION ONLY</span><span>ACTUATORS DISCONNECTED</span><span>NOT FOR OPERATIONAL USE</span></div>
+      <div class="fusion-summary"><article><span>Overall Safety Status</span><strong data-fusion-band>NORMAL</strong></article><article><span>Priority Score</span><strong data-fusion-score>0</strong></article><article><span>Dominant Risk</span><strong data-fusion-dominant>-</strong></article><article><span>Recommended Action</span><strong data-fusion-action>NO_ACTION</strong></article></div>
+      <div class="actions"><button type="button" data-fusion-run>RUN FUSION FIXTURE</button><button type="button" data-fusion-ack>ACK COMPOSITE RISK</button><button type="button" data-fusion-reset>RESET FUSION TARGET</button><button type="button" data-fusion-export>EXPORT CONTEXT JSON</button></div>
+      <details><summary>Administrator / Developer Details</summary><div class="fusion-details">
+        <article><h3>Operational Context</h3><dl><div><dt>Context ID</dt><dd data-fusion-context>-</dd></div><div><dt>Target / Assignment</dt><dd data-fusion-target>-</dd></div><div><dt>Vehicle / Driver</dt><dd data-fusion-identity>-</dd></div><div><dt>Active Hazards</dt><dd data-fusion-hazards>-</dd></div><div><dt>Active Conditions</dt><dd data-fusion-conditions>-</dd></div></dl></article>
+        <article><h3>Composite Risk</h3><dl><div><dt>Composite Risk ID</dt><dd data-fusion-composite>-</dd></div><div><dt>Severity / State</dt><dd data-fusion-state>-</dd></div><div><dt>Modifiers</dt><dd data-fusion-modifiers>-</dd></div><div><dt>Synergy / Override</dt><dd data-fusion-rules>-</dd></div><div><dt>Reason Codes</dt><dd data-fusion-reasons>-</dd></div></dl></article>
+        <article><h3>Decision / Execution</h3><dl><div><dt>Selected Policy</dt><dd data-fusion-policy>-</dd></div><div><dt>Recommended Actions</dt><dd data-fusion-actions>-</dd></div><div><dt>Latest ActionExecution</dt><dd data-fusion-execution>-</dd></div><div><dt>Simulation</dt><dd>true · actuatorConnected=false</dd></div></dl></article>
+        <article><h3>Ontology Lineage</h3><dl><div><dt>Graph nodes / edges</dt><dd data-fusion-graph>0 / 0</dd></div><div><dt>Triple count</dt><dd data-fusion-triples>0</dd></div><div><dt>Context lineage</dt><dd>RiskEvent → OperationalContext → CompositeRisk → PriorityDecision → ActionRequest</dd></div></dl></article>
+      </div><h3>Recent Fusion Audit</h3><pre class="fusion-audit" data-fusion-audit>[]</pre></details>
+    </section>
+
+    <section id="runtimeConfidencePanel" class="driver-test-panel runtime-confidence" aria-labelledby="confidenceTitle">
+      <h2 id="confidenceTitle" class="panel-title">Runtime Confidence</h2>
+      <div class="confidence-badges"><span>RISK AND CONFIDENCE ARE INDEPENDENT</span><span>CONFIDENCE CONFIGURATION UNVALIDATED</span><span>RECOMMENDATION SIMULATION ONLY</span><span>ACTUATORS DISCONNECTED</span><span>NOT FOR OPERATIONAL USE</span></div>
+      <div class="confidence-summary"><article><span>Risk Band</span><strong data-confidence-risk>UNKNOWN</strong></article><article><span>Confidence Band</span><strong data-confidence-band>UNKNOWN</strong></article><article><span>Decision Mode</span><strong data-confidence-mode>INSUFFICIENT_EVIDENCE</strong></article><article><span>Immediate Recommendation</span><strong data-confidence-action>VERIFY_FIRST</strong></article></div>
+      <div class="actions"><button type="button" data-confidence-run>RUN CONFIDENCE FIXTURE</button><button type="button" data-confidence-reset>RESET CONFIDENCE TARGET</button><button type="button" data-confidence-export>EXPORT CONFIDENCE JSON</button></div>
+      <details><summary>Administrator / Developer Details</summary><div class="confidence-details"><article><h3>Components</h3><pre data-confidence-components>{}</pre></article><article><h3>Availability / Penalties</h3><pre data-confidence-breakdown>{}</pre></article><article><h3>Reasons / Gated Actions</h3><pre data-confidence-reasons>[]</pre></article><article><h3>Audit / Lineage</h3><pre data-confidence-audit>[]</pre></article></div></details>
+    </section>
+
+    <section id="alcoholSensorRuntimePanel" class="driver-test-panel alcohol-sensor-runtime" aria-labelledby="alcoholSensorRuntimeTitle">
+      <h2 id="alcoholSensorRuntimeTitle" class="panel-title">Alcohol Sensor Runtime</h2>
+      <div class="alcohol-sensor-badges"><span>SENSOR ADAPTER FIXTURE</span><span>SIMULATION ONLY</span><span>NO STARTER INTERLOCK</span><span>NO VEHICLE CONTROL</span><span>NOT FOR OPERATIONAL USE</span></div>
+      <div class="alcohol-sensor-summary"><article><span>Sensor Type</span><strong data-alcohol-sensor-type>UNKNOWN</strong></article><article><span>BAC</span><strong data-alcohol-bac>UNKNOWN</strong></article><article><span>BrAC</span><strong data-alcohol-brac>UNKNOWN</strong></article><article><span>Unit</span><strong data-alcohol-unit>UNKNOWN</strong></article><article><span>Confidence</span><strong data-alcohol-confidence>UNKNOWN</strong></article><article><span>Sensor Health</span><strong data-alcohol-health>UNKNOWN</strong></article><article><span>Freshness</span><strong data-alcohol-freshness>UNKNOWN</strong></article><article><span>Runtime Risk</span><strong data-alcohol-risk>NORMAL</strong></article><article><span>Fusion</span><strong data-alcohol-fusion>NORMAL</strong></article><article><span>Recommendation</span><strong data-alcohol-recommendation>VERIFY FIRST</strong></article></div>
+      <div class="actions"><button type="button" data-alcohol-run>RUN FIXTURE</button><button type="button" data-alcohol-ack>ACK</button><button type="button" data-alcohol-reset>RESET</button><button type="button" data-alcohol-export>EXPORT JSON</button></div>
+      <details><summary>Measurement / Observation / Runtime</summary><pre data-alcohol-detail>{}</pre></details>
+    </section>
+
+    <section id="voiceInteractionPanel" class="driver-test-panel voice-interaction" aria-labelledby="voiceInteractionTitle">
+      <h2 id="voiceInteractionTitle" class="panel-title">Context-Aware Voice Interaction</h2>
+      <div class="voice-badges"><span>LOCAL AUDIO DEVELOPMENT ASSETS</span><span>SAME-ORIGIN WAV ONLY</span><span>NO EXTERNAL TTS</span><span>NO MICROPHONE RECORDING</span><span>EDGE SPEAKER NOT CONNECTED</span><span>NOT FOR OPERATIONAL USE</span></div>
+      <h3>Voice Summary</h3>
+      <div class="voice-summary"><article><span>Audio Enabled</span><strong data-voice-enabled>NO</strong></article><article><span>Current Message</span><strong data-voice-message>NONE</strong></article><article><span>Spoken Text</span><strong data-voice-text>-</strong></article><article><span>Severity / Priority</span><strong data-voice-priority>-</strong></article><article><span>Escalation</span><strong data-voice-escalation>-</strong></article><article><span>Confidence</span><strong data-voice-confidence>UNKNOWN</strong></article><article><span>Playback</span><strong data-voice-playback>IDLE</strong></article><article><span>ACK Required</span><strong data-voice-ack>NO</strong></article><article><span>Cooldown</span><strong data-voice-cooldown>-</strong></article><article><span>Repeat Count</span><strong data-voice-repeat>0</strong></article><article><span>Browser Voice</span><strong data-voice-browser-voice>SYSTEM_DEFAULT</strong></article><article><span>Volume / Rate</span><strong data-voice-levels>0.8 / 1</strong></article></div>
+      <div class="voice-summary"><article><span>Manifest State</span><strong data-voice-manifest>NOT_INITIALIZED</strong></article><article><span>Current Asset</span><strong data-voice-asset>-</strong></article><article><span>Requested Mode</span><strong data-voice-requested>-</strong></article><article><span>Attempted Modes</span><strong data-voice-attempted>-</strong></article><article><span>Successful Mode</span><strong data-voice-successful>-</strong></article><article><span>WAV Error</span><strong data-voice-wav-error>-</strong></article><article><span>TTS Error</span><strong data-voice-tts-error>-</strong></article><article><span>Tone Fallback</span><strong data-voice-tone-fallback>NO</strong></article></div>
+      <h3>Current Decision</h3><pre class="voice-current-decision" data-voice-decision>{}</pre>
+      <div class="voice-controls"><button data-voice-action="initialize">INITIALIZE AUDIO ASSETS</button><button data-voice-action="enable">ENABLE AUDIO</button><button data-voice-action="disable">DISABLE AUDIO</button><button data-voice-action="test-local">TEST LOCAL WAV</button><button data-voice-action="test-voice">TEST TTS</button><button data-voice-action="test-fallback">TEST FULL FALLBACK CHAIN</button><button data-voice-action="chime">TEST CHIME</button><button data-voice-action="critical">TEST CRITICAL ALARM</button><button data-voice-action="drowsiness">RUN DROWSINESS FIXTURE</button><button data-voice-action="right-turn">RUN RIGHT-TURN PEDESTRIAN FIXTURE</button><button data-voice-action="multi">RUN MULTI-HAZARD FIXTURE</button><button data-voice-action="physical-ack">SIMULATE PHYSICAL ACK</button><button data-voice-action="ok-ack">SIMULATE I-AM-OK ACK</button><button data-voice-action="help-ack">SIMULATE HELP ACK</button><button data-voice-action="mute">MUTE</button><button data-voice-action="unmute">UNMUTE</button><button data-voice-action="cancel">CANCEL CURRENT AUDIO</button><button data-voice-action="reset">RESET VOICE TARGET</button><button data-voice-action="export">EXPORT VOICE JSON</button></div>
+      <div class="voice-level-controls"><label>Volume <input data-voice-volume type="range" min="0" max="1" step="0.1" value="0.8"></label><label>Rate <input data-voice-rate type="range" min="0.6" max="1.4" step="0.1" value="1"></label><label>Pitch <input data-voice-pitch type="range" min="0.5" max="1.5" step="0.1" value="1"></label></div>
+      <div class="voice-grid"><article><h3>Queue</h3><pre data-voice-queue>[]</pre></article><article><h3>Voice History</h3><pre data-voice-history>[]</pre></article></div>
+    </section>
+
+    <section id="driverVoiceScenarioPanel" class="driver-test-panel voice-scenarios" aria-labelledby="driverVoiceScenarioTitle">
+      <h2 id="driverVoiceScenarioTitle" class="panel-title">Driver Voice Scenario Pack &amp; Escalation</h2>
+      <div class="voice-badges"><span>SCENARIO PACK V1</span><span>STATE TRANSITIONS ONLY</span><span>SIMULATION</span><span>NO MICROPHONE</span><span>NO VEHICLE CONTROL</span><span>NOT FOR OPERATIONAL USE</span></div>
+      <div class="voice-summary"><article><span>Current Scenario</span><strong data-scenario-current>NONE</strong></article><article><span>Current Escalation Level</span><strong data-scenario-level>0</strong></article><article><span>Remaining Cooldown</span><strong data-scenario-cooldown>0 ms</strong></article><article><span>Repeat Count</span><strong data-scenario-repeat>0</strong></article><article><span>Reason</span><strong data-scenario-reason>IDLE</strong></article><article><span>Next Escalation</span><strong data-scenario-next>-</strong></article></div>
+      <div class="voice-controls"><button data-scenario-action="drowsiness">RUN DROWSINESS TIMELINE</button><button data-scenario-action="pedestrian">RUN PEDESTRIAN TIMELINE</button><button data-scenario-action="collision">RUN COLLISION TIMELINE</button><button data-scenario-action="alcohol">RUN ALCOHOL TIMELINE</button><button data-scenario-action="multi">RUN MULTI HAZARD TIMELINE</button><button data-scenario-action="incapacitation">RUN INCAPACITATION TIMELINE</button><button data-scenario-action="deliver">DELIVER PRIMARY</button><button data-scenario-action="tick">ADVANCE ESCALATION</button><button data-scenario-action="ack">PHYSICAL ACK</button><button data-scenario-action="ok">I AM OK</button><button data-scenario-action="help">HELP</button><button data-scenario-action="timeout">NO RESPONSE TIMEOUT</button><button data-scenario-action="reset">RESET SCENARIO</button></div>
+      <div class="voice-scenario-grid"><article><h3>Queue</h3><pre data-scenario-queue>[]</pre></article><article><h3>Suppressed Messages</h3><pre data-scenario-suppressed>[]</pre></article><article class="voice-scenario-history"><h3>Scenario History</h3><pre data-scenario-history>[]</pre></article></div>
+    </section>
+
+    <section id="driverRuntimeMemoryPanel" class="driver-test-panel driver-memory" aria-labelledby="driverRuntimeMemoryTitle">
+      <h2 id="driverRuntimeMemoryTitle" class="panel-title">Driver Memory &amp; Fatigue Trend</h2>
+      <div class="voice-badges"><span>RUNTIME MEMORY ONLY</span><span>NO CLOUD</span><span>NO DATABASE</span><span>NO BROWSER STORAGE</span><span>NO PERSONAL PROFILE</span><span>NOT FOR OPERATIONAL USE</span></div>
+      <div class="driver-memory__summary"><article><span>Memory State</span><strong data-memory-state>EMPTY</strong></article><article><span>Active Target</span><strong data-memory-target>-</strong></article><article><span>Active Assignment</span><strong data-memory-assignment>-</strong></article><article><span>Current Fatigue Trend</span><strong data-memory-fatigue>UNKNOWN</strong></article><article><span>Fatigue Trend Score</span><strong data-memory-score>-</strong></article><article><span>Trend Confidence</span><strong data-memory-confidence>-</strong></article><article><span>Risk Trend</span><strong data-memory-risk>UNKNOWN</strong></article><article><span>Confidence Trend</span><strong data-memory-confidence-trend>UNKNOWN</strong></article><article><span>Context Trend</span><strong data-memory-context>NO_MEANINGFUL_TREND</strong></article><article><span>Evidence Count</span><strong data-memory-evidence>0</strong></article><article><span>Last Update</span><strong data-memory-updated>-</strong></article><article><span>Last Memory Replay Artifact</span><strong data-memory-last-replay>-</strong></article><article><span>Last Fatigue Trend Artifact</span><strong data-memory-last-fatigue>-</strong></article><article><span>Last Risk Trend Artifact</span><strong data-memory-last-risk>-</strong></article><article><span>Last Confidence Trend Artifact</span><strong data-memory-last-confidence>-</strong></article><article><span>Last Context Trend Artifact</span><strong data-memory-last-context>-</strong></article><article><span>Last Trend Voice Selection</span><strong data-memory-last-voice>-</strong></article><article><span>Trend Voice Suppression Reason</span><strong data-memory-voice-suppression>-</strong></article><article><span>Immediate Hazard Dominance</span><strong data-memory-hazard>INACTIVE</strong></article><article><span>Trend Voice Cooldown State</span><strong data-memory-voice-cooldown>UNKNOWN</strong></article><article><span>Trend Voice ACK Suppression</span><strong data-memory-voice-ack>UNKNOWN</strong></article><article><span>Current Generation</span><strong data-memory-generation>0</strong></article></div>
+      <div class="voice-controls"><button data-memory-action="stable">RUN STABLE TREND FIXTURE</button><button data-memory-action="increasing">RUN INCREASING FATIGUE FIXTURE</button><button data-memory-action="rapid">RUN RAPID FATIGUE FIXTURE</button><button data-memory-action="improving">RUN IMPROVING TREND FIXTURE</button><button data-memory-action="attention">RUN ATTENTION TREND FIXTURE</button><button data-memory-action="risk">RUN RISK ESCALATION FIXTURE</button><button data-memory-action="confidence">RUN CONFIDENCE DEGRADATION FIXTURE</button><button data-memory-action="advance">ADVANCE MEMORY CLOCK</button><button data-memory-action="reset">RESET MEMORY TARGET</button><button data-memory-action="export">EXPORT MEMORY JSON</button></div>
+      <h3>Trend Graph / Window Cards</h3><div class="driver-memory__windows" data-memory-graph></div>
+      <div class="driver-memory__history"><article><h3>Risk / Trend / Replay History</h3><pre data-memory-history>[]</pre></article><article><h3>Voice History / Evidence</h3><pre data-memory-voice>null</pre></article></div>
+    </section>
+
+    <section id="driverCompanionPanel" class="driver-test-panel driver-companion" aria-labelledby="driverCompanionTitle">
+      <h2 id="driverCompanionTitle" class="panel-title">Driver Companion Decision Runtime</h2>
+      <div class="driver-companion__badges"><span>DRIVER COMPANION DEVELOPMENT MODE</span><span>DECISION SUPPORT ONLY</span><span>NO VEHICLE CONTROL</span><span>NO AUTOMATIC EMERGENCY CALL</span><span>MEMORY IS RAM-ONLY</span><span>NOT FOR OPERATIONAL USE</span></div>
+      <div class="driver-companion__summary"><article><span>Companion State</span><strong data-companion-state>UNKNOWN</strong></article><article><span>Recommended Action</span><strong data-companion-action>UNKNOWN</strong></article><article><span>Selected Voice Scenario</span><strong data-companion-voice>-</strong></article><article><span>Urgency</span><strong data-companion-urgency>-</strong></article><article><span>Immediate Hazard State</span><strong data-companion-hazard>-</strong></article><article><span>Fatigue Trend</span><strong data-companion-fatigue>UNKNOWN</strong></article><article><span>Risk Trend</span><strong data-companion-risk>UNKNOWN</strong></article><article><span>Confidence Trend</span><strong data-companion-confidence>UNKNOWN</strong></article><article><span>Context Trend</span><strong data-companion-context>UNKNOWN</strong></article><article><span>Verification Required</span><strong data-companion-verification>false</strong></article><article><span>ACK Required</span><strong data-companion-ack>false</strong></article><article><span>Escalation Level</span><strong data-companion-escalation>0</strong></article><article><span>Decision Age</span><strong data-companion-age>-</strong></article><article><span>Expiry</span><strong data-companion-expiry>-</strong></article></div>
+      <div class="driver-companion__controls"><button data-companion-action="stable">RUN STABLE DRIVER FIXTURE</button><button data-companion-action="increasing">RUN INCREASING FATIGUE FIXTURE</button><button data-companion-action="rapid">RUN RAPID FATIGUE FIXTURE</button><button data-companion-action="right-turn">RUN RIGHT-TURN PEDESTRIAN FIXTURE</button><button data-companion-action="low-ttc">RUN LOW-TTC FIXTURE</button><button data-companion-action="incapacitation">RUN INCAPACITATION FIXTURE</button><button data-companion-action="alcohol">RUN ALCOHOL PRESTART FIXTURE</button><button data-companion-action="confidence">RUN CONFIDENCE DEGRADATION FIXTURE</button><button data-companion-action="improving">RUN IMPROVING DRIVER FIXTURE</button><button data-companion-action="ok">SIMULATE I-AM-OK</button><button data-companion-action="will-stop">SIMULATE I-WILL-STOP</button><button data-companion-action="help">SIMULATE HELP</button><button data-companion-action="no-response">SIMULATE NO-RESPONSE</button><button data-companion-action="reset">RESET COMPANION TARGET</button><button data-companion-action="export">EXPORT COMPANION JSON</button></div>
+      <div class="driver-companion__details"><article><h3>Evidence / Suppressed Recommendations</h3><pre data-companion-evidence>{}</pre></article><article><h3>Decision / ACK / Escalation History</h3><pre data-companion-history>[]</pre></article></div>
+    </section>
+
+    <section id="unifiedEdgeRuntimePanel" class="driver-test-panel unified-edge"><h2 class="panel-title">Unified Edge Runtime</h2><div class="unified-edge__badges"><span>REAL-TIME WARNING FIRST</span><span>BOUNDED STORAGE</span><span>NO RAW VIDEO STORAGE</span><span>NO RAW AUDIO STORAGE</span><span>NO POINT-CLOUD STORAGE</span><span>EDGE ACTUATOR SIMULATION</span><span>NO VEHICLE CONTROL</span><span>NOT FOR OPERATIONAL USE</span></div><div class="unified-edge__summary"><article><span>Edge Runtime State</span><strong data-unified-edge-state>NOT_REGISTERED</strong></article><article><span>Registered Devices</span><strong data-unified-edge-devices>0</strong></article><article><span>Active Inputs</span><strong data-unified-edge-inputs>0</strong></article><article><span>Active Outputs</span><strong data-unified-edge-outputs>0</strong></article><article><span>Storage Pressure</span><strong data-unified-edge-pressure>NORMAL</strong></article><article><span>Estimated RAM Usage</span><strong>ESTIMATION ONLY</strong></article><article><span>Incident Buffer Count</span><strong data-unified-edge-incidents>0</strong></article><article><span>Compact Log Count</span><strong data-unified-edge-log>0</strong></article><article><span>Critical Reserve Usage</span><strong data-unified-edge-reserve>0 / 100</strong></article><article><span>Dropped Count</span><strong data-unified-edge-dropped>0</strong></article><article><span>Last Compaction</span><strong data-unified-edge-compaction>-</strong></article><article><span>Current Generation</span><strong data-unified-edge-generation>0</strong></article></div><div class="unified-edge__controls"><button data-unified-edge-action="register">REGISTER COMPOSITE EDGE UNIT</button><button data-unified-edge-action="camera">RUN CAMERA INPUT FIXTURE</button><button data-unified-edge-action="imu">RUN IMU INPUT FIXTURE</button><button data-unified-edge-action="radar">RUN RADAR TRACK FIXTURE</button><button data-unified-edge-action="lidar">RUN LIDAR TRACK FIXTURE</button><button data-unified-edge-action="alcohol">RUN ALCOHOL INPUT FIXTURE</button><button data-unified-edge-action="ack">RUN PHYSICAL ACK FIXTURE</button><button data-unified-edge-action="pressure">RUN STORAGE PRESSURE FIXTURE</button><button data-unified-edge-action="incident">RUN INCIDENT BUFFER FIXTURE</button><button data-unified-edge-action="reset">RESET EDGE DEVICE</button><button data-unified-edge-action="export">EXPORT EDGE JSON</button></div><pre data-unified-edge-detail>{}</pre></section>
+    <section id="fieldPilotPanel" class="driver-test-panel field-pilot"><h2 class="panel-title">Controlled Field Pilot</h2><div class="field-pilot__badges"><span>SUPERVISED</span><span>DEVELOPMENT ONLY</span><span>NON-COMMERCIAL</span><span>NO VEHICLE CONTROL</span><span>NO RAW MEDIA</span><span>HUMAN APPROVAL REQUIRED</span></div><div class="field-pilot__summary"><article><span>Pilot Status</span><strong data-field-pilot-status>NOT_CONFIGURED</strong></article><article><span>Mode</span><strong data-field-pilot-mode>-</strong></article><article><span>Checklist</span><strong data-field-pilot-checklist>NOT_TESTED</strong></article><article><span>Scenario</span><strong data-field-pilot-scenario>0</strong></article><article><span>Incident</span><strong data-field-pilot-incident>0</strong></article><article><span>Evidence</span><strong data-field-pilot-evidence>0</strong></article><article><span>Safety Stop</span><strong data-field-pilot-stop>INACTIVE</strong></article><article><span>Pilot Gate</span><strong data-field-pilot-gate>NO_GO</strong></article></div><div class="field-pilot__controls"><button data-field-pilot-action="configure">CONFIGURE</button><button data-field-pilot-action="checklist">RUN CHECKLIST</button><button data-field-pilot-action="preflight">RUN PREFLIGHT</button><button data-field-pilot-action="start">START</button><button data-field-pilot-action="pause">PAUSE</button><button data-field-pilot-action="resume">RESUME</button><button data-field-pilot-action="stop">SAFETY STOP</button><button data-field-pilot-action="complete">COMPLETE</button><button data-field-pilot-action="cancel">CANCEL</button><button data-field-pilot-action="json">EXPORT JSON</button><button data-field-pilot-action="csv">EXPORT CSV</button><button data-field-pilot-action="evidence">EXPORT EVIDENCE</button></div><pre data-field-pilot-detail>{}</pre></section>
+
+    <section id="pocFunctionalReadinessPanel" class="driver-test-panel field-pilot"><h2 class="panel-title">POC Functional Readiness</h2><div class="field-pilot__badges"><span>POC FUNCTIONAL READINESS</span><span>LIVE HUMAN VALIDATION REQUIRED</span><span>KOREAN AUDIO DEVELOPMENT CANDIDATE</span><span>NO RAW MEDIA STORAGE</span><span>NO COMMERCIAL APPROVAL</span><span>NOT FOR OPERATIONAL USE</span></div><div class="field-pilot__summary"><article><span>Session</span><strong data-poc-state>NOT_STARTED</strong></article><article><span>Camera</span><strong data-poc-camera>CAMERA_REQUIRED_FOR_MANUAL_VALIDATION</strong></article><article><span>Calibration</span><strong data-poc-calibration>NOT_READY</strong></article><article><span>Blink Attempts / Accepted</span><strong><span data-poc-blink-attempts>0</span> / <span data-poc-blink-accepted>0</span></strong></article><article><span>Blink Missed / False Positive</span><strong><span data-poc-blink-missed>0</span> / <span data-poc-blink-fp>0</span></strong></article><article><span>Blink Re-arm</span><strong data-poc-rearm>NOT_VERIFIED</strong></article><article><span>Wink / Long Closure</span><strong><span data-poc-winks>0</span> / <span data-poc-closures>0</span></strong></article><article><span>Yawn Attempts / Confirmed</span><strong><span data-poc-yawn-attempts>0</span> / <span data-poc-yawn-confirmed>0</span></strong></article><article><span>Yawn Missed / Duplicate</span><strong><span data-poc-yawn-missed>0</span> / <span data-poc-yawn-duplicates>0</span></strong></article><article><span>Talking / Smile False Positive</span><strong><span data-poc-talking-fp>0</span> / <span data-poc-smile-fp>0</span></strong></article><article><span>MAR</span><strong data-poc-mar>INVALID</strong></article><article><span>Korean Audio / Audibility</span><strong><span data-poc-audio>NONE</span> / <span data-poc-audibility>NOT_YET_REVIEWED</span></strong></article><article><span>POC Gate</span><strong data-poc-gate>NO_GO_FOR_PHYSICAL_POC</strong></article><article><span>Remaining Blockers</span><strong data-poc-blockers>-</strong></article></div><div class="field-pilot__controls"><button data-poc-action="start">START FUNCTIONAL VALIDATION</button><button data-poc-action="eye-calibration">RESET &amp; START EYE CALIBRATION</button><button data-poc-action="mouth-calibration">START MOUTH CALIBRATION — PRESERVE READY EYE</button><button data-poc-action="blink-test">START BLINK 20 TEST</button><button data-poc-action="blink-attempt">RECORD BLINK ATTEMPT (ATTEMPT ONLY)</button><button data-poc-action="wink-test">START WINK TEST</button><button data-poc-action="closure-test">START LONG-CLOSURE TEST</button><button data-poc-action="yawn-test">START YAWN 5 TEST</button><button data-poc-action="talking-test">START TALKING TEST</button><button data-poc-action="smile-test">START SMILE TEST</button><button data-poc-action="false-positive">RECORD FALSE POSITIVE</button><button data-poc-action="false-negative">RECORD FALSE NEGATIVE</button><button data-poc-action="complete">COMPLETE MANUAL REVIEW</button><button data-poc-action="reset">RESET VALIDATION</button><button data-poc-action="json">EXPORT JSON</button><button data-poc-action="csv">EXPORT CSV</button></div><details><summary>Blink / Yawn diagnostics</summary><pre data-poc-diagnostics>{}</pre></details><pre data-poc-export hidden></pre></section>
+
+    <section id="driverStabilizationPanel" class="driver-test-panel driver-stabilization" aria-labelledby="driverStabilizationTitle">
+      <h2 id="driverStabilizationTitle" class="panel-title">Driver Companion Stabilization &amp; Productization Gate</h2>
+      <div class="driver-stabilization__badges"><span>STABILIZATION MODE</span><span>CONTROLLED VALIDATION ONLY</span><span>NO COMMERCIAL RELEASE</span><span>NO VEHICLE CONTROL</span><span>NO AUTOMATIC EMERGENCY CALL</span><span>NOT FOR OPERATIONAL USE</span></div>
+      <div class="driver-stabilization__summary">
+        <article><span>Overall Gate</span><strong data-stabilization-overall>NOT EVALUATED</strong></article><article><span>Product Maturity</span><strong data-stabilization-maturity>68%</strong></article>
+        <article><span>Hazard Activation Consistency</span><strong data-stabilization-hazard>MITIGATED</strong></article><article><span>ACK / Expiry Lifecycle</span><strong data-stabilization-ack>MITIGATED</strong></article>
+        <article><span>Voice Preemption Safety</span><strong data-stabilization-voice>MITIGATED</strong></article><article><span>Policy Vocabulary</span><strong data-stabilization-vocabulary>MITIGATED</strong></article>
+        <article><span>Runtime State Bounds</span><strong data-stabilization-bounds>MITIGATED</strong></article><article><span>Reset Isolation</span><strong data-stabilization-reset>MITIGATED</strong></article>
+        <article><span>Operational Chain Coverage</span><strong data-stabilization-chain>MITIGATED</strong></article><article><span>Open Blockers</span><strong data-stabilization-blockers>0</strong></article>
+        <article><span>Field Validation Required</span><strong data-stabilization-field>4</strong></article><article><span>Last Evaluation</span><strong data-stabilization-evaluated>-</strong></article>
+        <article><span>Voice History Count / Limit</span><strong data-stabilization-voice-retention>0 / 256</strong></article><article><span>Memory History Count / Limit</span><strong>0 / 1024</strong></article>
+        <article><span>Replay Artifact Count / Limit</span><strong>0 / 2048</strong></article><article><span>Companion History Count / Limit</span><strong>0 / 512</strong></article>
+        <article><span>Dropped Count</span><strong data-stabilization-dropped>0</strong></article><article><span>Current Generation</span><strong data-stabilization-generation>0</strong></article>
+        <article><span>Last Reset Scope</span><strong data-stabilization-reset-scope>-</strong></article><article><span>Reset Status</span><strong data-stabilization-reset-status>-</strong></article>
+        <article><span>Modules Completed</span><strong data-stabilization-completed>-</strong></article><article><span>Modules Failed</span><strong data-stabilization-failed>-</strong></article>
+      </div>
+      <div class="driver-stabilization__controls"><button data-stabilization-action="hazard">RUN HAZARD CONSISTENCY FIXTURE</button><button data-stabilization-action="ack">RUN ACK/EXPIRY FIXTURE</button><button data-stabilization-action="voice">RUN VOICE RACE FIXTURE</button><button data-stabilization-action="vocabulary">RUN VOCABULARY FIXTURE</button><button data-stabilization-action="bounds">RUN STATE BOUNDS FIXTURE</button><button data-stabilization-action="reset">RUN RESET ISOLATION FIXTURE</button><button data-stabilization-action="chain">RUN SIX-STAGE LINEAGE FIXTURE</button><button data-stabilization-action="full">RUN FULL PRODUCTIZATION GATE</button><button data-stabilization-action="reset-target">RESET STABILIZATION TARGET</button><button data-stabilization-action="export">EXPORT GATE JSON</button></div>
+      <div class="driver-stabilization__details"><article><h3>Gate / Evidence</h3><pre data-stabilization-gate>{}</pre></article><article><h3>Six-Stage Lineage / Reset Diagnostics</h3><pre data-stabilization-lineage>{}</pre></article></div>
+    </section>
+
+    <section id="runtimeCalibrationPanel" class="driver-test-panel runtime-calibration" aria-labelledby="runtimeCalibrationTitle">
+      <h2 id="runtimeCalibrationTitle" class="panel-title">Field Calibration &amp; Threshold Profile</h2>
+      <div class="runtime-calibration-badges"><span>DEVELOPMENT CANDIDATE</span><span>NOT AUTOMATICALLY APPLIED</span><span>NO IMAGE OR LANDMARK STORAGE</span><span>SIMULATION ONLY</span><span>NOT FOR OPERATIONAL USE</span></div>
+      <div class="runtime-calibration-summary"><article><span>Session</span><strong data-runtime-calibration-session>NOT_STARTED</strong></article><article><span>Samples</span><strong data-runtime-calibration-samples>0</strong></article><article><span>Blink</span><strong data-runtime-calibration-blink>UNKNOWN</strong></article><article><span>EAR</span><strong data-runtime-calibration-ear>UNKNOWN</strong></article><article><span>MAR</span><strong data-runtime-calibration-mar>UNKNOWN</strong></article><article><span>Yawn</span><strong data-runtime-calibration-yawn>UNKNOWN</strong></article><article><span>Head Pose</span><strong data-runtime-calibration-head>UNKNOWN</strong></article><article><span>Confidence</span><strong data-runtime-calibration-confidence>UNKNOWN</strong></article><article><span>Validation</span><strong data-runtime-calibration-validation>NOT_VALIDATED</strong></article></div>
+      <div class="actions"><button type="button" data-runtime-calibration-start>START</button><button type="button" data-runtime-calibration-pause>PAUSE</button><button type="button" data-runtime-calibration-stop>STOP</button><button type="button" data-runtime-calibration-reset>RESET</button><button type="button" data-runtime-calibration-export>EXPORT PROFILE</button><button type="button" data-runtime-calibration-import>IMPORT PROFILE</button><input type="file" accept="application/json,.json" hidden data-runtime-calibration-file></div>
+      <details><summary>Threshold Candidates / Profile</summary><pre data-runtime-calibration-detail>{}</pre></details>
+    </section>
+
+    <section id="pedestrianRuntimePanel" class="driver-test-panel pedestrian-runtime" aria-labelledby="pedestrianRuntimeTitle">
+      <h2 id="pedestrianRuntimeTitle" class="panel-title">Pedestrian Proximity Runtime</h2>
+      <div class="pedestrian-badges"><span>DETECTOR INTERFACE ONLY</span><span>NO IMAGE / FRAME / BBOX STORAGE</span><span>NO NETWORK TRANSMISSION</span><span>NOT FOR OPERATIONAL USE</span></div>
+      <div class="pedestrian-metrics"><article><span>Distance</span><strong data-pedestrian-distance>UNKNOWN</strong></article><article><span>Direction</span><strong data-pedestrian-direction>UNKNOWN</strong></article><article><span>Motion / Closing Speed</span><strong data-pedestrian-motion>UNKNOWN</strong></article><article><span>Detection Confidence</span><strong data-pedestrian-confidence>UNKNOWN</strong></article><article><span>Runtime Result</span><strong data-pedestrian-runtime>NOT RUN</strong></article></div>
+      <div class="actions"><button type="button" data-pedestrian-approach>RUN APPROACH FIXTURE</button><button type="button" data-pedestrian-static>RUN STATIC FIXTURE</button><button type="button" data-pedestrian-away>RUN AWAY FIXTURE</button><button type="button" data-pedestrian-unknown>RUN UNKNOWN FIXTURE</button></div>
+      <details><summary>Runtime SensorObservation / Confidence</summary><pre data-pedestrian-detail>{}</pre></details>
+    </section>
+
+    <section id="vehicleProximityRuntimePanel" class="driver-test-panel vehicle-proximity-runtime" aria-labelledby="vehicleProximityTitle">
+      <h2 id="vehicleProximityTitle" class="panel-title">Vehicle Proximity Runtime</h2>
+      <div class="vehicle-proximity-badges"><span>DETECTOR / SENSOR ADAPTER FIXTURE</span><span>DISTANCE AND TTC UNVALIDATED</span><span>NO ACTUATOR CONTROL</span><span>SIMULATION ONLY</span><span>NOT FOR OPERATIONAL USE</span></div>
+      <div class="vehicle-proximity-summary"><article><span>Vehicle Proximity Status</span><strong data-vehicle-status>NOT RUN</strong></article><article><span>Distance</span><strong data-vehicle-distance>UNKNOWN</strong></article><article><span>Relative Direction</span><strong data-vehicle-direction>UNKNOWN</strong></article><article><span>Relative Motion</span><strong data-vehicle-motion>UNKNOWN</strong></article><article><span>TTC</span><strong data-vehicle-ttc>UNKNOWN</strong></article><article><span>Immediate Recommendation</span><strong data-vehicle-recommendation>VERIFY FIRST</strong></article></div>
+      <div class="actions"><button type="button" data-vehicle-run>RUN VEHICLE FIXTURE</button><button type="button" data-vehicle-ack>ACK VEHICLE RISK</button><button type="button" data-vehicle-reset>RESET VEHICLE TARGET</button><button type="button" data-vehicle-export>EXPORT VEHICLE JSON</button></div>
+      <details><summary>Administrator / Developer Details</summary><div class="vehicle-proximity-details"><article><h3>Measurement / Observation</h3><pre data-vehicle-measurement>{}</pre></article><article><h3>Risk / Fusion / Confidence</h3><pre data-vehicle-runtime>{}</pre></article></div></details>
+    </section>
+
+    <section id="rightTurnRuntimePanel" class="driver-test-panel right-turn-runtime" aria-labelledby="rightTurnTitle">
+      <h2 id="rightTurnTitle" class="panel-title">Right Turn Safety Runtime</h2>
+      <div class="right-turn-badges"><span>DETECTOR-INDEPENDENT FIXTURE</span><span>NO CAN / GPS / ACTUATOR CONTROL</span><span>SIMULATION ONLY</span><span>NOT FOR OPERATIONAL USE</span></div>
+      <div class="right-turn-summary"><article><span>Turn State</span><strong data-right-turn-state>INACTIVE</strong></article><article><span>Turn Signal</span><strong data-right-turn-signal>OFF</strong></article><article><span>Hazard Zone</span><strong data-right-turn-zone>UNKNOWN</strong></article><article><span>Pedestrian</span><strong data-right-turn-pedestrian>NONE</strong></article><article><span>Vehicle</span><strong data-right-turn-vehicle>NONE</strong></article><article><span>Composite Risk</span><strong data-right-turn-risk>NORMAL</strong></article><article><span>Confidence / Recommendation</span><strong data-right-turn-confidence>UNKNOWN / VERIFY FIRST</strong></article></div>
+      <div class="actions"><button type="button" data-right-turn-run>RUN FIXTURE</button><button type="button" data-right-turn-ack>ACK</button><button type="button" data-right-turn-reset>RESET</button><button type="button" data-right-turn-export>EXPORT JSON</button></div>
+      <details><summary>Operational Context / Fusion / Confidence</summary><pre data-right-turn-detail>{}</pre></details>
+    </section>
+
+    <section id="driverAttentionRuntimePanel" class="driver-test-panel driver-attention" aria-labelledby="driverAttentionTitle">
+      <h2 id="driverAttentionTitle" class="panel-title">Driver Attention Runtime</h2>
+      <div class="attention-badges"><span>HEAD-POSE HEURISTIC IS NOT EYE GAZE</span><span>ATTENTION THRESHOLDS UNVALIDATED</span><span>PHONE DETECTION NOT CONNECTED</span><span>SIMULATION / FIXTURE ONLY</span><span>NO ACTUATOR CONTROL</span><span>NOT FOR OPERATIONAL USE</span></div>
+      <div class="attention-summary"><article><span>Attention Status</span><strong data-attention-status>UNKNOWN</strong></article><article><span>Current Direction</span><strong data-attention-direction>UNKNOWN</strong></article><article><span>Off-road Duration</span><strong data-attention-offroad>0 ms</strong></article><article><span>Immediate Recommendation</span><strong data-attention-recommendation>VERIFY FIRST</strong></article></div>
+      <div class="actions"><button type="button" data-attention-run>RUN ATTENTION FIXTURE</button><button type="button" data-attention-ack>ACK ATTENTION RISK</button><button type="button" data-attention-reset>RESET ATTENTION TARGET</button><button type="button" data-attention-export>EXPORT ATTENTION JSON</button></div>
+      <details><summary>Administrator / Developer Details</summary><div class="attention-details"><article><h3>Direction / Duration</h3><dl><div><dt>Gaze Direction / Source</dt><dd data-attention-gaze>UNKNOWN</dd></div><div><dt>Head Direction</dt><dd data-attention-head>UNKNOWN</dd></div><div><dt>Attention Zone</dt><dd data-attention-zone>UNKNOWN</dd></div><div><dt>Glance / Off-road</dt><dd data-attention-duration>0 / 0 ms</dd></div><div><dt>Forward Recovery</dt><dd data-attention-forward>0 ms</dd></div></dl></article><article><h3>Measurement / Identity</h3><dl><div><dt>Face / Landmark</dt><dd data-attention-face>false / false</dd></div><div><dt>Gaze / Head Pose Valid</dt><dd data-attention-valid>false / false</dd></div><div><dt>Measurement Confidence</dt><dd data-attention-confidence>UNKNOWN</dd></div><div><dt>Quality / Reasons</dt><dd data-attention-quality>UNKNOWN</dd></div><div><dt>Canonical Target</dt><dd data-attention-target>-</dd></div></dl></article><article><h3>Runtime</h3><dl><div><dt>Observation ID</dt><dd data-attention-observation>-</dd></div><div><dt>Risk Event ID</dt><dd data-attention-risk>-</dd></div><div><dt>Fusion Result</dt><dd data-attention-fusion>NORMAL</dd></div><div><dt>Runtime Confidence</dt><dd data-attention-runtime-confidence>UNKNOWN</dd></div><div><dt>Recommendation</dt><dd data-attention-detail-recommendation>VERIFY FIRST</dd></div></dl></article></div><pre data-attention-detail>{}</pre></details>
+    </section>
+
+    <section id="distractionEvidencePanel" class="driver-test-panel distraction-evidence" aria-labelledby="distractionEvidenceTitle">
+      <h2 id="distractionEvidenceTitle" class="panel-title">Distraction Source Evidence Adapter</h2>
+      <div class="distraction-evidence__badges"><span>DETECTOR ADAPTER FIXTURE</span><span>PHONE DETECTION NOT CONNECTED</span><span>SIMULATION ONLY</span><span>NO ACTUATOR CONTROL</span><span>NOT FOR OPERATIONAL USE</span></div>
+      <div class="distraction-evidence__summary"><article><span>Source</span><strong data-distraction-source>UNKNOWN</strong></article><article><span>Confidence</span><strong data-distraction-confidence>UNKNOWN</strong></article><article><span>Duration</span><strong data-distraction-duration>0 ms</strong></article><article><span>Quality</span><strong data-distraction-quality>UNKNOWN</strong></article><article><span>Evidence Count</span><strong data-distraction-count>0</strong></article><article><span>Runtime State</span><strong data-distraction-state>NORMAL</strong></article><article><span>Recommendation</span><strong data-distraction-recommendation>MONITOR</strong></article></div>
+      <div class="actions"><button type="button" data-distraction-run>RUN FIXTURE</button><button type="button" data-distraction-ack>ACK</button><button type="button" data-distraction-reset>RESET</button><button type="button" data-distraction-export>EXPORT JSON</button></div>
+      <details><summary>Evidence / Observation / Risk / Fusion / Confidence</summary><pre data-distraction-detail>{}</pre></details>
+    </section>
+
+    <section id="runtimeReplayPanel" class="driver-test-panel runtime-replay" aria-labelledby="runtimeReplayTitle">
+      <h2 id="runtimeReplayTitle" class="panel-title">Operational Replay &amp; Explainable Runtime Black Box</h2>
+      <div class="runtime-replay__badges"><span>RUNTIME REPLAY ONLY</span><span>NO VIDEO RECORDING</span><span>RECORDED ARTIFACTS ONLY</span><span>LIVE RUNTIME NOT MODIFIED</span><span>SIMULATION ONLY</span><span>NOT FOR OPERATIONAL USE</span></div>
+      <div class="runtime-replay__summary"><article><span>Playback</span><strong data-replay-state>STOPPED</strong></article><article><span>Timeline</span><strong data-replay-timeline>0 / 0</strong></article><article><span>Current Event</span><strong data-replay-event>-</strong></article><article><span>Current Risk</span><strong data-replay-risk>NORMAL</strong></article><article><span>Current Confidence</span><strong data-replay-confidence>UNKNOWN</strong></article><article><span>Current Recommendation</span><strong data-replay-recommendation>MONITOR</strong></article></div>
+      <div class="actions"><button type="button" data-replay-fixture>LOAD FIXTURE</button><button type="button" data-replay-play>PLAY</button><button type="button" data-replay-pause>PAUSE</button><button type="button" data-replay-step>STEP</button><button type="button" data-replay-reset>RESET</button><button type="button" data-replay-why>WHY?</button><button type="button" data-replay-export>EXPORT JSON</button></div>
+      <details open><summary>Replay Snapshot</summary><div class="runtime-replay__details"><article><h3>Current Context</h3><pre data-replay-context>{}</pre></article><article><h3>Current Event / Risk</h3><pre data-replay-current>{}</pre></article><article><h3>Explanation</h3><pre data-replay-explanation>{}</pre></article><article><h3>Graph / Triple Summary</h3><pre data-replay-lineage>{}</pre></article></div></details>
+    </section>
+
+    <section id="edgeHardwarePanel" class="driver-test-panel edge-hardware-panel" aria-labelledby="edgeHardwareTitle">
+      <h2 id="edgeHardwareTitle" class="panel-title">Unified Edge Hardware Adapter Contracts</h2>
+      <div class="edge-hardware__badges"><span>HARDWARE CONTRACTS ONLY</span><span>NO REAL DEVICE DRIVER</span><span>NO AUDIO RECORDING</span><span>NO ACTUATOR CONTROL</span><span>ALL OUTPUTS SIMULATED</span><span>ACTUATOR CONNECTED: FALSE</span><span>NOT FOR OPERATIONAL USE</span></div>
+      <div class="edge-hardware__summary"><article><span>Registered Hardware Count</span><strong data-edge-registered>0</strong></article><article><span>Connected Count</span><strong data-edge-connected>0</strong></article><article><span>Degraded / Offline Count</span><strong data-edge-degraded>0 / 0</strong></article><article><span>Pending Output Requests</span><strong data-edge-pending>0</strong></article><article><span>Last Input Event</span><strong data-edge-input>-</strong></article><article><span>Last Output Result</span><strong data-edge-output>-</strong></article><article><span>Actuator Connected</span><strong>NO</strong></article><article><span>Operational Use Allowed</span><strong>NO</strong></article></div>
+      <div class="edge-hardware__controls"><button type="button" data-edge-register>REGISTER EDGE FIXTURE</button><button type="button" data-edge-run-input>RUN INPUT FIXTURE</button><button type="button" data-edge-run-output>RUN OUTPUT FIXTURE</button><button type="button" data-edge-voice-ack>SIMULATE VOICE ACK</button><button type="button" data-edge-physical-ack>SIMULATE PHYSICAL ACK</button><button type="button" data-edge-degrade>SET HARDWARE DEGRADED</button><button type="button" data-edge-offline>SET HARDWARE OFFLINE</button><button type="button" data-edge-reset>RESET EDGE TARGET</button><button type="button" data-edge-export>EXPORT EDGE JSON</button></div>
+      <div class="edge-hardware__grid"><article><h3>Hardware Inventory</h3><pre data-edge-inventory>[]</pre></article><article><h3>Input Events</h3><pre data-edge-inputs>[]</pre></article><article><h3>Output Requests / Results</h3><pre data-edge-outputs>[]</pre></article><article><h3>Voice / ACK</h3><pre data-edge-ack>{}</pre></article><article><h3>Runtime Bridge / Confidence</h3><pre data-edge-bridge>{}</pre></article><article><h3>Graph / Triple / Audit</h3><pre data-edge-lineage>{}</pre></article></div>
+    </section>
+
+    <section id="runtimeEventGraphViewer" class="driver-test-panel runtime-graph" aria-labelledby="runtimeGraphTitle">
+      <h2 id="runtimeGraphTitle" class="panel-title">Runtime Graph</h2>
+      <p class="panel-copy">Runtime artifacts are observed and connected in memory for simulation and inspection only.</p>
+      <div class="driver-output-grid runtime-graph-grid">
+        <article class="driver-output"><h3>Nodes</h3><pre id="runtimeGraphNodes">[]</pre></article>
+        <article class="driver-output"><h3>Edges</h3><pre id="runtimeGraphEdges">[]</pre></article>
+        <article class="driver-output runtime-graph-wide"><h3>Current Runtime Path</h3><pre id="runtimeGraphPath">Observation → RiskEvent → PolicyDecision → ActionRequest → ActionExecution</pre></article>
+        <article class="driver-output runtime-graph-wide"><h3>JSON</h3><pre id="runtimeGraphJSON">{"nodes":[],"edges":[]}</pre></article>
+      </div>
+    </section>
+
+    <section id="runtimeTripleViewer" class="driver-test-panel runtime-triple" aria-labelledby="runtimeTripleTitle">
+      <h2 id="runtimeTripleTitle" class="panel-title">Runtime Triple Viewer</h2>
+      <div class="simulation-banner"><strong>SIMULATION</strong>NOT FOR OPERATIONAL USE</div>
+      <div class="actions">
+        <button id="exportRuntimeTriplesJSON" class="button button-secondary" type="button">EXPORT JSON</button>
+        <button id="exportRuntimeTriplesTTL" class="button button-secondary" type="button">EXPORT TURTLE</button>
+        <button id="traceCurrentExecution" class="button button-secondary" type="button">TRACE CURRENT EXECUTION</button>
+        <button id="resetRuntimeTripleStore" class="button button-secondary" type="button">RESET TRIPLE STORE</button>
+      </div>
+      <div class="driver-output-grid runtime-triple-grid">
+        <article class="driver-output"><h3>Triple Count</h3><pre id="runtimeTripleCount">0</pre></article>
+        <article class="driver-output"><h3>Current Runtime Triple</h3><pre id="runtimeCurrentTriples">[]</pre></article>
+        <article class="driver-output runtime-triple-wide"><h3>Current Runtime Lineage</h3><pre id="runtimeCurrentLineage">{}</pre></article>
+        <article class="driver-output runtime-triple-wide"><h3>Current Turtle</h3><pre id="runtimeTripleTTL"></pre></article>
+        <article class="driver-output runtime-triple-wide"><h3>Current JSON</h3><pre id="runtimeTripleJSON">[]</pre></article>
+      </div>
+    </section>
+
+    <nav class="tabs" aria-label="Driver Safety 정보">
+      <button class="tab-button active" type="button" data-tab="overview">구현 현황</button>
+      <button class="tab-button" type="button" data-tab="ontology">Ontology 흐름</button>
+      <button class="tab-button" type="button" data-tab="integration">연동 준비</button>
+    </nav>
+
+    <section id="overview" class="tab-panel active">
+      <h2 class="panel-title">현재 저장소에서 확인된 범위</h2>
+      <p class="panel-copy">랜딩 페이지의 개념 정의와 기존 창고 위험 이벤트 상태 머신을 기준으로 정리했습니다.</p>
+      <div class="grid">
+        <article class="card">
+          <div class="card-label">AVAILABLE</div>
+          <h3>이벤트 상태 모델</h3>
+          <p>NEW, ACTIVE, ACKNOWLEDGED, CLEARED 상태와 JSON 직렬화 구조가 창고 안전 콘솔에 구현되어 있습니다.</p>
+        </article>
+        <article class="card">
+          <div class="card-label">AVAILABLE</div>
+          <h3>브라우저 음성 경고</h3>
+          <p>Web Speech API 기반 한국어 경고가 창고 위험 이벤트에 연결되어 있습니다.</p>
+        </article>
+        <article class="card">
+          <div class="card-label">NOT IMPLEMENTED</div>
+          <h3>졸음·졸도 판정</h3>
+          <p>카메라, MediaPipe, EAR/PERCLOS, 얼굴 자세 및 졸도 분류 알고리즘은 아직 없습니다.</p>
+        </article>
+      </div>
+      <div class="actions">
+        <a class="button button-primary" href="{{ url_for('index') }}">기존 창고 안전 콘솔 열기</a>
+        <a class="button button-secondary" href="{{ url_for('landing') }}">모듈 목록으로 돌아가기</a>
+      </div>
+    </section>
+
+    <section id="ontology" class="tab-panel">
+      <h2 class="panel-title">랜딩 페이지에 정의된 의미 흐름</h2>
+      <p class="panel-copy">아래 흐름은 현재 설계 개념이며 실행 중인 졸음 판정 파이프라인이 아닙니다.</p>
+      <div class="flow">
+        <div class="flow-step"><strong>Observation</strong><span>EyeClosureObservation</span></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step"><strong>Event</strong><span>EyeClosureEvent</span></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step"><strong>State</strong><span>DrowsinessSuspectedState</span></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step"><strong>Risk</strong><span>RiskLevel2_Warn</span></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step"><strong>Action</strong><span>SpeakerWarningAction</span></div>
+      </div>
+      <p class="note">실제 적용 전에는 관측 품질, 시간 누적, 오탐 억제, 운전자 확인 및 센서 장애 정책이 추가되어야 합니다.</p>
+    </section>
+
+    <section id="integration" class="tab-panel">
+      <h2 class="panel-title">실제 기능 연결에 필요한 미구현 항목</h2>
+      <p class="panel-copy">현재 코드에 없는 항목을 구현 완료처럼 표시하지 않습니다.</p>
+      <div class="checklist">
+        <div class="check"><span>카메라 또는 RTSP 프레임 입력</span><span class="check-state">미구현</span></div>
+        <div class="check"><span>얼굴·눈 랜드마크 및 입력 품질 판단</span><span class="check-state">미구현</span></div>
+        <div class="check"><span>EAR/PERCLOS 또는 학습 모델 기반 졸음 판정</span><span class="check-state">미구현</span></div>
+        <div class="check"><span>졸음과 졸도 상태 구분</span><span class="check-state">미구현</span></div>
+        <div class="check"><span>Driver Safety 이벤트 API 및 영속 저장</span><span class="check-state">미구현</span></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="/static/js/driver_stabilization_config.js"></script>
+  <script src="/static/js/driver_runtime_lifecycle_contracts.js"></script>
+  <script src="/static/js/driver_policy_vocabulary.js"></script>
+  <script src="/static/js/runtime_state_retention_policy.js"></script>
+  <script src="/static/js/runtime_reset_coordinator.js"></script>
+  <script src="/static/js/runtime_lifecycle_contract.js"></script>
+  <script src="/static/js/runtime_bounded_store.js"></script>
+  <script src="/static/js/runtime_store_registry.js"></script>
+  <script src="/static/js/unified_edge_runtime_config.js"></script><script src="/static/js/unified_edge_input_contract.js"></script><script src="/static/js/unified_edge_output_contract.js"></script><script src="/static/js/edge_resource_retention_policy.js"></script><script src="/static/js/edge_incident_buffer.js"></script><script src="/static/js/edge_storage_pressure_manager.js"></script><script src="/static/js/unified_edge_runtime.js"></script><script src="/static/js/edge_hardware_validation_protocol.js"></script><script src="/static/js/field_pilot_config.js"></script><script src="/static/js/field_pilot_session_model.js"></script><script src="/static/js/field_pilot_checklist_engine.js"></script><script src="/static/js/field_pilot_incident_engine.js"></script><script src="/static/js/field_pilot_evidence_export.js"></script><script src="/static/js/field_pilot_runtime.js"></script>
+  <script src="/static/js/sensor_observation.js"></script>
+  <script src="/static/js/driver_state_config.js"></script>
+  <script src="/static/js/driver_state.js"></script>
+  <script src="/static/js/driver_sensor_adapters.js"></script>
+  <script src="/static/js/driver_risk_runtime.js"></script>
+  <script src="/static/js/driver_policy_config.js"></script>
+  <script src="/static/js/driver_policy_engine.js"></script>
+  <script src="/static/js/driver_action_config.js"></script>
+  <script src="/static/js/driver_action_dispatcher.js"></script>
+  <script src="/static/js/runtime_operational_context.js"></script>
+  <script src="/static/js/runtime_identity_adapter.js"></script>
+  <script src="/static/js/runtime_identity_registry.js"></script>
+  <script src="/static/js/runtime_confidence_config.js"></script>
+  <script src="/static/js/runtime_confidence_engine.js"></script>
+  <script src="/static/js/runtime_calibration_profile.js"></script>
+  <script src="/static/js/runtime_calibration_engine.js"></script>
+  <script src="/static/js/pedestrian_proximity_runtime.js"></script>
+  <script src="/static/js/multi_hazard_fusion_config.js"></script>
+  <script src="/static/js/multi_hazard_fusion_engine.js"></script>
+  <script src="/static/js/driver_attention_runtime.js"></script>
+  <script src="/static/js/distraction_evidence_adapter.js"></script>
+  <script src="/static/js/runtime_replay_session.js"></script>
+  <script src="/static/js/runtime_explanation_engine.js"></script>
+  <script src="/static/js/runtime_replay_engine.js"></script>
+  <script src="/static/js/edge_hardware_contracts.js"></script>
+  <script src="/static/js/edge_hardware_registry.js"></script>
+  <script src="/static/js/edge_hardware_adapter.js"></script>
+  <script src="/static/js/edge_hardware_runtime_bridge.js"></script>
+  <script src="/static/js/voice_message_catalog.js"></script>
+  <script src="/static/js/voice_interaction_config.js"></script>
+  <script src="/static/js/voice_interaction_runtime.js"></script>
+  <script src="/static/js/local_audio_asset_registry.js"></script>
+  <script src="/static/js/audio_playback_adapter.js"></script>
+  <script src="/static/js/voice_alert_orchestrator.js"></script>
+  <script src="/static/js/driver_voice_scenario_pack.js"></script>
+  <script src="/static/js/driver_voice_scenario_runtime.js"></script>
+  <script src="/static/js/driver_runtime_memory_config.js"></script>
+  <script src="/static/js/driver_runtime_memory_model.js"></script>
+  <script src="/static/js/driver_fatigue_trend_engine.js"></script>
+<script src="/static/js/driver_runtime_memory_engine.js"></script>
+<script src="/static/js/driver_companion_config.js"></script>
+<script src="/static/js/driver_companion_decision_model.js"></script>
+<script src="/static/js/driver_companion_recommendation_mapper.js"></script>
+<script src="/static/js/driver_companion_decision_runtime.js"></script>
+  <script src="/static/js/driver_input_mode_controller.js"></script>
+  <script src="/static/js/driver_runtime_page.js"></script>
+  <script src="/static/js/vehicle_proximity_runtime.js"></script>
+  <script src="/static/js/right_turn_runtime.js"></script>
+  <script src="/static/js/alcohol_sensor_runtime.js"></script>
+  <script src="/static/js/driver_perception/driver_perception_config.js"></script>
+  <script src="/static/js/driver_perception/camera_manager.js"></script>
+  <script src="/static/js/driver_perception/face_landmark_adapter.js"></script>
+  <script src="/static/js/driver_perception/driver_calibration.js"></script>
+  <script src="/static/js/driver_perception/driver_metric_calculator.js"></script>
+  <script src="/static/js/driver_perception/driver_metric_snapshot.js"></script>
+  <script src="/static/js/driver_perception/perception_dataset_recorder.js"></script>
+  <script src="/static/js/driver_perception/perception_validation_session.js"></script>
+  <script src="/static/js/driver_perception/perception_episode_validator.js"></script>
+  <script src="/static/js/driver_perception/perception_threshold_comparator.js"></script>
+  <script src="/static/js/driver_perception/driver_perception_runtime.js"></script>
+  <script src="/static/js/web_demo_warning.js"></script>
+  <script src="/static/js/customer_demo_simple_warning.js"></script>
+  <script src="/static/js/driver_perception/guided_live_tuning.js"></script>
+  <script src="/static/js/poc_functional_readiness.js"></script>
+  <script src="/static/js/driver_perception/driver_camera_observation_bridge.js"></script>
+  <script src="/static/js/runtime_event_graph.js"></script>
+  <script src="/static/js/runtime_triple_engine.js"></script>
+  <script>window.UnifiedEdgeRuntimePage=Object.freeze({runtime:new UnifiedEdgeRuntime.UnifiedEdgeRuntime(),mounted:true});</script>
+  <script>(()=>{const panel=document.getElementById('fieldPilotPanel');if(!panel)return;let clock=Date.now(),sessionId=null,last=null;const runtime=new FieldPilotRuntime.FieldPilotRuntime({now:()=>clock}),field=name=>panel.querySelector(`[data-field-pilot-${name}]`),allPass=items=>Object.fromEntries(items.map(x=>[x,'PASS']));const render=value=>{last=value||last;const snapshot=sessionId?runtime.getSnapshot(sessionId):null,s=snapshot?.session;field('status').textContent=s?.pilotStatus||'NOT_CONFIGURED';field('mode').textContent=s?.testMode||'-';field('checklist').textContent=snapshot?.checklists.at(-1)?.passed?'PASS':snapshot?.checklists.length?'BLOCKED':'NOT_TESTED';field('scenario').textContent=snapshot?.scenarios.at(-1)?.entries.length||0;field('incident').textContent=snapshot?.incidents.length||0;field('evidence').textContent=snapshot?.evidencePackages.length||0;field('stop').textContent=s?.pilotStatus==='SAFETY_STOPPED'?'ACTIVE':'INACTIVE';field('gate').textContent=snapshot?.gate.overall||'NO_GO';field('detail').textContent=typeof last==='string'?last:JSON.stringify(last||snapshot||{},null,2);panel.dataset.mounted='true'};panel.addEventListener('click',event=>{const action=event.target.dataset.fieldPilotAction;if(!action)return;try{if(action==='configure'){sessionId=`pilot-${clock}`;last=runtime.configure({pilotSessionId:sessionId,siteCode:'SITE-ANON',testAreaCode:'AREA-CONTROLLED',vehicleAnonymousId:'VEHICLE-ANON',operatorAnonymousId:'OPERATOR-ANON',supervisorAnonymousId:'SUPERVISOR-ANON',shiftCode:'SHIFT-A',plannedStartAt:new Date(clock).toISOString(),testMode:'STATIC_BENCH',edgeDeviceIds:[]});runtime.planScenarios(sessionId)}else if(action==='checklist')last=runtime.runInstallation(sessionId,allPass(FieldPilotConfig.installationItems));else if(action==='preflight')last=runtime.runPreflight(sessionId,allPass(FieldPilotConfig.preflightItems));else if(action==='start')last=runtime.start(sessionId,{supervisorConfirmed:true});else if(action==='pause')last=runtime.pause(sessionId);else if(action==='resume')last=runtime.resume(sessionId,{supervisorConfirmed:true});else if(action==='stop')last=runtime.safetyStop(sessionId,'SUPERVISOR_REQUEST',{requestedBy:'SUPERVISOR',snapshots:{resourceMetrics:window.UnifiedEdgeRuntimePage.runtime.getMetrics()}});else if(action==='complete')last=runtime.complete(sessionId);else if(action==='cancel')last=runtime.cancel(sessionId);else if(action==='json')last=runtime.exportJSON(sessionId);else if(action==='csv')last=runtime.exportCSV(sessionId);else if(action==='evidence')last=runtime.evidence.json(runtime.createEvidence(sessionId,{resourceMetrics:window.UnifiedEdgeRuntimePage.runtime.getMetrics()}))}catch(error){last={error:error.message,humanReviewRequired:true}}render(last)});window.FieldPilotPage=Object.freeze({runtime,getSessionId:()=>sessionId,render,getLatest:()=>last});render()})();</script>
+  <script>
+    (()=>{const panel=document.getElementById('driverStabilizationPanel');if(!panel)return;const field=name=>panel.querySelector(`[data-stabilization-${name}]`),runtime=new DriverStabilizationConfig.StabilizationRuntime(),coordinator=new RuntimeResetCoordinator.RuntimeResetCoordinator(),target='stabilization-target',assignment='stabilization-assignment';let gate=null,lineage=null,lastReset=null;coordinator.register('VOICE',()=>window.VoiceInteractionPage?.orchestrator?.resetTarget?.(target),['TARGET','VOICE','FULL_RUNTIME']);coordinator.register('MEMORY',()=>window.DriverRuntimeMemoryPage?.engine?.resetTarget?.(target),['TARGET','MEMORY','FULL_RUNTIME']);coordinator.register('COMPANION',()=>window.DriverCompanionPage?.runtime?.resetTarget?.(target),['TARGET','COMPANION','FULL_RUNTIME']);const render=()=>{const map={overall:gate?.overallStatus,maturity:`${gate?.productMaturity||68}%`,hazard:gate?.hazardActivationConsistency,ack:gate?.ackExpiryLifecycle,voice:gate?.voicePreemptionSafety,vocabulary:gate?.policyVocabularyConsistency,bounds:gate?.runtimeStateBoundedness,reset:gate?.resetIsolation,chain:gate?.operationalChainCoverage,blockers:gate?.blockers?.length??0,field:gate?.fieldValidationRequired?.length??4,evaluated:gate?.evaluatedAt||'-',generation:coordinator.generation(target,assignment),'reset-scope':lastReset?.scope||'-','reset-status':lastReset?.status||'-',completed:lastReset?.completedModules?.join(', ')||'-',failed:lastReset?.failedModules?.map(x=>x.module).join(', ')||'-'};Object.entries(map).forEach(([name,value])=>{if(field(name))field(name).textContent=value??'NOT EVALUATED'});field('gate').textContent=JSON.stringify(gate||{},null,2);field('lineage').textContent=JSON.stringify({lineage,reset:lastReset},null,2);const retention=window.VoiceInteractionPage?.orchestrator?.getRetentionState?.();if(retention){field('voice-retention').textContent=`${retention.count} / ${retention.maximumEntries}`;field('dropped').textContent=retention.droppedCount}};const evaluate=()=>{gate=runtime.evaluate({ackExpiryLifecycle:'OPEN',runtimeStateBoundedness:'OPEN',mitigations:['INACTIVE_HAZARD_DOMINANCE_BLOCKED','VOICE_PLAYBACK_OWNERSHIP_GUARD','BOUNDED_STORE_CONTRACT','RESET_COORDINATOR'],verifiedEvidence:[],fieldValidationRequired:['CAMERA_HARDWARE','EDGE_AUDIO_HARDWARE','ALCOHOL_SENSOR','RADAR_LIDAR']});render()};panel.addEventListener('click',async event=>{const action=event.target.dataset.stabilizationAction;if(!action)return;if(action==='chain'){lineage=runtime.createLineage({canonicalTargetId:target,assignmentId:assignment})}else if(action==='reset'||action==='reset-target'){lastReset=await coordinator.reset({scope:action==='reset'?'FULL_RUNTIME':'TARGET',canonicalTargetId:target,assignmentId:assignment,reasonCode:'STABILIZATION_FIXTURE'});runtime.markReset(lastReset.resetId)}else if(action==='export'){const blob=new Blob([runtime.exportJSON()],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='driver-companion-productization-gate.json';a.click();URL.revokeObjectURL(url)}else evaluate();render()});window.DriverStabilizationPage=Object.freeze({runtime,coordinator,evaluate,render,getGate:()=>gate});render()})();
+  </script>
+  <script>
+    window.RuntimeIdentityRegistryPage=window.RuntimeIdentityRegistryPage||{registry:window.RuntimeIdentityRegistry.registry};
+    window.MultiHazardFusionPage=window.MultiHazardFusionPage||window.MultiHazardFusionEngine.engine;
+    window.RuntimeConfidencePage=window.RuntimeConfidencePage||{engine:new window.RuntimeConfidenceEngine.Engine()};
+    (()=>{const panel=document.getElementById('perceptionValidationPanel');if(!panel)return;const field=name=>panel.querySelector(`[data-validation-${name}]`),runtime=new window.DriverPerception.PerceptionValidation.ValidationRuntime(),validator=new window.DriverPerception.PerceptionEpisodeValidator.PerceptionEpisodeValidator({runtime}),comparator=new window.DriverPerception.PerceptionThresholdComparator.PerceptionThresholdComparator({minimumEvidence:5});let selected=-1,unsubscribe=null,lastBlink=0,lastYawn=0,lastPose='UNKNOWN',latestSnapshot=null;const render=()=>{const state=runtime.getState(),session=state.session,episodes=state.episodes,summary=state.summary||{blink:{countMismatch:0},yawn:{countIncrements:0,confirmedCount:0},headPose:{gateRejections:0},confidence:{reviewCandidates:0}};selected=Math.min(Math.max(selected,episodes.length?0:-1),episodes.length-1);field('state').textContent=session?.state||'NOT_STARTED';field('samples').textContent=session?.totalSamples||0;field('active').textContent=episodes.filter(x=>['CANDIDATE','ACTIVE','RECOVERING'].includes(x.state)).length;field('accepted').textContent=episodes.filter(x=>x.decision==='ACCEPTED').length;field('rejected').textContent=episodes.filter(x=>x.decision==='REJECTED').length;field('annotations').textContent=state.annotations.length;field('blink-mismatch').textContent=summary.blink.countMismatch||0;field('yawn-mismatch').textContent=Math.abs((summary.yawn.confirmedCount||0)-(summary.yawn.countIncrements||0));field('head-gate').textContent=summary.headPose.gateRejections||0;field('confidence-review').textContent=summary.confidence.reviewCandidates||0;field('live').textContent=JSON.stringify(latestSnapshot?{EAR:latestSnapshot.metrics?.ear,MAR:latestSnapshot.metrics?.marSmoothed,blinkCount:latestSnapshot.metrics?.blinkCount,yawnCount:latestSnapshot.metrics?.yawnCount,headPose:latestSnapshot.metrics?.headPoseState,attentionState:latestSnapshot.attention?.attentionState||'UNKNOWN',confidence:latestSnapshot.confidence||null}:{},null,2);field('episode').textContent=JSON.stringify(episodes[selected]||{},null,2);field('thresholds').textContent=JSON.stringify(state.comparisons,null,2);field('detail').textContent=JSON.stringify({summary,replayArtifacts:runtime.getReplayArtifacts()},null,2)};const identity=()=>window.RuntimeIdentityRegistryPage.getActiveIdentity?.()||window.RuntimeIdentityRegistryPage.register?.();const attach=()=>{if(unsubscribe)return;const perception=document.querySelector('[data-driver-perception-root]')?.driverPerceptionRuntime;if(perception?.onMetricSnapshot)unsubscribe=perception.onMetricSnapshot(snapshot=>{if(runtime.getState().session?.state!=='RECORDING')return;const id=identity(),attention=window.DriverAttentionRuntimePage?.getLatest?.()?.measurement||null,confidence=window.RuntimeConfidencePage?.getLatest?.()?.runtimeConfidence||null;latestSnapshot={...snapshot,canonicalTargetId:id?.canonicalTargetId,assignmentId:id?.driverAssignmentId,attention,confidence:confidence?validator.confidenceRecord(confidence):null};runtime.recordSnapshot(latestSnapshot);const m=snapshot.metrics||{},d=snapshot.diagnostics||{},timestamp=Date.parse(snapshot.timestamp);if(m.blinkCount>lastBlink&&d.eye?.blinkAccepted){const duration=m.lastBlinkDurationMs||0;try{validator.addBlink({startedAt:new Date(timestamp-duration).toISOString(),endedAt:snapshot.timestamp,sourceSnapshotIds:[snapshot.driverMetricSnapshotId],measuredValues:{leftEar:m.leftEAR,rightEar:m.rightEAR,rawEar:m.rawEar,smoothedEar:m.ear,closureDurationMs:duration,recoveryDurationMs:0,frameCount:d.eye.validFrameCountDuringClosure+d.eye.invalidFrameCountDuringClosure,validFrameCount:d.eye.validFrameCountDuringClosure,invalidFrameCount:d.eye.invalidFrameCountDuringClosure,oneEyeOnly:d.eye.leftEyeClosed!==d.eye.rightEyeClosed,frameGapMs:d.eye.frameDeltaMs,faceDetected:snapshot.faceDetected,earValid:snapshot.quality.earValid,headPoseState:m.headPoseState,recoveryConfirmed:true,blinkCountBefore:lastBlink,blinkCountAfter:m.blinkCount},thresholdsUsed:{threshold:m.earThreshold,blinkMinMs:80,blinkMaxMs:500,recoveryMs:80,maxFrameGapMs:250}})}catch(_){}}if(m.yawnCount>lastYawn){const duration=m.lastYawnDurationMs||0;try{validator.addYawn({startedAt:new Date(timestamp-duration).toISOString(),endedAt:snapshot.timestamp,sourceSnapshotIds:[snapshot.driverMetricSnapshotId],measuredValues:{rawMar:m.marRaw,smoothedMar:m.marSmoothed,baselineMar:m.mouthBaseline,activeThreshold:m.mouthOpenThreshold,mouthOpenDurationMs:duration,sustainDurationMs:duration,recoveryDurationMs:0,headPoseState:m.headPoseState,headPoseGateResult:d.mouth?.headPoseAllowsMouthMetric===true,faceDetected:snapshot.faceDetected,landmarkValid:snapshot.quality.landmarkAvailable,marValid:snapshot.quality.marValid,calibrationAvailable:snapshot.quality.mouthCalibrationAvailable,recoveryConfirmed:true,algorithmYawnState:m.yawnState,yawnCountBefore:lastYawn,yawnCountAfter:m.yawnCount},thresholdsUsed:{activeThreshold:m.mouthOpenThreshold,sustainMs:1200,recoveryMs:150,maxDurationMs:8000}})}catch(_){}}if(m.headPoseState&&m.headPoseState!==lastPose){try{validator.addHeadPose({startedAt:snapshot.timestamp,endedAt:snapshot.timestamp,sourceSnapshotIds:[snapshot.driverMetricSnapshotId],measuredValues:{pitch:m.pitch,yaw:m.yaw,roll:m.roll,heuristicState:m.headPoseState,expectedAnnotation:'UNKNOWN',faceDetected:snapshot.faceDetected,landmarkValid:snapshot.quality.landmarkAvailable,metricValidity:snapshot.quality.headPoseValid,eyeGateResult:snapshot.quality.earValid,mouthGateResult:d.mouth?.headPoseAllowsMouthMetric===true}})}catch(_){}}lastBlink=m.blinkCount||0;lastYawn=m.yawnCount||0;lastPose=m.headPoseState||'UNKNOWN';selected=runtime.getState().episodes.length-1;render()});};const compare=()=>{const snapshots=runtime.getState().snapshots,ears=snapshots.map(x=>x.metrics.ear),mars=snapshots.map(x=>x.metrics.marSmoothed),confidence=snapshots.map(x=>x.confidence?.runtimeConfidenceScore);[{metricGroup:'BLINK',metricName:'EAR_THRESHOLD',currentValue:latestSnapshot?.metrics?.earThreshold,candidateValue:latestSnapshot?.metrics?.earThreshold,evidence:ears},{metricGroup:'YAWN',metricName:'MAR_THRESHOLD',currentValue:latestSnapshot?.metrics?.mouthOpenThreshold,candidateValue:latestSnapshot?.metrics?.mouthOpenThreshold,evidence:mars},{metricGroup:'CONFIDENCE',metricName:'HIGH',currentValue:80,candidateValue:80,evidence:confidence}].forEach(x=>runtime.addComparison(comparator.compare({...x,annotations:runtime.getState().annotations.map(a=>a.annotation)})))};field('start').addEventListener('click',()=>{const id=identity();if(!id)return;runtime.start({validationSessionId:`perception-validation-${Date.now()}`,canonicalTargetId:id.canonicalTargetId,assignmentId:id.driverAssignmentId,vehicleType:id.vehicleType,cameraPosition:'DRIVER_FRONT',lightingCondition:'UNKNOWN',glassesMode:'UNKNOWN',operatorLabel:null});lastBlink=latestSnapshot?.metrics?.blinkCount||0;lastYawn=latestSnapshot?.metrics?.yawnCount||0;attach();render()});field('pause').addEventListener('click',()=>{const state=runtime.getState().session?.state;if(state==='RECORDING')runtime.pause();else if(state==='PAUSED')runtime.resume();render()});field('complete').addEventListener('click',()=>{compare();runtime.complete();render()});field('cancel').addEventListener('click',()=>{runtime.cancel();render()});field('previous').addEventListener('click',()=>{selected=Math.max(0,selected-1);render()});field('next').addEventListener('click',()=>{selected=Math.min(runtime.getState().episodes.length-1,selected+1);render()});panel.querySelectorAll('[data-validation-annotate]').forEach(button=>button.addEventListener('click',()=>{const episode=runtime.getState().episodes[selected];if(episode)runtime.annotate(episode.episodeId,button.dataset.validationAnnotate);render()}));const download=(text,name,type)=>{const blob=new Blob([text],{type}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();URL.revokeObjectURL(url)};field('export-json').addEventListener('click',()=>download(runtime.exportJSON(),'perception-validation.json','application/json'));field('export-csv').addEventListener('click',()=>download(runtime.exportCSV(),'perception-validation.csv','text/csv'));field('reset').addEventListener('click',()=>{runtime.reset();latestSnapshot=null;selected=-1;render()});window.PerceptionValidationPage=Object.freeze({runtime,validator,comparator,render});render()})();
+    (()=>{const panel=document.getElementById('runtimeReplayPanel'),field=name=>panel.querySelector(`[data-replay-${name}]`);if(!panel)return;const engine=new window.RuntimeReplayEngine.ReplayEngine(),render=()=>{const playback=engine.getPlaybackState(),snapshot=engine.getSnapshot()||{};field('state').textContent=playback.state;field('timeline').textContent=`${Math.max(0,playback.cursor+1)} / ${playback.eventCount}`;field('event').textContent=snapshot.currentEvent?.eventType||'-';const risks=Object.values(snapshot.risks||{}),risk=risks.at(-1);field('risk').textContent=risk?`${risk.eventType} / ${risk.state}`:'NORMAL';field('confidence').textContent=snapshot.confidence?.confidenceBand||'UNKNOWN';field('recommendation').textContent=snapshot.recommendation?.decisionMode||'MONITOR';field('context').textContent=JSON.stringify(snapshot.context||{},null,2);field('current').textContent=JSON.stringify({event:snapshot.currentEvent,risk,compositeRisk:snapshot.compositeRisk,priority:snapshot.priority},null,2);field('lineage').textContent=JSON.stringify({graph:snapshot.graph?{nodes:snapshot.graph.nodes.length,edges:snapshot.graph.edges.length}:null,triples:snapshot.triples?.length||0},null,2)};const load=()=>{const identity=window.RuntimeIdentityRegistryPage.getActiveIdentity()||window.RuntimeIdentityRegistryPage.register(),target=identity.canonicalTargetId,base=Date.now(),at=offset=>new Date(base+offset).toISOString(),events=[{timestamp:at(0),sequence:1,eventType:'IdentityChanged',source:'IDENTITY',payload:identity},{timestamp:at(100),sequence:2,eventType:'Observation',source:'DRIVER_ATTENTION',payload:{observationId:'replay-attention-observation',observationType:'DRIVER_ATTENTION',targetId:target,value:'DISTRACTED',observedAt:at(100),metadata:{distractionSource:'PHONE',simulation:true,operationalUseAllowed:false}}},{timestamp:at(200),sequence:3,eventType:'RiskCreated',source:'DRIVER_RISK',payload:{eventId:'replay-distraction-risk',eventType:'DRIVER_DISTRACTION',targetId:target,state:'NEW',severity:'MEDIUM',sourceEventId:'replay-attention-observation'}},{timestamp:at(300),sequence:4,eventType:'RiskActivated',source:'DRIVER_RISK',payload:{eventId:'replay-distraction-risk',eventType:'DRIVER_DISTRACTION',targetId:target,state:'ACTIVE',severity:'MEDIUM',sourceEventId:'replay-attention-observation'}},{timestamp:at(400),sequence:5,eventType:'OperationalContextChanged',source:'FUSION',payload:{contextId:'replay-context',canonicalTargetId:target,driverAssignmentId:identity.driverAssignmentId,activeRiskTypes:['DRIVER_DISTRACTION','ALCOHOL_POLICY_VIOLATION'],conditions:['VEHICLE_MOVING','RIGHT_TURN_ACTIVE']}},{timestamp:at(500),sequence:6,eventType:'CompositeRiskChanged',source:'FUSION',payload:{compositeRiskId:'replay-composite',contextId:'replay-context',priorityScore:76,priorityBand:'HIGH',dominantRiskType:'ALCOHOL_POLICY_VIOLATION',contributingRiskTypes:['DRIVER_DISTRACTION','ALCOHOL_POLICY_VIOLATION'],reasonCodes:['SYNERGY-DISTRACTION-ALCOHOL']}},{timestamp:at(600),sequence:7,eventType:'PriorityChanged',source:'FUSION',payload:{priorityDecisionId:'replay-priority',compositeRiskId:'replay-composite',priorityScore:76,priorityBand:'HIGH',selectedPolicy:'SUPERVISOR_NOTIFICATION_REQUEST'}},{timestamp:at(700),sequence:8,eventType:'ConfidenceChanged',source:'CONFIDENCE',payload:{confidenceId:'replay-confidence',overallConfidence:58,confidenceBand:'MEDIUM',reasonCodes:['SINGLE_SOURCE_ONLY']}},{timestamp:at(800),sequence:9,eventType:'RecommendationChanged',source:'CONFIDENCE',payload:{recommendationId:'replay-recommendation',decisionMode:'WARNING_WITH_CAUTION',recommendedActions:['SUPERVISOR_NOTIFICATION_REQUEST'],verificationRequired:true,reasonCodes:['SINGLE_SOURCE_ONLY']}},{timestamp:at(900),sequence:10,eventType:'RiskAcknowledged',source:'DRIVER_RISK',payload:{eventId:'replay-distraction-risk',eventType:'DRIVER_DISTRACTION',targetId:target,state:'ACKNOWLEDGED',severity:'MEDIUM'}},{timestamp:at(1000),sequence:11,eventType:'ReplayMarker',source:'FIXTURE',payload:{marker:'RECOVERY_STARTED'}},{timestamp:at(1100),sequence:12,eventType:'RiskCleared',source:'DRIVER_RISK',payload:{eventId:'replay-distraction-risk',eventType:'DRIVER_DISTRACTION',targetId:target,state:'CLEARED',severity:'MEDIUM'}}];engine.createSession({sessionId:`runtime-replay-${base}`,canonicalTarget:target,assignment:identity.driverAssignmentId,runtimeVersion:'warehouse-runtime-replay-v1',simulation:true},events);field('explanation').textContent='{}';render()};field('fixture').addEventListener('click',load);field('play').addEventListener('click',()=>{engine.play({intervalMs:250});render()});field('pause').addEventListener('click',()=>{engine.pause();render()});field('step').addEventListener('click',()=>{engine.step();render()});field('reset').addEventListener('click',()=>{engine.reset();field('explanation').textContent='{}';render()});field('why').addEventListener('click',()=>{field('explanation').textContent=JSON.stringify(engine.explain(),null,2);render()});field('export').addEventListener('click',()=>{const blob=new Blob([engine.exportJSON()],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='runtime-replay.json';a.click();URL.revokeObjectURL(url)});window.RuntimeReplayPage=Object.freeze({engine,load,render});render()})();
+    (()=>{const panel=document.getElementById('distractionEvidencePanel'),field=name=>panel.querySelector(`[data-distraction-${name}]`);if(!panel)return;let targetId=null,latest=null,sequence=0;const runtime=new window.DistractionEvidenceAdapter.Runtime({identityRegistry:window.RuntimeIdentityRegistryPage.registry,fusionEngine:window.MultiHazardFusionPage,confidenceEngine:window.RuntimeConfidencePage.engine});const render=result=>{latest=result||latest;const e=latest?.evidence;field('source').textContent=e?.distractionSource||'UNKNOWN';field('confidence').textContent=e?.detectionConfidence==null?'UNKNOWN':e.detectionConfidence.toFixed(2);field('duration').textContent=`${e?.durationMs||0} ms`;field('quality').textContent=JSON.stringify(e?.quality||{});field('count').textContent=latest?.evidenceCount||0;field('state').textContent=latest?.runtimeState||'NORMAL';field('recommendation').textContent=latest?.recommendation||'MONITOR';field('detail').textContent=JSON.stringify(latest||{},null,2)};const run=()=>{let identity=window.RuntimeIdentityRegistryPage.getActiveIdentity()||window.RuntimeIdentityRegistryPage.register(),sensorId='DISTRACTION-FIXTURE';const attached=window.RuntimeIdentityRegistryPage.adapter.adapt({runtimeSource:'DRIVER_CAMERA',vehicleId:identity.vehicleId,sensorId,sourceTargetId:`distraction:${identity.canonicalTargetId}`,ownershipToken:identity.ownershipToken});identity=attached.identity||identity;targetId=identity.canonicalTargetId;const base=Date.now(),input=(timestamp,duration)=>({evidenceId:`distraction-fixture-${++sequence}`,timestamp:new Date(timestamp).toISOString(),sensorId,sourceType:'FIXTURE_CONTRACT',targetId,canonicalTargetId:targetId,distractionSource:'PHONE',detectionConfidence:.88,bboxAvailable:true,bbox:{discarded:true},trackingId:'fixture-track',durationMs:duration,quality:{score:.9,fixture:true},sampleAgeMs:0,simulation:true});runtime.ingest(input(base,0),{vehicleMotion:'MOVING'});latest=runtime.ingest(input(base+1600,1600),{vehicleMotion:'MOVING'});render(latest);return latest};field('run').addEventListener('click',run);field('ack').addEventListener('click',()=>{if(targetId)runtime.acknowledge(targetId)});field('reset').addEventListener('click',()=>{if(targetId)runtime.reset(targetId);latest=null;render(null)});field('export').addEventListener('click',()=>{if(!targetId)return;const blob=new Blob([runtime.exportJSON(targetId)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='distraction-evidence.json';a.click();URL.revokeObjectURL(url)});window.DistractionEvidencePage=Object.freeze({runtime,run,getLatest:()=>latest});render(null)})();
+    (()=>{const page=window.PerceptionValidationPage,panel=document.getElementById('perceptionValidationPanel');if(!page||!panel)return;const field=name=>panel.querySelector(`[data-validation-${name}]`),renderRobustness=()=>{const state=page.runtime.getState(),summary=state.summary,empty=!state.session?.totalSamples||!state.session?.validSamples;field('valid-samples').textContent=state.session?.validSamples||0;field('episode-count').textContent=state.episodes.length;field('comparison-state').textContent=empty?'INSUFFICIENT DATA':summary?.thresholdComparison||'NOT EVALUATED';field('empty').textContent=empty?'No samples collected. Threshold comparison unavailable. INSUFFICIENT DATA.':''};page.runtime.subscribe(renderRobustness);renderRobustness()})();
+    window.DriverStatePage = window.DriverState.initializeDriverStatePage();
+    window.DriverPolicyPage = window.DriverPolicy.initializeDriverPolicyPage();
+    window.DriverActionPage = window.DriverActions.initializeDriverActionPage();
+    window.DriverRuntimePage.attach({
+      driverStatePage: window.DriverStatePage,
+      policyPage: window.DriverPolicyPage,
+      actionPage: window.DriverActionPage
+    });
+    (() => {
+      const panel = document.getElementById('runtimeIdentityPanel'), registry = window.RuntimeIdentityRegistry.registry, adapter = new window.RuntimeIdentityAdapter.RuntimeIdentityAdapter(registry); if (!panel) return;
+      let activeIdentity = null; const field = name => panel.querySelector(`[data-identity-${name}]`), formIdentity = () => ({vehicleType:document.getElementById('driverVehicleType').value,vehicleId:document.getElementById('driverVehicleId').value,driverId:document.getElementById('driverId').value,driverAssignmentId:document.getElementById('driverAssignmentId').value});
+      const ownership = input => `driver-page-owner-${input.vehicleId}-${input.driverId}-${input.driverAssignmentId}`;const render = () => { const conflicts=registry.getConflicts(),context=activeIdentity&&window.MultiHazardFusionPage?.getOperationalContext(activeIdentity.canonicalTargetId);field('vehicle').textContent=activeIdentity?.vehicleId||'-';field('driver').textContent=activeIdentity?.driverId||'-';field('assignment').textContent=activeIdentity?.driverAssignmentId||'-';field('ownership').textContent=activeIdentity?'ACTIVE':'INACTIVE';field('target').textContent=activeIdentity?.canonicalTargetId||'-';field('conflict').textContent=conflicts.at(-1)?.conflictType||'NO_CONFLICT';field('sources').textContent=activeIdentity?.runtimeSources?.join(', ')||'-';field('counts').textContent=`${activeIdentity?.sensorIds?.length||0} / ${activeIdentity?.cameraIds?.length||0}`;field('context').textContent=context?.contextId||'-';field('detail').textContent=registry.exportJSON(); };
+      const register = () => { const input=formIdentity(),cameraId=document.querySelector('[data-camera-select]')?.value;const result=adapter.adapt({...input,runtimeSource:'DRIVER_RUNTIME',sourceTargetId:new window.DriverState.VehicleContext(input).targetId,ownershipToken:ownership(input),sensorIds:[],cameraIds:cameraId?[cameraId]:[],simulation:true});activeIdentity=result.identity;render();return activeIdentity; };
+      field('register').addEventListener('click',register);field('warehouse').addEventListener('click',()=>{const identity=activeIdentity||register();if(identity){const result=adapter.adapt({runtimeSource:'WAREHOUSE_RUNTIME',vehicleId:identity.vehicleId,sourceTargetId:`${identity.vehicleId}|PERSON-FIXTURE`,ownershipToken:identity.ownershipToken});activeIdentity=result.identity||activeIdentity;render();}});field('release').addEventListener('click',()=>{if(activeIdentity)registry.releaseIdentity(activeIdentity.identityId,activeIdentity.ownershipToken);activeIdentity=null;render();});field('export').addEventListener('click',()=>{const blob=new Blob([registry.exportJSON()],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='canonical-operational-identities.json';a.click();URL.revokeObjectURL(url);});
+      window.RuntimeIdentityRegistryPage=Object.freeze({registry,adapter,register,getActiveIdentity:()=>activeIdentity,render});render();
+    })();
+    (()=>{const panel=document.getElementById('edgeHardwarePanel');if(!panel)return;const field=name=>panel.querySelector(`[data-edge-${name}]`),registry=new window.EdgeHardwareRegistry.EdgeHardwareRegistry({identityRegistry:window.RuntimeIdentityRegistryPage.registry}),adapter=new window.EdgeHardwareAdapter.UnifiedEdgeHardwareAdapter({registry}),bridge=new window.EdgeHardwareRuntimeBridge.EdgeHardwareRuntimeBridge({adapter});let target=null,assignment=null,token=null,sequence=0,lastAck={};const render=()=>{const inventory=target?registry.getByTarget(target):[],health=target?registry.getHealthSummary(target):{connected:0,degraded:0,offline:0},inputs=target?adapter.getInputEvents(target):[],results=target?adapter.getResults(target):[],lineage=adapter.getLineage();field('registered').textContent=inventory.length;field('connected').textContent=health.connected;field('degraded').textContent=`${health.degraded} / ${health.offline}`;field('pending').textContent=target?adapter.getPendingRequests(target).length:0;field('input').textContent=inputs.at(-1)?.measurementType||'-';field('output').textContent=results.at(-1)?.executionState||'-';field('inventory').textContent=JSON.stringify(inventory.map(x=>({hardwareId:x.hardwareId,type:x.hardwareType,role:x.hardwareRole,interface:x.interfaceType,target:x.canonicalTargetId,assignment:x.assignmentId,capabilities:x.capabilities,connection:x.connectionState,health:x.healthState,simulation:x.simulation})),null,2);field('inputs').textContent=JSON.stringify(inputs.map(x=>({eventType:x.measurementType,sourceHardware:x.hardwareId,valueSummary:x.value,quality:x.quality,freshness:x.timestamp,routeCandidate:x.routeKey})),null,2);field('outputs').textContent=JSON.stringify({requests:target?adapter.getPendingRequests(target):[],results},null,2);field('ack').textContent=JSON.stringify(lastAck,null,2);field('bridge').textContent=JSON.stringify(target?bridge.confidenceEvidence(target):{},null,2);field('lineage').textContent=JSON.stringify({nodes:lineage.nodes.length,edges:lineage.edges.length,triples:lineage.triples.length,audit:target?adapter.getAuditHistory(target).slice(-12):[]},null,2)};const descriptor=(id,type,role,capabilities,commands=[],measurements=[])=>({hardwareId:id,hardwareType:type,hardwareRole:role,interfaceType:'FIXTURE',canonicalTargetId:target,assignmentId:assignment,capabilities,supportedCommands:commands,supportedMeasurements:measurements,connectionState:'CONNECTED',healthState:'HEALTHY'});const register=()=>{const identity=window.RuntimeIdentityRegistryPage.getActiveIdentity()||window.RuntimeIdentityRegistryPage.register();target=identity.canonicalTargetId;assignment=identity.driverAssignmentId;token=identity.ownershipToken;adapter.resetTarget(target);registry.reset();[descriptor('EDGE-COMPOSITE','COMPOSITE_EDGE_UNIT','COMPUTE',[]),descriptor('EDGE-CAMERA','DRIVER_CAMERA','INPUT',['CAPTURE_DRIVER_VIDEO'],[],['CAMERA_FRAME_AVAILABLE']),descriptor('EDGE-SPEAKER','SPEAKER','OUTPUT',['PLAY_VOICE'],['PLAY_VOICE']),descriptor('EDGE-MIC','MICROPHONE','INPUT',['CAPTURE_AUDIO'],[],['AUDIO_RESPONSE_DETECTED']),descriptor('EDGE-ALCOHOL','ALCOHOL_SENSOR','INPUT',['MEASURE_ALCOHOL','SENSOR_HEALTH'],[],['ALCOHOL_READING','SENSOR_HEALTH']),descriptor('EDGE-RADAR','RADAR','INPUT',['MEASURE_DISTANCE','MEASURE_RELATIVE_SPEED'],[],['DISTANCE_READING']),descriptor('EDGE-ACK','ACK_BUTTON','USER_INTERFACE',['READ_ACK_BUTTON'],[],['ACK_BUTTON_PRESSED']),descriptor('EDGE-EMERGENCY','EMERGENCY_BUTTON','SAFETY_INTERFACE',['READ_EMERGENCY_BUTTON'],[],['EMERGENCY_BUTTON_PRESSED']),descriptor('EDGE-BUZZER','BUZZER','OUTPUT',['ACTIVATE_BUZZER'],['ACTIVATE_BUZZER']),descriptor('EDGE-LED','WARNING_LED','OUTPUT',['SET_WARNING_LED'],['SET_WARNING_LED']),descriptor('EDGE-DISPLAY','DISPLAY','OUTPUT',['SHOW_MESSAGE'],['REQUEST_ACK']),descriptor('EDGE-HAPTIC','HAPTIC','OUTPUT',['VIBRATE'],['VIBRATE']),descriptor('EDGE-VEHICLE','VEHICLE_INTERFACE_CANDIDATE','SAFETY_INTERFACE',['VEHICLE_CONTROL_REQUEST'],['VEHICLE_CONTROL_REQUEST'])].forEach(x=>adapter.registerHardware(x,token));render();return identity};const input=(hardwareId,hardwareType,measurementType,value)=>bridge.routeInput({inputEventId:`edge-input-${++sequence}`,timestamp:new Date().toISOString(),hardwareId,hardwareType,interfaceType:'FIXTURE',canonicalTargetId:target,assignmentId:assignment,measurementType,value,unit:null,quality:{fixture:true,fresh:true},confidence:null});field('register').addEventListener('click',register);field('run-input').addEventListener('click',()=>{if(!target)register();input('EDGE-ALCOHOL','ALCOHOL_SENSOR','ALCOHOL_READING',.04);input('EDGE-RADAR','RADAR','DISTANCE_READING',2.4);render()});field('run-output').addEventListener('click',()=>{const identity=window.RuntimeIdentityRegistryPage.getActiveIdentity()||register();bridge.submitActionRequest({actionId:`edge-action-${++sequence}`,actionType:'VOICE_WARNING',targetId:target,sourceEventId:'EDGE-FIXTURE-RISK',priority:80,messageCode:'DRIVER_STATUS_CHECK'},identity,{});render()});field('voice-ack').addEventListener('click',()=>{if(!target)register();lastAck=input('EDGE-MIC','MICROPHONE','AUDIO_RESPONSE_DETECTED','I_AM_OK');render()});field('physical-ack').addEventListener('click',()=>{if(!target)register();lastAck=input('EDGE-ACK','ACK_BUTTON','ACK_BUTTON_PRESSED',true);render()});field('degrade').addEventListener('click',()=>{if(!target)register();adapter.updateHardware('EDGE-RADAR',{healthState:'DEGRADED'},token);render()});field('offline').addEventListener('click',()=>{if(!target)register();adapter.updateHardware('EDGE-RADAR',{healthState:'OFFLINE',connectionState:'DISCONNECTED'},token);render()});field('reset').addEventListener('click',()=>{if(target)adapter.resetTarget(target);lastAck={};render()});field('export').addEventListener('click',()=>{if(!target)return;const blob=new Blob([adapter.exportJSON(target)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='edge-hardware-contracts.json';a.click();URL.revokeObjectURL(url)});window.EdgeHardwarePage=Object.freeze({registry,adapter,bridge,register,render});render()})();
+    (() => {
+      const panel = document.getElementById('multiHazardFusion'); if (!panel) return;
+      const identityPage=window.RuntimeIdentityRegistryPage,engine = new window.MultiHazardFusionEngine.FusionEngine({ identityRegistry:identityPage.registry,actionSink: (action, context) => window.DriverRuntimePage.ingestActionRequest(action, context) });
+      window.MultiHazardFusionPage = engine; let targetId = null, latest = null, fixtureSequence = 0;
+      const field = name => panel.querySelector(`[data-fusion-${name}]`);
+      const render = result => { latest = result || latest; const context = latest?.context, risk = latest?.compositeRisk, decision = latest?.priorityDecision, lineage = latest?.lineage || engine.getLineage();
+        field('band').textContent = risk?.priorityBand || 'NORMAL'; field('score').textContent = risk?.priorityScore ?? 0; field('dominant').textContent = risk?.dominantRiskType || '-'; field('action').textContent = decision?.recommendedActions?.[0] || 'NO_ACTION';
+        field('context').textContent = context?.contextId || '-'; field('target').textContent = context ? `${context.targetId} / ${context.driverAssignmentId || '-'}` : '-'; field('identity').textContent = context ? `${context.vehicleId || '-'} / ${context.driverId || '-'}` : '-';
+        field('hazards').textContent = context?.activeRiskTypes?.join(', ') || '-'; field('conditions').textContent = context?.conditions?.map(item => item.conditionType).join(', ') || '-';field('composite').textContent = risk?.compositeRiskId || '-';field('state').textContent = risk ? `${risk.severity} / ${risk.state}` : '-';
+        field('modifiers').textContent = risk ? JSON.stringify(risk.modifiers) : '-';field('rules').textContent = risk ? [...risk.synergyRules,...risk.overrideRules.map(item => item.overrideRuleId)].join(', ') || '-' : '-';field('reasons').textContent = risk?.reasonCodes?.join(', ') || '-';
+        field('policy').textContent = decision?.selectedPolicy || '-';field('actions').textContent = decision?.recommendedActions?.join(', ') || '-';field('execution').textContent = latest?.actionExecutions?.at(-1)?.executionId || '-';field('graph').textContent = `${lineage.nodes.length} / ${lineage.edges.length}`;field('triples').textContent = lineage.triples.length;field('audit').textContent = JSON.stringify(engine.getAuditHistory(targetId).slice(-12),null,2); };
+      field('run').addEventListener('click', () => { const identity=identityPage.getActiveIdentity()||identityPage.register();if(!identity)return;targetId=identity.canonicalTargetId;engine.resetTarget(targetId);identityPage.adapter.adapt({runtimeSource:'PEDESTRIAN_SENSOR',vehicleId:identity.vehicleId,sourceTargetId:`${identity.vehicleId}|PERSON-FIXTURE`,ownershipToken:identity.ownershipToken});const at=Date.now(),ctx={...identity,targetId:identity.canonicalTargetId};const condition=(type,index)=>({conditionId:`fusion-fixture-condition-${++fixtureSequence}-${index}`,conditionType:type,targetId,driverAssignmentId:identity.driverAssignmentId,value:true,sourceObservationId:`fusion-fixture-observation-${fixtureSequence}-${index}`,timestamp:new Date(at).toISOString(),validUntil:new Date(at+5000).toISOString(),quality:{confidenceAvailable:false},simulation:true,confidence:null,confidenceAvailable:false,operationalContext:ctx});engine.ingestCondition(condition('VEHICLE_MOVING',1));engine.ingestCondition(condition('REVERSING',2));const event=(type,eventTarget)=>({eventId:`fusion-fixture-event-${++fixtureSequence}-${type}`,eventType:type,targetId:eventTarget,severity:'HIGH',state:'ACTIVE',createdTime:new Date(at).toISOString(),updatedTime:new Date(at).toISOString(),simulation:true});engine.ingestRiskEvent(event('DROWSINESS',targetId));render(engine.ingestRiskEvent(event('HUMAN_PROXIMITY',`${identity.vehicleId}|PERSON-FIXTURE`)));identityPage.render(); });
+      field('ack').addEventListener('click',()=>{if(latest?.compositeRisk){engine.acknowledgeCompositeRisk(latest.compositeRisk.compositeRiskId);render(engine.reevaluate(targetId));}});field('reset').addEventListener('click',()=>{if(targetId)engine.resetTarget(targetId);latest=null;render(null);});field('export').addEventListener('click',()=>{if(!targetId)return;const blob=new Blob([engine.exportContextJSON(targetId)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='multi-hazard-operational-context.json';a.click();URL.revokeObjectURL(url);});render(null);
+    })();
+    (() => {
+      const panel=document.getElementById('runtimeConfidencePanel'),engine=new window.RuntimeConfidenceEngine.Engine(),field=name=>panel.querySelector(`[data-confidence-${name}]`);let targetId=null,latest=null;
+      const render=result=>{latest=result||latest;const c=latest?.runtimeConfidence,r=latest?.confidenceRecommendation;field('risk').textContent=r?.priorityBand||'UNKNOWN';field('band').textContent=c?.confidenceBand||'UNKNOWN';field('mode').textContent=r?.decisionMode||'INSUFFICIENT_EVIDENCE';field('action').textContent=r?.recommendedActions?.[0]||'VERIFY_FIRST';field('components').textContent=JSON.stringify(c?{overall:c.overallConfidence,measurement:c.measurementConfidence,sensorHealth:c.sensorHealthConfidence,identity:c.identityConfidence,freshness:c.freshnessConfidence,context:c.contextCompletenessConfidence,agreement:c.agreementConfidence}:{},null,2);field('breakdown').textContent=JSON.stringify(c?.confidenceBreakdown||{},null,2);field('reasons').textContent=JSON.stringify({reasonCodes:c?.reasonCodes||[],gatedActions:r?.gatedActions||[],verificationRequired:r?.verificationRequired??true},null,2);field('audit').textContent=JSON.stringify({audit:targetId?engine.getAuditHistory(targetId).slice(-10):[],lineage:engine.getLineage()},null,2)};
+      field('run').addEventListener('click',()=>{const identity=window.RuntimeIdentityRegistryPage.getActiveIdentity()||window.RuntimeIdentityRegistryPage.register(),fusion=window.MultiHazardFusionPage.getOperationalContext(identity.canonicalTargetId),risk=window.MultiHazardFusionPage.getCompositeRisk(identity.canonicalTargetId);targetId=identity.canonicalTargetId;const now=Date.now(),context=fusion||{contextId:`confidence-fixture-${now}`,canonicalTargetId:targetId,targetId,driverAssignmentId:identity.driverAssignmentId,updatedAt:new Date(now).toISOString()};const composite=risk||{compositeRiskId:`confidence-risk-${now}`,priorityScore:90,priorityBand:'CRITICAL',recommendedActions:['SAFE_STOP_REQUEST']};latest=engine.evaluate({operationalContext:context,compositeRisk:composite,canonicalIdentity:identity,identityConflicts:window.RuntimeIdentityRegistryPage.registry.getConflicts(),observations:[{observationId:`confidence-observation-${now}`,timestamp:new Date(now).toISOString()}],sensorStates:[{status:'ONLINE',sensorConnected:true}],evidence:{measurement:{faceDetected:true,landmarkAvailable:true,calibrated:true,earValid:true,perclosValid:true,headPoseValid:true,marValid:true,processingStatus:'RUNNING'},sampleAgeMs:0,context:{requiredEvidence:['DRIVER_CAMERA','ASSIGNMENT'],availableEvidence:['DRIVER_CAMERA','ASSIGNMENT']},agreement:{agreementStatus:'SINGLE_SOURCE'}}});render(latest)});field('reset').addEventListener('click',()=>{if(targetId)engine.resetTarget(targetId);latest=null;render(null)});field('export').addEventListener('click',()=>{if(!targetId)return;const blob=new Blob([engine.exportConfidenceJSON(targetId)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='runtime-confidence.json';a.click();URL.revokeObjectURL(url)});window.RuntimeConfidencePage=Object.freeze({engine,render,getLatest:()=>latest});render(null);
+    })();
+    (()=>{const panel=document.getElementById('runtimeCalibrationPanel'),field=name=>panel.querySelector(`[data-runtime-calibration-${name}]`);if(!panel)return;const engine=new window.RuntimeCalibrationEngine.Engine();let fixtureSequence=0;const render=()=>{const session=engine.getSession(),candidates=engine.getCandidates(),profile=engine.getProfile();field('session').textContent=session?.state||'NOT_STARTED';field('samples').textContent=session?.sampleCount||0;field('blink').textContent=candidates?.blink?.blinkMinDuration==null?'UNKNOWN':`${Math.round(candidates.blink.blinkMinDuration)}-${Math.round(candidates.blink.blinkMaxDuration)} ms`;field('ear').textContent=candidates?.ear?.candidateEarBaseline==null?'UNKNOWN':candidates.ear.candidateEarBaseline.toFixed(3);field('mar').textContent=candidates?.mar?.candidateThreshold==null?'UNKNOWN':candidates.mar.candidateThreshold.toFixed(3);field('yawn').textContent=candidates?.yawn?.candidateSustain==null?'UNKNOWN':`${Math.round(candidates.yawn.candidateSustain)} ms`;field('head').textContent=candidates?.headPose?.candidateBoundaries?'CANDIDATE':'UNKNOWN';field('confidence').textContent=candidates?.confidence?.safeStopCandidate==null?'UNKNOWN':candidates.confidence.safeStopCandidate.toFixed(1);field('validation').textContent=profile?.validationState||'NOT_VALIDATED';field('detail').textContent=JSON.stringify({session,candidates,profile,audit:engine.getAuditHistory().slice(-12)},null,2)};const prepare=()=>engine.prepare({sessionId:`field-calibration-${++fixtureSequence}`,vehicleType:document.getElementById('driverVehicleType').value,cameraPosition:'CABIN_FRONT',lightingCondition:'WAREHOUSE_MIXED',operator:'DEVELOPMENT_FIXTURE',notes:'Deterministic profile candidate fixture',timestamp:new Date().toISOString(),simulation:true});field('start').addEventListener('click',()=>{if(!engine.getSession()||!['READY','PAUSED'].includes(engine.getSession().state))prepare();engine.start();for(let i=0;i<24;i++){const mouth=['NEUTRAL','CLOSED','TALKING','OPEN','YAWN','RECOVERY'][i%6],pose=['CENTER','DOWN','UP','LEFT','RIGHT','UNKNOWN'][i%6];engine.addSample({timestamp:new Date(Date.now()+i).toISOString(),ear:i%4===0?.14:.3+i*.001,leftEAR:.3,rightEAR:.29,eyeClosed:i%4===0,blinkDurationMs:100+i*5,blinkIntervalMs:1000+i*10,blinkRecoveryMs:80+i,blinkAccepted:i%7!==0,mar:[.18,.2,.25,.4,.62,.24][i%6],mouthState:mouth,yawnDurationMs:mouth==='YAWN'?1200+i*10:null,yawnRecoveryMs:mouth==='RECOVERY'?300+i:null,pitch:i-10,yaw:i%5-2,roll:i%3-1,headPoseState:pose,earValid:true,marValid:i%9!==0,headPoseValid:i%8!==0,leftEyeValid:i%10!==0,rightEyeValid:true,sensorHealth:90,freshness:95,agreement:85,identityConfidence:98,trackingConfidence:88,qualityScore:90,glasses:i%3===0,cameraDistanceMeters:.7+i*.01,simulation:true})}render()});field('pause').addEventListener('click',()=>{if(engine.getSession()?.state==='COLLECTING')engine.pause();render()});field('stop').addEventListener('click',()=>{if(['COLLECTING','PAUSED'].includes(engine.getSession()?.state)){engine.stop();if(engine.getSession().state==='COMPLETED')engine.createProfile()}render()});field('reset').addEventListener('click',()=>{engine.reset();render()});field('export').addEventListener('click',()=>{if(!engine.getProfile())return;const blob=new Blob([engine.exportProfile()],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='field-calibration-profile.json';a.click();URL.revokeObjectURL(url)});field('import').addEventListener('click',()=>field('file').click());field('file').addEventListener('change',event=>{const file=event.target.files?.[0];if(!file)return;const reader=new FileReader();reader.onload=()=>{engine.importProfile(String(reader.result));render()};reader.readAsText(file)});window.RuntimeCalibrationPage=Object.freeze({engine,render});render()})();
+    (()=>{const panel=document.getElementById('pedestrianRuntimePanel'),field=name=>panel.querySelector(`[data-pedestrian-${name}]`),runtime=new window.PedestrianProximity.Runtime({identityRegistry:window.RuntimeIdentityRegistryPage.registry,runtimePage:window.DriverRuntimePage,confidenceEngine:window.RuntimeConfidencePage.engine});let sequence=0;const run=(distance,motion,direction='FRONT',closingSpeed=0,confidence=.92)=>{const identity=window.RuntimeIdentityRegistryPage.getActiveIdentity()||window.RuntimeIdentityRegistryPage.register(),result=runtime.processDetection({targetId:identity.canonicalTargetId,pedestrianId:`PEDESTRIAN-${++sequence}`,timestamp:new Date().toISOString(),distanceMeters:distance,direction,motion,closingSpeed,detectionConfidence:confidence,sensorId:'PEDESTRIAN-FIXTURE',simulation:true});field('distance').textContent=distance===null?'UNKNOWN':`${distance.toFixed(2)} m`;field('direction').textContent=direction;field('motion').textContent=`${motion} / ${closingSpeed===null?'UNKNOWN':closingSpeed.toFixed(2)+' m/s'}`;field('confidence').textContent=confidence===null?'UNKNOWN':confidence.toFixed(2);field('runtime').textContent=result.runtimeResult.riskSignal.reason;field('detail').textContent=JSON.stringify({sensorObservation:result.sensorObservation,runtimeResult:result.runtimeResult,confidence:result.confidence},null,2);return result};field('approach').addEventListener('click',()=>run(2.5,'MOVING_TOWARD','FRONT',1.2,.94));field('static').addEventListener('click',()=>run(4.5,'STATIC','FRONT_LEFT',0,.88));field('away').addEventListener('click',()=>run(5.0,'MOVING_AWAY','REAR',-1,.9));field('unknown').addEventListener('click',()=>run(null,'UNKNOWN','UNKNOWN',null,null));window.PedestrianProximityPage=Object.freeze({runtime,run});})();
+    (()=>{const panel=document.getElementById('vehicleProximityRuntimePanel'),field=name=>panel.querySelector(`[data-vehicle-${name}]`);if(!panel)return;let targetId=null,latest=null,sequence=0;const runtime=new window.VehicleProximityRuntime.Runtime({identityRegistry:window.RuntimeIdentityRegistryPage.registry,runtimePage:window.DriverRuntimePage,fusionEngine:window.MultiHazardFusionPage,confidenceEngine:window.RuntimeConfidencePage.engine});const render=result=>{latest=result||latest;const m=latest?.measurement,s=latest?.runtimeResult?.riskSignal,c=latest?.confidence?.confidenceRecommendation;field('status').textContent=s?.phase||'NOT RUN';field('distance').textContent=m?.distanceMeters==null?'UNKNOWN':`${m.distanceMeters.toFixed(2)} m`;field('direction').textContent=m?.relativeDirection||'UNKNOWN';field('motion').textContent=m?`${m.relativeMotion} / ${m.closingSpeedMps==null?'UNKNOWN':m.closingSpeedMps.toFixed(2)+' m/s'}`:'UNKNOWN';field('ttc').textContent=m?.timeToCollisionSeconds==null?'UNAVAILABLE':`${m.timeToCollisionSeconds.toFixed(2)} s`;field('recommendation').textContent=c?.decisionMode||'VERIFY FIRST';field('measurement').textContent=JSON.stringify({measurement:m,observation:latest?.observation,quality:m?.quality},null,2);field('runtime').textContent=JSON.stringify({risk:latest?.runtimeResult,fusion:latest?.fusion,confidence:latest?.confidence,lineage:latest?.lineage},null,2)};const run=()=>{let identity=window.RuntimeIdentityRegistryPage.getActiveIdentity()||window.RuntimeIdentityRegistryPage.register();const sensorId='VEHICLE-PROXIMITY-FIXTURE';const attached=window.RuntimeIdentityRegistryPage.adapter.adapt({runtimeSource:'VEHICLE_PROXIMITY',vehicleId:identity.vehicleId,sensorId,sourceTargetId:`vehicle-proximity:${identity.canonicalTargetId}`,ownershipToken:identity.ownershipToken});identity=attached.identity||identity;targetId=identity.canonicalTargetId;const base=Date.now(),input=timestamp=>({measurementId:`vehicle-fixture-${++sequence}`,timestamp:new Date(timestamp).toISOString(),sensorId,sourceType:'FIXTURE',targetId,detectedVehicleId:'VEHICLE-FIXTURE-01',detectedVehicleClass:'FORKLIFT',distanceMeters:6,relativeDirection:'FRONT',closingSpeedMps:2,relativeMotion:'MOVING_TOWARD',timeToCollisionSeconds:null,detectionConfidence:.92,distanceConfidence:.9,trackingConfidence:.88,sampleAgeMs:0,sensorConnected:true,simulation:true});runtime.ingest(input(base));latest=runtime.ingest(input(base+600));render(latest);return latest};field('run').addEventListener('click',run);field('ack').addEventListener('click',()=>{const eventId=latest?.runtimeResult?.riskEvent?.eventId;if(eventId)runtime.acknowledge(eventId)});field('reset').addEventListener('click',()=>{if(targetId)runtime.reset(targetId);latest=null;render(null)});field('export').addEventListener('click',()=>{if(!targetId)return;const blob=new Blob([runtime.exportJSON(targetId)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='vehicle-proximity-runtime.json';a.click();URL.revokeObjectURL(url)});window.VehicleProximityPage=Object.freeze({runtime,run,getLatest:()=>latest});render(null)})();
+    (()=>{const panel=document.getElementById('rightTurnRuntimePanel'),field=name=>panel.querySelector(`[data-right-turn-${name}]`);if(!panel)return;let targetId=null,latest=null,sequence=0;const runtime=new window.RightTurnRuntime.Runtime({identityRegistry:window.RuntimeIdentityRegistryPage.registry,fusionEngine:window.MultiHazardFusionPage,confidenceEngine:window.RuntimeConfidencePage.engine});const render=result=>{latest=result||latest;const state=latest?.rightTurnState,risk=latest?.compositeRisk,confidence=latest?.confidence?.runtimeConfidence,recommendation=latest?.confidence?.confidenceRecommendation,types=latest?.operationalContext?.activeRiskTypes||[];field('state').textContent=state?.state||'INACTIVE';field('signal').textContent=state?.turnSignal||'OFF';field('zone').textContent=state?.state==='ACTIVE'?'RIGHT_FRONT':'UNKNOWN';field('pedestrian').textContent=types.includes('HUMAN_PROXIMITY')?'ACTIVE':'NONE';field('vehicle').textContent=types.includes('VEHICLE_PROXIMITY')?'ACTIVE':'NONE';field('risk').textContent=risk?.priorityBand||'NORMAL';field('confidence').textContent=`${confidence?.confidenceBand||'UNKNOWN'} / ${recommendation?.decisionMode||'VERIFY FIRST'}`;field('detail').textContent=JSON.stringify(latest||{},null,2)};const run=()=>{const identity=window.RuntimeIdentityRegistryPage.getActiveIdentity()||window.RuntimeIdentityRegistryPage.register();targetId=identity.canonicalTargetId;const base=Date.now(),state=timestamp=>({timestamp:new Date(timestamp).toISOString(),targetId,sensorId:'RIGHT-TURN-FIXTURE',turnSignal:'RIGHT',vehicleMotion:'MOVING',speedMps:3,steeringCandidate:true,sensorConnected:true,simulation:true});runtime.ingest(state(base));runtime.ingest(state(base+500),{pedestrianFresh:true,vehicleFresh:true,agreementStatus:'AGREEMENT'});const risk=type=>({eventId:`right-turn-fixture-risk-${++sequence}-${type}`,eventType:type,targetId,severity:'HIGH',state:'ACTIVE',createdTime:new Date(base+500).toISOString(),updatedTime:new Date(base+500).toISOString(),simulation:true,operationalContext:identity});window.MultiHazardFusionPage.ingestRiskEvent(risk('HUMAN_PROXIMITY'));const fused=window.MultiHazardFusionPage.ingestRiskEvent(risk('VEHICLE_PROXIMITY'));latest={...runtime.getState(targetId),operationalContext:fused.context,compositeRisk:fused.compositeRisk};render(latest);return latest};field('run').addEventListener('click',run);field('ack').addEventListener('click',()=>{if(targetId)runtime.acknowledge(targetId)});field('reset').addEventListener('click',()=>{if(targetId)runtime.reset(targetId);latest=null;render(null)});field('export').addEventListener('click',()=>{if(!targetId)return;const blob=new Blob([runtime.exportJSON(targetId)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='right-turn-runtime.json';a.click();URL.revokeObjectURL(url)});window.RightTurnRuntimePage=Object.freeze({runtime,run,getLatest:()=>latest});render(null)})();
+    window.RuntimeGraphViewer = window.RuntimeEventGraph.initializeRuntimeGraphViewer();
+    window.RuntimeTripleViewer = window.RuntimeTripleEngine.initializeRuntimeTripleViewer();
+    document.addEventListener('DOMContentLoaded', () => {
+      const root = document.querySelector('[data-driver-perception-root]');
+      const panel = root?.querySelector('[data-live-bridge-panel]');
+      const runtime = root?.driverPerceptionRuntime;
+      if (!panel || !runtime) return;
+      const bridge = new window.DriverPerception.DriverCameraObservationBridge({ perceptionRuntime: runtime });
+      window.DriverCameraObservationBridgePage = bridge;
+      const modeController = window.DriverRuntimePage.getInputModeController();
+      let latestNotification = null;
+      let startDiagnostic = { attempted: false, result: 'NOT_ATTEMPTED', blockedReason: null };
+      const unsubscribeResults = window.DriverRuntimePage.subscribeToResults(notification => { latestNotification = notification; render(); });
+      modeController.registerSource({ sourceId: 'driver-deterministic-page', mode: window.DriverInputModeController.Mode.DETERMINISTIC_SIMULATION });
+      const out = name => panel.querySelector(`[data-live-${name}]`);
+      const context = () => ({ vehicleType: document.getElementById('driverVehicleType').value,
+        vehicleId: document.getElementById('driverVehicleId').value, driverId: document.getElementById('driverId').value,
+        driverAssignmentId: document.getElementById('driverAssignmentId').value });
+      const lifecycleContext = () => new window.DriverState.VehicleContext(context());
+      const cameraActive = state => [window.DriverPerception.States.RUNNING, window.DriverPerception.States.FACE_NOT_DETECTED].includes(state);
+      const readiness = expectedGeneration => runtime.getLiveBridgeReadiness(expectedGeneration);
+      const synchronizeBridge = (_snapshot, reason = 'CAMERA_RUNTIME_STATE_CHANGED', manual = false) => {
+        const camera = readiness();
+        const values = context(), contextAvailable = values.vehicleType && values.vehicleId && values.driverId && values.driverAssignmentId;
+        if (!contextAvailable) {
+          if (manual) startDiagnostic = { attempted: false, result: 'BLOCKED', blockedReason: 'TARGET_OR_ASSIGNMENT_UNAVAILABLE' };
+          return { ...camera, readyForLiveBridge: false, blockedReason: 'TARGET_OR_ASSIGNMENT_UNAVAILABLE' };
+        }
+        if (camera.readyForLiveBridge) {
+          const expected = lifecycleContext(), state = bridge.getState();
+          if (state.targetId && (state.targetId !== expected.targetId || state.boundRuntimeGeneration !== runtime.runtimeGeneration)) bridge.stop(state.targetId !== expected.targetId ? 'TARGET_OR_ASSIGNMENT_REPLACED' : 'RUNTIME_GENERATION_REPLACED');
+          try { const result = bridge.start(values, reason); startDiagnostic = { attempted: true, result: result.bridgeState, blockedReason: null }; }
+          catch (error) { startDiagnostic = { attempted: true, result: 'ERROR', blockedReason: 'BRIDGE_INITIALIZATION_ERROR', error: error?.message || String(error) }; }
+        } else {
+          if (manual) startDiagnostic = { attempted: false, result: 'BLOCKED', blockedReason: camera.blockedReason };
+          if (['STOPPING','STOPPED','ERROR','PERMISSION_REQUIRED','IDLE'].includes(camera.runtimeState)) bridge.stop(`CAMERA_RUNTIME_${camera.runtimeState}`);
+        }
+        return camera;
+      };
+      const render = () => {
+        const state = bridge.getState(); const targetId = state.targetId, camera = readiness(state.boundRuntimeGeneration ?? runtime.runtimeGeneration);
+        const runtimeState = targetId ? window.DriverRuntimePage.getRuntimeSnapshot(targetId) : null;
+        const rawMode = runtimeState?.inputMode || 'STOPPED', inputMode = rawMode === 'LIVE_WEBCAM' ? 'LIVE_CAMERA' : (rawMode === 'DETERMINISTIC_SIMULATION' ? 'DETERMINISTIC_FIXTURE' : rawMode);
+        out('mode').textContent = inputMode; out('status').textContent = state.bridgeState;
+        out('ownership').textContent = state.ownershipTokenActive ? 'ACTIVE' : 'INACTIVE'; out('target').textContent = targetId || '-';
+        out('snapshot').textContent = state.lastObservation?.metadata?.driverMetricSnapshotId || '-';
+        out('observation').textContent = state.lastObservation?.observationId || '-';
+        out('risk').textContent = state.lastResult?.riskEvent?.state || 'NORMAL';
+        out('triples').textContent = String(window.RuntimeTripleEngine.getRuntimeTriples().length);
+        out('camera-state').textContent = camera.runtimeState; out('owner').textContent = state.bridgeOwner || '-';
+        out('subscription').textContent = state.subscriptionActive ? 'YES' : 'NO'; out('generation').textContent = `${state.boundRuntimeGeneration ?? '-'} / ${state.currentRuntimeGeneration ?? '-'}`;
+        out('notification').textContent = latestNotification?.notificationId || '-';
+        const scenario = targetId ? window.DriverVoiceScenarioPage?.runtime?.getState(targetId) : null, voice = window.VoiceInteractionPage?.orchestrator?.getHistory(targetId).at(-1), audio = window.VoiceInteractionPage?.audio?.getState();
+        out('scenario').textContent = `${scenario?.currentScenario || '-'} / ${voice?.messageCode || audio?.currentMessageCode || '-'}`;
+        out('playback').textContent = audio?.playbackState || 'IDLE'; out('reasons').textContent = `${state.lastStartReason || '-'} / ${state.lastStopReason || '-'}`;
+        const automaticReady = cameraActive(runtime.state) && state.bridgeState === 'RUNNING' && state.subscriptionActive && state.source === 'LIVE_WEBCAM' && state.boundRuntimeGeneration === state.currentRuntimeGeneration;
+        out('automatic').textContent = automaticReady ? 'AUTOMATIC_LIVE_BRIDGE_READY' : 'NOT_READY';
+        out('start-attempted').textContent = startDiagnostic.attempted ? 'YES' : 'NO'; out('start-result').textContent = startDiagnostic.result;
+        out('blocked-reason').textContent = startDiagnostic.blockedReason || '-'; out('camera-source').textContent = 'DRIVER_PERCEPTION_RUNTIME';
+        out('readiness-source').textContent = camera.stateSource; out('authoritative-stream').textContent = `${camera.streamPresent ? 'YES' : 'NO'} / ${camera.streamSource}`;
+        out('authoritative-track').textContent = `${camera.videoTrackState || '-'} / enabled=${camera.trackEnabled ?? '-'}`;
+        const synchronization = camera.generationMatch === false ? 'GENERATION_MISMATCH' : (camera.readyForLiveBridge ? (automaticReady ? 'SYNCHRONIZED_READY' : 'STATE_SOURCE_MISMATCH') : (camera.runtimeActive ? 'WAITING_FOR_CAMERA' : 'SYNCHRONIZED_STOPPED'));
+        out('synchronization').textContent = synchronization;
+        out('result').textContent = JSON.stringify({ bridge: state, cameraReadiness: camera, startDiagnostic, runtime: runtimeState }, null, 2);
+      };
+      panel.querySelector('[data-live-bridge-start]').addEventListener('click', () => { synchronizeBridge({ state: runtime.state }, 'DEVELOPMENT_DIAGNOSTIC_BUTTON', true); render(); });
+      panel.querySelector('[data-live-bridge-stop]').addEventListener('click', () => { bridge.stop('DEVELOPMENT_DIAGNOSTIC_BUTTON'); render(); });
+      panel.querySelector('[data-live-bridge-ack]').addEventListener('click', () => { const id = bridge.getState().lastResult?.riskEvent?.eventId; if (id) window.DriverRuntimePage.acknowledgeRisk(id); render(); });
+      panel.querySelector('[data-live-bridge-reset]').addEventListener('click', () => { bridge.resetTarget(); render(); });
+      document.getElementById('driverStateTestForm').addEventListener('submit', event => {
+        const requestedType = event.submitter?.id === 'incapacitationTestButton' ? 'INCAPACITATION'
+          : (event.submitter?.id === 'alcoholTestButton' ? 'ALCOHOL_LEVEL' : 'DROWSINESS');
+        const target = new window.DriverState.VehicleContext(context()).targetId;
+        if (requestedType === 'DROWSINESS') bridge.stop('SWITCH_TO_SIMULATION');
+        modeController.activateMode({ observationType: requestedType, targetId: target,
+          mode: window.DriverInputModeController.Mode.DETERMINISTIC_SIMULATION,
+          sourceId: 'driver-deterministic-page', reason: 'DETERMINISTIC_FORM_SUBMIT' });
+        render();
+      }, true);
+      panel.querySelector('[data-live-bridge-simulation]').addEventListener('click', () => { document.getElementById('drowsinessTestButton').click(); render(); });
+      runtime.subscribe(snapshot => { synchronizeBridge(snapshot); render(); });
+      runtime.onMetricSnapshot(render);
+      window.addEventListener('pagehide', () => { unsubscribeResults(); bridge.destroy('PAGE_TEARDOWN'); }, { once: true });
+      render();
+      synchronizeBridge({ state: runtime.state }, 'INITIAL_LIFECYCLE_RECONCILIATION');
+      render();
+      const recorderPanel = root.querySelector('[data-recorder-panel]');
+      const recorder = new window.DriverPerception.PerceptionDatasetRecorder({ runtime, runtimeStateProvider: () => {
+        const bridgeState = bridge.getState(); const targetId = bridgeState.targetId;
+        const state = targetId ? window.DriverRuntimePage.getRuntimeSnapshot(targetId) : null;
+        return { bridgeStatus: bridgeState.status, inputMode: state?.inputMode || 'STOPPED', riskSignal: bridgeState.lastResult?.riskSignal?.reason || null,
+          riskState: bridgeState.lastResult?.riskEvent?.state || null, policyStage: bridgeState.lastResult?.policyDecision?.stage || null,
+          latestActionType: bridgeState.lastResult?.actionRequests?.at(-1)?.actionType || null,
+          observationSimulation: bridgeState.lastObservation?.metadata?.simulation ?? null,
+          actionExecutionSimulation: bridgeState.lastResult?.actionExecutions?.at(-1)?.simulation ?? null };
+      }});
+      window.PerceptionDatasetRecorderPage = recorder;
+      const recorderOut = name => recorderPanel.querySelector(`[data-recorder-${name}]`);
+      const renderRecorder = () => { const state = recorder.getState(), summary = recorder.getSessionSummary(), rows = recorder.getRows();
+        recorderOut('session').textContent = state.sessionId || '-'; recorderOut('state').textContent = state.state; recorderOut('started').textContent = summary.startedAt || '-'; recorderOut('sampling').textContent = summary.samplingMode || '-';
+        recorderOut('duration').textContent = String(summary.durationMs || 0); recorderOut('counts').textContent = `${summary.rowCount || 0} / ${summary.metricRowCount || 0} / ${summary.markerCount || 0}`;
+        recorderOut('memory').textContent = `${summary.memoryUsageEstimateBytes || 0} bytes`; recorderOut('last').textContent = state.lastRecordTimestamp || '-'; recorderOut('reason').textContent = state.stopReason || state.error || '-';
+        const metric = rows.findLast?.(row => row.recordType === 'METRIC') || [...rows].reverse().find(row => row.recordType === 'METRIC') || {};
+        recorderOut('ear').textContent = metric.earSmoothed ?? '-'; recorderOut('mar').textContent = metric.marSmoothed ?? '-'; recorderOut('pose').textContent = `${metric.pitch ?? '-'} / ${metric.roll ?? '-'} / ${metric.yaw ?? '-'}`; recorderOut('episodes').textContent = `${metric.eyeState ?? (metric.eyeClosed === true ? 'CLOSED' : metric.eyeClosed === false ? 'OPEN' : '-')} / ${metric.yawnState ?? '-'}`; recorderOut('reject').textContent = metric.rejectionReason || '-'; recorderOut('preview').textContent = JSON.stringify(rows.at(-1) || {}, null, 2);
+      };
+      recorderPanel.querySelector('[data-recorder-start]').addEventListener('click', () => { try { recorder.start({ participantCode: recorderOut('participant').value,
+        glassesMode: recorderOut('glasses').value, lightingMode: recorderOut('lighting').value, postureMode: recorderOut('posture').value,
+        scenarioLabel: recorderOut('scenario').value }); } catch (_) {} renderRecorder(); });
+      recorderPanel.querySelector('[data-recorder-pause]').addEventListener('click', () => { try { recorder.pause(); } catch (_) {} renderRecorder(); });
+      recorderPanel.querySelector('[data-recorder-resume]').addEventListener('click', () => { try { recorder.resume(); } catch (_) {} renderRecorder(); });
+      recorderPanel.querySelector('[data-recorder-stop]').addEventListener('click', () => { try { recorder.stop(); } catch (_) {} renderRecorder(); });
+      recorderPanel.querySelector('[data-recorder-reset]').addEventListener('click', () => { recorder.reset(); renderRecorder(); });
+      recorderPanel.querySelector('[data-recorder-csv]').addEventListener('click', () => { try { recorder.exportCSV(); } catch (_) {} renderRecorder(); });
+      recorderPanel.querySelector('[data-recorder-json]').addEventListener('click', () => { try { recorder.exportJSON(); } catch (_) {} renderRecorder(); });
+      recorderPanel.querySelectorAll('[data-marker]').forEach(button => button.addEventListener('click', () => { try { recorder.addMarker(button.dataset.marker); } catch (_) {} renderRecorder(); }));
+      runtime.onMetricSnapshot(renderRecorder); renderRecorder();
+    });
+    const tabButtons = document.querySelectorAll('.tab-button');
+    const tabPanels = document.querySelectorAll('.tab-panel');
+
+    tabButtons.forEach(button => {
+      button.addEventListener('click', () => {
+        const targetId = button.dataset.tab;
+        tabButtons.forEach(item => item.classList.toggle('active', item === button));
+        tabPanels.forEach(panel => panel.classList.toggle('active', panel.id === targetId));
+      });
+    });
+  </script>
+  <script>
+    (()=>{const panel=document.getElementById('driverAttentionRuntimePanel'),field=name=>panel.querySelector(`[data-attention-${name}]`);if(!panel)return;let targetId=null,latest=null,sequence=0;const runtime=new window.DriverAttentionRuntime.Runtime({identityRegistry:window.RuntimeIdentityRegistryPage.registry,fusionEngine:window.MultiHazardFusionPage,confidenceEngine:window.RuntimeConfidencePage.engine});const render=result=>{latest=result||latest;const m=latest?.measurement,o=latest?.observation,r=latest?.riskEvent,f=latest?.fusion?.compositeRisk,c=latest?.confidence?.runtimeConfidence,rec=latest?.confidence?.confidenceRecommendation;field('status').textContent=latest?.attentionState||'UNKNOWN';field('direction').textContent=m?.gazeDirection||'UNKNOWN';field('offroad').textContent=`${m?.offRoadDurationMs||0} ms`;field('recommendation').textContent=rec?.decisionMode||((latest?.attentionState==='DISTRACTED')?'VERIFY FIRST':'MONITOR');field('gaze').textContent=`${m?.gazeDirection||'UNKNOWN'} / ${m?.gazeSource||'UNKNOWN'}`;field('head').textContent=m?.headDirection||'UNKNOWN';field('zone').textContent=m?.roadAttentionZone||'UNKNOWN';field('duration').textContent=`${m?.glanceDurationMs||0} / ${m?.offRoadDurationMs||0} ms`;field('forward').textContent=`${m?.forwardAttentionDurationMs||0} ms`;field('face').textContent=`${m?.faceDetected===true} / ${m?.landmarkValid===true}`;field('valid').textContent=`${m?.gazeValid===true} / ${m?.headPoseValid===true}`;field('confidence').textContent=m?.measurementConfidence==null?'UNKNOWN':m.measurementConfidence.toFixed(2);field('quality').textContent=`${JSON.stringify(m?.quality||{})} / ${(o?.metadata?.reasonCodes||[]).join(', ')||'NONE'}`;field('target').textContent=m?.canonicalTargetId||'-';field('observation').textContent=o?.observationId||'-';field('risk').textContent=r?.eventId||'-';field('fusion').textContent=f?.priorityBand||'NORMAL';field('runtime-confidence').textContent=c?.confidenceBand||'UNKNOWN';field('detail-recommendation').textContent=rec?.decisionMode||'VERIFY FIRST';field('detail').textContent=JSON.stringify(latest||{},null,2)};const run=()=>{let identity=window.RuntimeIdentityRegistryPage.getActiveIdentity()||window.RuntimeIdentityRegistryPage.register(),sensorId='ATTENTION-FIXTURE';const attached=window.RuntimeIdentityRegistryPage.adapter.adapt({runtimeSource:'DRIVER_CAMERA',vehicleId:identity.vehicleId,sensorId,sourceTargetId:`attention:${identity.canonicalTargetId}`,ownershipToken:identity.ownershipToken});identity=attached.identity||identity;targetId=identity.canonicalTargetId;const base=Date.now(),input=(timestamp,duration,direction='DOWN',zone='DOWN_OFF_ROAD')=>({measurementId:`attention-fixture-${++sequence}`,timestamp:new Date(timestamp).toISOString(),sensorId,sourceType:'FIXTURE',targetId,canonicalTargetId:targetId,gazeDirection:direction,gazeSource:'FIXTURE',headDirection:direction==='FORWARD'?'CENTER':direction,roadAttentionZone:zone,glanceDurationMs:duration,offRoadDurationMs:duration,forwardAttentionDurationMs:direction==='FORWARD'?duration:0,faceDetected:true,landmarkValid:true,gazeValid:true,headPoseValid:true,pitch:direction==='DOWN'?12:0,yaw:0,roll:0,measurementConfidence:.82,sampleAgeMs:0,sensorConnected:true,quality:{fixture:true,zoneValidationStatus:'DEVELOPMENT_UNVALIDATED_ATTENTION_ZONE_CANDIDATE'},simulation:true});runtime.ingest(input(base,0,'FORWARD','ROAD_FORWARD'));runtime.ingest(input(base+100,100));latest=runtime.ingest(input(base+2000,2000),{context:{vehicleMotionAvailable:true,turnStateAvailable:true,relatedHazardAvailable:false}});render(latest);return latest};field('run').addEventListener('click',run);field('ack').addEventListener('click',()=>{if(targetId)runtime.acknowledge(targetId);render(runtime.getLatest(targetId))});field('reset').addEventListener('click',()=>{if(targetId)runtime.reset(targetId);latest=null;render(null)});field('export').addEventListener('click',()=>{if(!targetId)return;const blob=new Blob([runtime.exportJSON(targetId)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='driver-attention-runtime.json';a.click();URL.revokeObjectURL(url)});window.DriverAttentionRuntimePage=Object.freeze({runtime,run,getLatest:()=>latest});render(null)})();
+    (()=>{const panel=document.getElementById('alcoholSensorRuntimePanel'),field=name=>panel.querySelector(`[data-alcohol-${name}]`);if(!panel)return;let targetId=null,latest=null,sequence=0;const runtime=new window.AlcoholSensorRuntime.Runtime({identityRegistry:window.RuntimeIdentityRegistryPage.registry,runtimePage:window.DriverRuntimePage,fusionEngine:window.MultiHazardFusionPage,confidenceEngine:window.RuntimeConfidencePage.engine});const render=result=>{latest=result||latest;const m=latest?.measurement,r=latest?.runtimeResult?.riskSignal,f=latest?.fusion?.compositeRisk,c=latest?.confidence?.confidenceRecommendation;field('sensor-type').textContent=m?.sensorType||'UNKNOWN';field('bac').textContent=m?.bac==null?'UNKNOWN':String(m.bac);field('brac').textContent=m?.brac==null?'UNKNOWN':String(m.brac);field('unit').textContent=m?.unit||'UNKNOWN';field('confidence').textContent=m?.measurementConfidence==null?'UNKNOWN':m.measurementConfidence.toFixed(2);field('health').textContent=m?.sensorHealth||'UNKNOWN';field('freshness').textContent=m?(m.quality?.sampleFresh?'FRESH':'STALE'):'UNKNOWN';field('risk').textContent=r?.policyStatus||r?.reason||'NORMAL';field('fusion').textContent=f?.priorityBand||'NORMAL';field('recommendation').textContent=c?.decisionMode||'VERIFY FIRST';field('detail').textContent=JSON.stringify(latest||{},null,2)};const run=()=>{let identity=window.RuntimeIdentityRegistryPage.getActiveIdentity()||window.RuntimeIdentityRegistryPage.register(),sensorId='ALCOHOL-FIXTURE';const attached=window.RuntimeIdentityRegistryPage.adapter.adapt({runtimeSource:'ALCOHOL_SENSOR',vehicleId:identity.vehicleId,sensorId,sourceTargetId:`alcohol:${identity.canonicalTargetId}`,ownershipToken:identity.ownershipToken});identity=attached.identity||identity;targetId=identity.canonicalTargetId;const base=Date.now(),input=timestamp=>({measurementId:`alcohol-fixture-${++sequence}`,timestamp:new Date(timestamp).toISOString(),sensorId,sensorType:'FIXTURE',targetId,bac:.08,brac:null,unit:'BAC',measurementConfidence:.94,sensorTemperature:24,sensorHealth:'ONLINE',sampleAgeMs:0,simulation:true});runtime.ingest(input(base));latest=runtime.ingest(input(base+400));render(latest);return latest};field('run').addEventListener('click',run);field('ack').addEventListener('click',()=>{const id=latest?.runtimeResult?.riskEvent?.eventId;if(id)runtime.acknowledge(id)});field('reset').addEventListener('click',()=>{if(targetId)runtime.reset(targetId);latest=null;render(null)});field('export').addEventListener('click',()=>{if(!targetId)return;const blob=new Blob([runtime.exportJSON(targetId)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='alcohol-sensor-runtime.json';a.click();URL.revokeObjectURL(url)});window.AlcoholSensorRuntimePage=Object.freeze({runtime,run,getLatest:()=>latest});render(null)})();
+  </script>
+  <script>
+    window.addEventListener('driver-camera-throttled', () => {
+      const page = window.PerceptionValidationPage;
+      if (page?.runtime?.getState?.().session?.state === 'RECORDING') page.runtime.pause();
+      page?.render?.();
+    });
+  </script>
+</body>
+</html>

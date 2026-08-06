@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>Driver policy runtime regression</title></head>
+<body>
+  <select id="driverVehicleType"><option>FORKLIFT</option></select>
+  <input id="driverVehicleId" value="F-03"><input id="driverId" value="DRIVER001">
+  <input id="driverAssignmentId" value="ASSIGNMENT001">
+  <section id="driverPolicySimulation"></section>
+  <button id="runDrowsinessPolicyTest"></button><button id="runIncapacitationPolicyTest"></button>
+  <button id="runAlcoholPolicyTest"></button><button id="acknowledgeCurrentDriverAction"></button>
+  <button id="completeCurrentDriverAction"></button><button id="resetDriverPolicySimulation"></button>
+  <pre id="driverPolicyActiveEvents"></pre><pre id="driverPolicyHighestRisk"></pre>
+  <pre id="driverPolicyCurrentDecision"></pre><pre id="driverPolicyStage"></pre>
+  <pre id="driverPolicyRecommendedActions"></pre><pre id="driverPolicyPendingActions"></pre>
+  <pre id="driverPolicyActionState"></pre><pre id="driverPolicySourceEventId"></pre>
+  <pre id="driverPolicyDecisionId"></pre><pre id="driverPolicyActionId"></pre>
+  <pre id="driverPolicyAuditHistory"></pre><pre id="result">RUNNING</pre>
+  <script src="../backend/static/js/sensor_observation.js"></script>
+  <script src="../backend/static/js/driver_state_config.js"></script>
+  <script src="../backend/static/js/driver_state.js"></script>
+  <script src="../backend/static/js/driver_policy_config.js"></script>
+  <script src="../backend/static/js/driver_policy_engine.js"></script>
+  <script>
+    (function runTests() {
+      'use strict';
+      const assert = (condition, message) => { if (!condition) throw new Error(message); };
+      const P = window.DriverPolicy;
+      const config = window.DriverPolicyConfig;
+      const context = (assignment = 'ASSIGNMENT001', vehicle = 'F-03') => ({
+        vehicleId: vehicle, vehicleType: 'FORKLIFT', driverId: 'DRIVER001', driverAssignmentId: assignment,
+        targetId: `${vehicle.replace('-', '')}|DRIVER001|${assignment}`
+      });
+      const event = (id, type, targetId, state, created = 0, updated = created, severity = 'HIGH') => ({
+        eventId: id, eventType: type, targetId, state, severity,
+        createdTime: new Date(created).toISOString(), updatedTime: new Date(updated).toISOString()
+      });
+      const timers = new Map(); let timerId = 0;
+      window.setTimeout = callback => { timerId += 1; timers.set(timerId, { callback, cleared: false }); return timerId; };
+      window.clearTimeout = id => { if (timers.has(id)) timers.get(id).cleared = true; };
+      const runNext = () => { const item = Array.from(timers.entries()).find(([, t]) => !t.cleared);
+        if (!item) throw new Error('Expected timer'); timers.delete(item[0]); item[1].callback(); return item[1]; };
+
+      try {
+        const modelDecision = new P.DriverPolicyDecision({ decisionId: 'd', policyType: 'DROWSINESS', targetId: 't',
+          sourceEventId: 'e', sourceEventType: 'DROWSINESS', sourceEventState: 'NEW', severity: 'HIGH',
+          createdTime: new Date(0).toISOString(), updatedTime: new Date(0).toISOString(), policyVersion: 'p',
+          configurationVersion: 'c', decision: 'MONITOR', reasonCodes: [], recommendedActions: [], metadata: {} });
+        const modelAction = new P.ActionRequest({ actionId: 'a', actionType: 'VISUAL_WARNING', targetId: 't',
+          sourceEventId: 'e', sourceDecisionId: 'd', createdTime: new Date(0).toISOString(),
+          updatedTime: new Date(0).toISOString(), state: 'REQUESTED', priority: 1, channel: 'SIMULATION',
+          message: 'request only', requiresAcknowledgement: true, acknowledgedTime: null, completedTime: null,
+          cancelledTime: null, metadata: { simulation: true, operationalUseAllowed: false } });
+        assert(JSON.parse(JSON.stringify(modelDecision)).decisionId === 'd', 'Decision must serialize');
+        assert(JSON.parse(JSON.stringify(modelAction)).actionId === 'a', 'Action must serialize');
+
+        const engine = new P.DriverPolicyEngine(config); const ctx = context();
+        let result = engine.evaluate(event('d1', 'DROWSINESS', ctx.targetId, 'NEW'), ctx, new Date(0));
+        assert(result.decision.decision === 'MONITOR' && result.actions.length === 1 &&
+          result.actions[0].actionType === 'VISUAL_WARNING', 'DROWSINESS NEW warning');
+        const countAfterNew = engine.getDriverActionRequests().length;
+        engine.evaluate(event('d1', 'DROWSINESS', ctx.targetId, 'NEW'), ctx, new Date(10));
+        assert(engine.getDriverActionRequests().length === countAfterNew, 'Same stage action must deduplicate');
+        result = engine.evaluate(event('d1', 'DROWSINESS', ctx.targetId, 'ACTIVE'), ctx, new Date(250));
+        assert(result.decision.decision === 'WARN_DRIVER', 'DROWSINESS stage 1');
+        result = engine.evaluate(event('d1', 'DROWSINESS', ctx.targetId, 'ACTIVE'), ctx, new Date(500));
+        assert(result.decision.decision === 'ESCALATE_WARNING', 'DROWSINESS stage 2');
+        result = engine.evaluate(event('d1', 'DROWSINESS', ctx.targetId, 'ACTIVE'), ctx, new Date(750));
+        assert(result.actions.some(a => a.actionType === 'SAFE_STOP_REQUEST'), 'DROWSINESS safe stop request');
+        const beforeAck = engine.getDriverActionRequests().length;
+        engine.evaluate(event('d1', 'DROWSINESS', ctx.targetId, 'ACKNOWLEDGED'), ctx, new Date(800));
+        assert(engine.getActiveDriverPolicies().length === 1 && engine.getDriverActionRequests().length === beforeAck,
+          'ACK must preserve risk and suppress repeats');
+        result = engine.evaluate(event('d1', 'DROWSINESS', ctx.targetId, 'CLEARED'), ctx, new Date(900));
+        assert(result.decision.decision === 'CLOSE_POLICY' && engine.getActiveDriverPolicies().length === 0,
+          'DROWSINESS clear closes policy');
+
+        result = engine.evaluate(event('i1', 'DRIVER_INCAPACITATION', ctx.targetId, 'NEW', 1000), ctx, new Date(1000));
+        assert(result.actions.some(a => a.actionType === 'SUPERVISOR_NOTIFICATION_REQUEST'), 'INCAPACITATION supervisor');
+        result = engine.evaluate(event('i1', 'DRIVER_INCAPACITATION', ctx.targetId, 'ACTIVE', 1000), ctx, new Date(1250));
+        assert(result.actions.some(a => a.actionType === 'SAFE_STOP_REQUEST'), 'INCAPACITATION safe stop');
+        result = engine.evaluate(event('i1', 'DRIVER_INCAPACITATION', ctx.targetId, 'ACTIVE', 1000), ctx, new Date(1500));
+        assert(result.actions.some(a => a.actionType === 'EMERGENCY_RESPONSE_REQUEST'), 'INCAPACITATION emergency request');
+        engine.evaluate(event('i1', 'DRIVER_INCAPACITATION', ctx.targetId, 'ACKNOWLEDGED', 1000), ctx, new Date(1600));
+        assert(engine.getActiveDriverPolicies().some(p => p.sourceEventId === 'i1'), 'INCAPACITATION ACK preserves policy');
+        engine.evaluate(event('i1', 'DRIVER_INCAPACITATION', ctx.targetId, 'CLEARED', 1000), ctx, new Date(1700));
+
+        const alcoholCases = [
+          ['ALLOW', 'NO_ACTION', null], ['RETEST', 'REQUEST_RETEST', 'RETEST_REQUEST'],
+          ['BLOCK_START', 'BLOCK_START_REQUEST', 'BLOCK_START_REQUEST'],
+          ['SAFE_STOP_REQUEST', 'SAFE_STOP_REQUEST', 'SAFE_STOP_REQUEST']
+        ];
+        alcoholCases.forEach(([observed, decision, action], index) => {
+          const alcoholEngine = new P.DriverPolicyEngine(config);
+          const evaluated = alcoholEngine.evaluate(event(`a${index}`, 'ALCOHOL_POLICY_VIOLATION', ctx.targetId, 'NEW'),
+            ctx, new Date(index), { policyDecision: observed, measurementMode: index === 3 ? 'IN_OPERATION' : 'PRE_START' });
+          assert(evaluated.decision.decision === decision, `Alcohol ${observed}`);
+          assert(action === null ? evaluated.actions.length === 0 : evaluated.actions[0].actionType === action,
+            `Alcohol action ${observed}`);
+        });
+        const failed = new P.DriverPolicyEngine(config).evaluate(
+          event('af', 'ALCOHOL_POLICY_VIOLATION', ctx.targetId, 'NEW'), ctx, new Date(),
+          { policyDecision: 'NO_DECISION', measurementStatus: 'FAILED' });
+        assert(failed.decision.reasonCodes.includes('ALCOHOL_MEASUREMENT_FAILED_NO_POLICY_VIOLATION_DECISION'),
+          'Failed measurement reason must differ from violation');
+
+        const isolation = new P.DriverPolicyEngine(config); const ctx2 = context('ASSIGNMENT002');
+        isolation.evaluate(event('same', 'DROWSINESS', ctx.targetId, 'NEW'), ctx, new Date(0));
+        isolation.evaluate(event('same', 'DROWSINESS', ctx2.targetId, 'NEW'), ctx2, new Date(0));
+        isolation.evaluate(event('other-source', 'DROWSINESS', ctx.targetId, 'NEW'), ctx, new Date(0));
+        assert(isolation.getActiveDriverPolicies().length === 3, 'Target, assignment and source event isolation');
+        isolation.resetTarget(ctx.targetId, new Date(10));
+        assert(isolation.getActiveDriverPolicies().length === 1 && isolation.getActiveDriverPolicies()[0].targetId === ctx2.targetId,
+          'Reset must preserve another target');
+
+        const conflict = new P.DriverPolicyEngine(config);
+        conflict.evaluate(event('cd', 'DROWSINESS', ctx.targetId, 'ACTIVE', 0), ctx, new Date(250));
+        const incap = conflict.evaluate(event('ci', 'DRIVER_INCAPACITATION', ctx.targetId, 'NEW', 0), ctx, new Date(250));
+        assert(conflict.getHighestPriorityRisk().eventType === 'DRIVER_INCAPACITATION', 'Incapacitation priority');
+        assert(!incap.actions.some(a => a.actionType === 'VOICE_WARNING'), 'Duplicate action type must deduplicate');
+        assert(incap.decision.reasonCodes.includes('ACTION_DEDUPLICATED_VOICE_WARNING'),
+          'Conflict deduplication reason must remain in decision audit');
+        assert(conflict.getActiveDriverPolicies().some(p => p.eventType === 'DROWSINESS'), 'Lower policy audit/state retained');
+
+        const page = P.initializeDriverPolicyPage();
+        page.start('DROWSINESS'); runNext();
+        const stale = Array.from(timers.values()).find(t => !t.cleared);
+        page.start('DROWSINESS');
+        assert(stale.cleared, 'Restart timer cancelled');
+        const auditBefore = page.engine.getDriverRuntimeAuditTrail().length;
+        stale.callback();
+        assert(page.engine.getDriverRuntimeAuditTrail().length === auditBefore, 'Stale callback isolated');
+
+        document.getElementById('result').textContent = 'PASS'; document.title = 'PASS';
+      } catch (error) {
+        document.getElementById('result').textContent = `FAIL\n${error.stack || error.message}`;
+        document.title = 'FAIL';
+      }
+    }());
+  </script>
+</body></html>

@@ -1,0 +1,11 @@
+.fusion-panel { border-color: rgba(248,113,113,.45); background: linear-gradient(145deg,rgba(69,10,10,.3),rgba(15,23,42,.85)); }
+.fusion-summary { display:grid; grid-template-columns:2fr repeat(3,1fr); gap:12px; margin:16px 0; }
+.fusion-summary article,.fusion-details article { padding:14px; border:1px solid rgba(148,163,184,.2); border-radius:10px; background:rgba(2,6,23,.6); }
+.fusion-summary span,.fusion-details dt { display:block; color:#94a3b8; font-size:11px; text-transform:uppercase; }
+.fusion-summary strong { display:block; margin-top:8px; color:#f8fafc; font-size:18px; overflow-wrap:anywhere; }
+.fusion-summary [data-fusion-band] { color:#fb7185; font-size:30px; }
+.fusion-details { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-top:12px; }
+.fusion-details dl { margin:0; }.fusion-details dl div { margin-bottom:9px; }.fusion-details dd { margin:3px 0 0; color:#e2e8f0; overflow-wrap:anywhere; }
+.fusion-audit { max-height:260px; overflow:auto; }
+.fusion-badges { display:flex; flex-wrap:wrap; gap:7px; }.fusion-badges span { padding:6px 9px; border:1px solid rgba(251,191,36,.35); border-radius:999px; color:#fde68a; font-size:10px; font-weight:800; }
+@media(max-width:900px){.fusion-summary,.fusion-details{grid-template-columns:1fr 1fr}}@media(max-width:620px){.fusion-summary,.fusion-details{grid-template-columns:1fr}}
