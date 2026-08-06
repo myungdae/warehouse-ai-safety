@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="data:,">
   <title>IMC Agentic AI Platform</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -403,7 +404,7 @@
     <div class="cards-grid">
 
       <!-- 물류센터 ATC -->
-      <a class="module-card card-warehouse" href="/warehouse">
+      <a class="module-card card-warehouse" href="{{ url_for('index') }}">
         <div class="card-icon">🏭</div>
         <div class="card-label">Module 03 · Warehouse ATC</div>
         <div class="card-title">물류센터 디지털 트윈<br>AI 안전 관제 시스템</div>
@@ -428,15 +429,15 @@
       </a>
 
       <!-- 졸음/졸도 감지 -->
-      <a class="module-card card-driver" href="/driver-safety.html">
+      <a id="driver-safety" class="module-card card-driver" href="{{ url_for('driver_safety') }}">
         <div class="badge-new">NEW</div>
         <div class="card-icon">🚨</div>
         <div class="card-label">Module 02 · Driver Safety</div>
         <div class="card-title">졸음 / 졸도 감지 모듈<br>Run-time Operational Ontology</div>
         <div class="card-desc">
           탑차·지게차 운전자의 졸음(Drowsiness)과 졸도(Incapacitation)를
-          실시간으로 구분하고, 경고→문자통보→전광판까지 연결하는
-          5계층 Agentic AI 안전 모듈입니다.
+          구분하고 경고→문자통보→전광판까지 연결하는 것을 목표로 하는
+          5계층 Agentic AI 설계 모듈입니다. 감지 런타임은 아직 미구현입니다.
         </div>
         <div class="card-tags">
           <span class="tag">Run-time Ontology</span>
@@ -447,14 +448,14 @@
         <div class="card-footer">
           <div class="card-status">
             <div class="status-dot"></div>
-            <span style="color:#00d4ff">설계 완료 · 시뮬레이션 가동</span>
+            <span style="color:#00d4ff">설계 문서 · 구현 준비</span>
           </div>
           <div class="card-arrow">→</div>
         </div>
       </a>
 
       <!-- 탑차 전용 Ontology -->
-      <a class="module-card card-truck" href="/truck-ontology">
+      <a id="truck-ontology" class="module-card card-truck" href="{{ url_for('landing', _anchor='truck-ontology') }}">
         <div class="badge-new" style="background:linear-gradient(135deg,#a855f7,#7c3aed);">NEW</div>
         <div class="card-icon">🚛</div>
         <div class="card-label">Module 04 · Truck Ontology</div>
@@ -480,7 +481,7 @@
       </a>
 
       <!-- AI Smart Battery Platform -->
-      <a class="module-card card-battery" href="/battery">
+      <a class="module-card card-battery" href="{{ url_for('battery') }}">
         <div class="badge-new" style="background:linear-gradient(135deg,#00ff88,#00d4ff);color:#0a0e1a;">NEW</div>
         <div class="card-icon">🔋</div>
         <div class="card-label">Module 05 · Smart Battery</div>

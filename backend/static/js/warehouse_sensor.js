@@ -237,6 +237,10 @@ function showDigitalTwin() {
                         <button class="btn-control btn-warning" onclick="triggerScenario2()">📍 시나리오 2</button>
                         <button class="btn-control btn-info" onclick="triggerScenario3()">📍 시나리오 3</button>
                         <button class="btn-control btn-imu" onclick="triggerScenario4()">📍 시나리오 4</button>
+                        <button class="btn-control btn-imu" onclick="triggerAccelerationTest()">⚡ 급가속 테스트</button>
+                        <button class="btn-control btn-danger" onclick="triggerBrakingTest()">🛑 급제동 테스트</button>
+                        <button class="btn-control btn-info" onclick="triggerTurnRateTest()">🔄 급회전 테스트</button>
+                        <button class="btn-control btn-warning" onclick="triggerHumanProximityTest()">HUMAN_PROXIMITY TEST</button>
                     </div>
                 </div>
                 <div class="map-canvas-large" id="digitalTwinMap">
@@ -267,110 +271,6 @@ function showDigitalTwin() {
     setTimeout(() => {
         initializeFullDigitalTwin();
     }, 100);
-}
-
-// Initialize Full Digital Twin
-function initializeFullDigitalTwin() {
-    const layout = document.getElementById('dtLayout');
-    if (!layout) return;
-    
-    // Draw 4 aisles
-    const aisles = [
-        {x: 100, y: 50, w: 800, h: 100, color: '#3b82f6', label: 'Aisle-A'},
-        {x: 100, y: 180, w: 800, h: 100, color: '#10b981', label: 'Aisle-B'},
-        {x: 100, y: 310, w: 800, h: 100, color: '#f59e0b', label: 'Aisle-C'},
-        {x: 100, y: 440, w: 800, h: 100, color: '#8b5cf6', label: 'Aisle-D'}
-    ];
-    
-    aisles.forEach(aisle => {
-        const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-        g.innerHTML = `
-            <rect x="${aisle.x}" y="${aisle.y}" width="${aisle.w}" height="${aisle.h}" 
-                  fill="${aisle.color}15" stroke="${aisle.color}" stroke-width="2" rx="5"/>
-            <text x="${aisle.x + aisle.w/2}" y="${aisle.y + aisle.h/2}" 
-                  text-anchor="middle" fill="${aisle.color}" font-size="18" font-weight="600">${aisle.label}</text>
-        `;
-        layout.appendChild(g);
-    });
-    
-    // Add sensors
-    const sensorsGroup = document.getElementById('dtSensors');
-    
-    // CCTV
-    const cctvs = [
-        {x:150,y:30},{x:500,y:30},{x:850,y:30},
-        {x:150,y:560},{x:500,y:560},{x:850,y:560},
-        {x:50,y:300},{x:950,y:300}
-    ];
-    cctvs.forEach((c, i) => {
-        const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-        g.innerHTML = `
-            <circle cx="${c.x}" cy="${c.y}" r="8" fill="#2196F3" stroke="#fff" stroke-width="2"/>
-            <text x="${c.x}" y="${c.y-12}" text-anchor="middle" fill="#2196F3" font-size="10" class="dt-label">CCTV-0${i+1}</text>
-        `;
-        sensorsGroup.appendChild(g);
-    });
-    
-    // LiDAR
-    const lidars = [
-        {x:300,y:100},{x:500,y:100},{x:700,y:100},
-        {x:300,y:380},{x:500,y:380},{x:700,y:380}
-    ];
-    lidars.forEach((l, i) => {
-        const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-        g.innerHTML = `
-            <circle cx="${l.x}" cy="${l.y}" r="6" fill="#FF9800" stroke="#fff" stroke-width="2"/>
-            <text x="${l.x}" y="${l.y+20}" text-anchor="middle" fill="#FF9800" font-size="10" class="dt-label">LIDAR-0${i+1}</text>
-        `;
-        sensorsGroup.appendChild(g);
-    });
-    
-    // UWB
-    const uwbs = [
-        {x:100,y:50},{x:500,y:50},{x:900,y:50},
-        {x:100,y:550},{x:500,y:550},{x:900,y:550}
-    ];
-    uwbs.forEach((u, i) => {
-        const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-        g.innerHTML = `
-            <polygon points="${u.x},${u.y-6} ${u.x-5},${u.y+6} ${u.x+5},${u.y+6}" fill="#9C27B0" stroke="#fff" stroke-width="2"/>
-            <text x="${u.x}" y="${u.y+20}" text-anchor="middle" fill="#9C27B0" font-size="10" class="dt-label">UWB-0${i+1}</text>
-        `;
-        sensorsGroup.appendChild(g);
-    });
-    
-    // Add forklifts
-    const forkliftsGroup = document.getElementById('dtForklifts');
-    const forklifts = [
-        {x:200,y:100,id:'F-07'},{x:600,y:100,id:'F-12'},
-        {x:400,y:230,id:'F-03'},{x:750,y:360,id:'F-15'}
-    ];
-    forklifts.forEach(f => {
-        const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-        g.innerHTML = `
-            <rect x="${f.x-12}" y="${f.y-8}" width="24" height="16" fill="#4CAF50" stroke="#fff" stroke-width="2" rx="3"/>
-            <text x="${f.x}" y="${f.y-15}" text-anchor="middle" fill="#4CAF50" font-size="12" font-weight="600">${f.id}</text>
-        `;
-        forkliftsGroup.appendChild(g);
-    });
-}
-
-// Reset Digital Twin View
-function resetDigitalTwinView() {
-    const svg = document.getElementById('digitalTwinSvg');
-    if (svg) {
-        svg.setAttribute('viewBox', '0 0 1000 600');
-    }
-}
-
-// Toggle Digital Twin Labels
-let dtLabelsVisible = true;
-function toggleDigitalTwinLabels() {
-    dtLabelsVisible = !dtLabelsVisible;
-    const labels = document.querySelectorAll('.dt-label');
-    labels.forEach(label => {
-        label.style.display = dtLabelsVisible ? 'block' : 'none';
-    });
 }
 
 // Show Sensor Detail (placeholder)
@@ -649,6 +549,711 @@ function updateClock() {
 }
 
 // ========================================
+// SENSOR OBSERVATION MODEL
+// ========================================
+
+const { ObservationType, SensorObservation } = window.SafetyObservation;
+
+const TILT_RISK_RULE = Object.freeze({
+    ENTRY_THRESHOLD_DEGREES: 20,
+    CLEAR_THRESHOLD_DEGREES: 15,
+    MINIMUM_DURATION_MS: 1500
+});
+
+const ACCELERATION_RISK_RULE = Object.freeze({
+    ENTRY_THRESHOLD_MPS2: 3,
+    CLEAR_THRESHOLD_MPS2: 1,
+    MINIMUM_DURATION_MS: 150
+});
+
+const BRAKING_RISK_RULE = Object.freeze({
+    ENTRY_THRESHOLD_MPS2: -3,
+    CLEAR_THRESHOLD_MPS2: -1,
+    MINIMUM_DURATION_MS: 150
+});
+
+const TURN_RATE_RISK_RULE = Object.freeze({
+    ENTRY_THRESHOLD_DPS: 45,
+    CLEAR_THRESHOLD_DPS: 30,
+    MINIMUM_DURATION_MS: 150,
+    MINIMUM_SPEED: 0.5
+});
+
+const HUMAN_PROXIMITY_RISK_RULE = Object.freeze({
+    ENTRY_THRESHOLD_MAP_UNITS: 100,
+    CLEAR_THRESHOLD_MAP_UNITS: 120,
+    MINIMUM_DURATION_MS: 150
+});
+
+const tiltRiskStates = new Map();
+const accelerationRiskStates = new Map();
+const brakingRiskStates = new Map();
+const turnRateRiskStates = new Map();
+const humanProximityRiskStates = new Map();
+
+function observationToRiskSignal(observation) {
+    if (!(observation instanceof SensorObservation)) {
+        return {
+            shouldCreateRisk: false,
+            shouldClearRisk: false,
+            eventInput: null,
+            observation: null,
+            reason: 'INVALID_OBSERVATION'
+        };
+    }
+
+    if (observation.observationType === ObservationType.TILT) {
+        return tiltObservationToRiskSignal(observation);
+    }
+
+    if (observation.observationType === ObservationType.ACCELERATION) {
+        return accelerationObservationToRiskSignal(observation);
+    }
+
+    if (observation.observationType === ObservationType.BRAKING) {
+        return brakingObservationToRiskSignal(observation);
+    }
+
+    if (observation.observationType === ObservationType.TURN_RATE) {
+        return turnRateObservationToRiskSignal(observation);
+    }
+
+    if (observation.observationType === ObservationType.HUMAN_PROXIMITY) {
+        return humanProximityObservationToRiskSignal(observation);
+    }
+
+    return {
+        shouldCreateRisk: false,
+        shouldClearRisk: false,
+        eventInput: null,
+        observation: observation.toJSON(),
+        reason: 'NO_RISK_RULE_CONFIGURED'
+    };
+}
+
+function humanProximityObservationToRiskSignal(observation) {
+    const distance = Number(observation.value);
+    if (!Number.isFinite(distance) || distance < 0) {
+        return {
+            shouldCreateRisk: false,
+            shouldClearRisk: false,
+            eventInput: null,
+            observation: observation.toJSON(),
+            reason: 'INVALID_HUMAN_PROXIMITY_DISTANCE'
+        };
+    }
+
+    const observedAtMs = Date.parse(observation.observedAt);
+    const targetState = humanProximityRiskStates.get(observation.targetId) || {
+        thresholdEnteredAt: null,
+        riskActive: false
+    };
+
+    if (targetState.riskActive) {
+        if (distance >= HUMAN_PROXIMITY_RISK_RULE.CLEAR_THRESHOLD_MAP_UNITS) {
+            humanProximityRiskStates.delete(observation.targetId);
+            return {
+                shouldCreateRisk: false,
+                shouldClearRisk: true,
+                eventInput: null,
+                observation: observation.toJSON(),
+                reason: 'HUMAN_PROXIMITY_CLEARED'
+            };
+        }
+
+        humanProximityRiskStates.set(observation.targetId, targetState);
+        return createHumanProximityRiskSignal(observation, 'HUMAN_PROXIMITY_RISK_MAINTAINED');
+    }
+
+    if (distance <= HUMAN_PROXIMITY_RISK_RULE.ENTRY_THRESHOLD_MAP_UNITS) {
+        if (targetState.thresholdEnteredAt === null || observedAtMs < targetState.thresholdEnteredAt) {
+            targetState.thresholdEnteredAt = observedAtMs;
+        }
+
+        if (observedAtMs - targetState.thresholdEnteredAt >= HUMAN_PROXIMITY_RISK_RULE.MINIMUM_DURATION_MS) {
+            targetState.riskActive = true;
+            humanProximityRiskStates.set(observation.targetId, targetState);
+            return createHumanProximityRiskSignal(observation, 'HUMAN_PROXIMITY_RISK_CONFIRMED');
+        }
+
+        humanProximityRiskStates.set(observation.targetId, targetState);
+        return {
+            shouldCreateRisk: false,
+            shouldClearRisk: false,
+            eventInput: null,
+            observation: observation.toJSON(),
+            reason: 'HUMAN_PROXIMITY_MINIMUM_DURATION_PENDING'
+        };
+    }
+
+    humanProximityRiskStates.delete(observation.targetId);
+    return {
+        shouldCreateRisk: false,
+        shouldClearRisk: false,
+        eventInput: null,
+        observation: observation.toJSON(),
+        reason: 'HUMAN_PROXIMITY_OUTSIDE_ENTRY_THRESHOLD'
+    };
+}
+
+function createHumanProximityRiskSignal(observation, reason) {
+    return {
+        shouldCreateRisk: true,
+        shouldClearRisk: false,
+        eventInput: {
+            eventType: 'HUMAN_PROXIMITY',
+            targetId: observation.targetId,
+            severity: 'CRITICAL'
+        },
+        observation: observation.toJSON(),
+        reason
+    };
+}
+
+function turnRateObservationToRiskSignal(observation) {
+    const turnRateDps = Number(observation.value);
+    const speed = Number(observation.metadata.speed);
+    if (!Number.isFinite(turnRateDps) || !Number.isFinite(speed)) {
+        return {
+            shouldCreateRisk: false,
+            shouldClearRisk: false,
+            eventInput: null,
+            observation: observation.toJSON(),
+            reason: 'INVALID_TURN_RATE_VALUE'
+        };
+    }
+
+    const observedAtMs = Date.parse(observation.observedAt);
+    const absoluteTurnRate = Math.abs(turnRateDps);
+    const targetState = turnRateRiskStates.get(observation.targetId) || {
+        thresholdEnteredAt: null,
+        riskActive: false
+    };
+
+    if (targetState.riskActive) {
+        if (
+            absoluteTurnRate <= TURN_RATE_RISK_RULE.CLEAR_THRESHOLD_DPS ||
+            speed < TURN_RATE_RISK_RULE.MINIMUM_SPEED
+        ) {
+            turnRateRiskStates.delete(observation.targetId);
+            return {
+                shouldCreateRisk: false,
+                shouldClearRisk: true,
+                eventInput: null,
+                observation: observation.toJSON(),
+                reason: 'TURN_RATE_CLEARED'
+            };
+        }
+
+        turnRateRiskStates.set(observation.targetId, targetState);
+        return createTurnRateRiskSignal(observation, 'TURN_RATE_RISK_MAINTAINED');
+    }
+
+    if (
+        absoluteTurnRate >= TURN_RATE_RISK_RULE.ENTRY_THRESHOLD_DPS &&
+        speed >= TURN_RATE_RISK_RULE.MINIMUM_SPEED
+    ) {
+        if (targetState.thresholdEnteredAt === null || observedAtMs < targetState.thresholdEnteredAt) {
+            targetState.thresholdEnteredAt = observedAtMs;
+        }
+
+        if (observedAtMs - targetState.thresholdEnteredAt >= TURN_RATE_RISK_RULE.MINIMUM_DURATION_MS) {
+            targetState.riskActive = true;
+            turnRateRiskStates.set(observation.targetId, targetState);
+            return createTurnRateRiskSignal(observation, 'TURN_RATE_RISK_CONFIRMED');
+        }
+
+        turnRateRiskStates.set(observation.targetId, targetState);
+        return {
+            shouldCreateRisk: false,
+            shouldClearRisk: false,
+            eventInput: null,
+            observation: observation.toJSON(),
+            reason: 'TURN_RATE_MINIMUM_DURATION_PENDING'
+        };
+    }
+
+    turnRateRiskStates.delete(observation.targetId);
+    return {
+        shouldCreateRisk: false,
+        shouldClearRisk: false,
+        eventInput: null,
+        observation: observation.toJSON(),
+        reason: 'TURN_RATE_BELOW_ENTRY_THRESHOLD'
+    };
+}
+
+function createTurnRateRiskSignal(observation, reason) {
+    return {
+        shouldCreateRisk: true,
+        shouldClearRisk: false,
+        eventInput: {
+            eventType: 'SHARP_TURN',
+            targetId: observation.targetId,
+            severity: 'MEDIUM'
+        },
+        observation: observation.toJSON(),
+        reason
+    };
+}
+
+function brakingObservationToRiskSignal(observation) {
+    const accelerationMps2 = Number(observation.value);
+    if (!Number.isFinite(accelerationMps2)) {
+        return {
+            shouldCreateRisk: false,
+            shouldClearRisk: false,
+            eventInput: null,
+            observation: observation.toJSON(),
+            reason: 'INVALID_BRAKING_VALUE'
+        };
+    }
+
+    const observedAtMs = Date.parse(observation.observedAt);
+    const targetState = brakingRiskStates.get(observation.targetId) || {
+        thresholdEnteredAt: null,
+        riskActive: false
+    };
+
+    if (targetState.riskActive) {
+        if (accelerationMps2 > BRAKING_RISK_RULE.CLEAR_THRESHOLD_MPS2) {
+            brakingRiskStates.delete(observation.targetId);
+            return {
+                shouldCreateRisk: false,
+                shouldClearRisk: true,
+                eventInput: null,
+                observation: observation.toJSON(),
+                reason: 'BRAKING_CLEARED'
+            };
+        }
+
+        brakingRiskStates.set(observation.targetId, targetState);
+        return createBrakingRiskSignal(observation, 'BRAKING_RISK_MAINTAINED');
+    }
+
+    if (accelerationMps2 <= BRAKING_RISK_RULE.ENTRY_THRESHOLD_MPS2) {
+        if (targetState.thresholdEnteredAt === null || observedAtMs < targetState.thresholdEnteredAt) {
+            targetState.thresholdEnteredAt = observedAtMs;
+        }
+
+        if (observedAtMs - targetState.thresholdEnteredAt >= BRAKING_RISK_RULE.MINIMUM_DURATION_MS) {
+            targetState.riskActive = true;
+            brakingRiskStates.set(observation.targetId, targetState);
+            return createBrakingRiskSignal(observation, 'BRAKING_RISK_CONFIRMED');
+        }
+
+        brakingRiskStates.set(observation.targetId, targetState);
+        return {
+            shouldCreateRisk: false,
+            shouldClearRisk: false,
+            eventInput: null,
+            observation: observation.toJSON(),
+            reason: 'BRAKING_MINIMUM_DURATION_PENDING'
+        };
+    }
+
+    brakingRiskStates.delete(observation.targetId);
+    return {
+        shouldCreateRisk: false,
+        shouldClearRisk: false,
+        eventInput: null,
+        observation: observation.toJSON(),
+        reason: 'BRAKING_BELOW_ENTRY_THRESHOLD'
+    };
+}
+
+function createBrakingRiskSignal(observation, reason) {
+    return {
+        shouldCreateRisk: true,
+        shouldClearRisk: false,
+        eventInput: {
+            eventType: 'HARD_BRAKING',
+            targetId: observation.targetId,
+            severity: 'HIGH'
+        },
+        observation: observation.toJSON(),
+        reason
+    };
+}
+
+function accelerationObservationToRiskSignal(observation) {
+    const accelerationMps2 = Number(observation.value);
+    if (!Number.isFinite(accelerationMps2)) {
+        return {
+            shouldCreateRisk: false,
+            shouldClearRisk: false,
+            eventInput: null,
+            observation: observation.toJSON(),
+            reason: 'INVALID_ACCELERATION_VALUE'
+        };
+    }
+
+    const observedAtMs = Date.parse(observation.observedAt);
+    const targetState = accelerationRiskStates.get(observation.targetId) || {
+        thresholdEnteredAt: null,
+        riskActive: false
+    };
+
+    if (targetState.riskActive) {
+        if (accelerationMps2 <= ACCELERATION_RISK_RULE.CLEAR_THRESHOLD_MPS2) {
+            accelerationRiskStates.delete(observation.targetId);
+            return {
+                shouldCreateRisk: false,
+                shouldClearRisk: true,
+                eventInput: null,
+                observation: observation.toJSON(),
+                reason: 'ACCELERATION_CLEARED'
+            };
+        }
+
+        accelerationRiskStates.set(observation.targetId, targetState);
+        return createAccelerationRiskSignal(observation, 'ACCELERATION_RISK_MAINTAINED');
+    }
+
+    if (accelerationMps2 >= ACCELERATION_RISK_RULE.ENTRY_THRESHOLD_MPS2) {
+        if (targetState.thresholdEnteredAt === null || observedAtMs < targetState.thresholdEnteredAt) {
+            targetState.thresholdEnteredAt = observedAtMs;
+        }
+
+        if (observedAtMs - targetState.thresholdEnteredAt >= ACCELERATION_RISK_RULE.MINIMUM_DURATION_MS) {
+            targetState.riskActive = true;
+            accelerationRiskStates.set(observation.targetId, targetState);
+            return createAccelerationRiskSignal(observation, 'ACCELERATION_RISK_CONFIRMED');
+        }
+
+        accelerationRiskStates.set(observation.targetId, targetState);
+        return {
+            shouldCreateRisk: false,
+            shouldClearRisk: false,
+            eventInput: null,
+            observation: observation.toJSON(),
+            reason: 'ACCELERATION_MINIMUM_DURATION_PENDING'
+        };
+    }
+
+    accelerationRiskStates.delete(observation.targetId);
+    return {
+        shouldCreateRisk: false,
+        shouldClearRisk: false,
+        eventInput: null,
+        observation: observation.toJSON(),
+        reason: 'ACCELERATION_BELOW_ENTRY_THRESHOLD'
+    };
+}
+
+function createAccelerationRiskSignal(observation, reason) {
+    return {
+        shouldCreateRisk: true,
+        shouldClearRisk: false,
+        eventInput: {
+            eventType: 'HARD_ACCELERATION',
+            targetId: observation.targetId,
+            severity: 'MEDIUM'
+        },
+        observation: observation.toJSON(),
+        reason
+    };
+}
+
+function tiltObservationToRiskSignal(observation) {
+    const tiltDegrees = Number(observation.value);
+    if (!Number.isFinite(tiltDegrees)) {
+        return {
+            shouldCreateRisk: false,
+            shouldClearRisk: false,
+            eventInput: null,
+            observation: observation.toJSON(),
+            reason: 'INVALID_TILT_VALUE'
+        };
+    }
+
+    const observedAtMs = Date.parse(observation.observedAt);
+    const targetState = tiltRiskStates.get(observation.targetId) || {
+        thresholdEnteredAt: null,
+        riskActive: false
+    };
+
+    if (targetState.riskActive) {
+        if (tiltDegrees < TILT_RISK_RULE.CLEAR_THRESHOLD_DEGREES) {
+            tiltRiskStates.delete(observation.targetId);
+            return {
+                shouldCreateRisk: false,
+                shouldClearRisk: true,
+                eventInput: null,
+                observation: observation.toJSON(),
+                reason: 'TILT_CLEARED'
+            };
+        }
+
+        tiltRiskStates.set(observation.targetId, targetState);
+        return createTiltRiskSignal(observation, 'TILT_RISK_MAINTAINED');
+    }
+
+    if (tiltDegrees >= TILT_RISK_RULE.ENTRY_THRESHOLD_DEGREES) {
+        if (targetState.thresholdEnteredAt === null || observedAtMs < targetState.thresholdEnteredAt) {
+            targetState.thresholdEnteredAt = observedAtMs;
+        }
+
+        if (observedAtMs - targetState.thresholdEnteredAt >= TILT_RISK_RULE.MINIMUM_DURATION_MS) {
+            targetState.riskActive = true;
+            tiltRiskStates.set(observation.targetId, targetState);
+            return createTiltRiskSignal(observation, 'TILT_RISK_CONFIRMED');
+        }
+
+        tiltRiskStates.set(observation.targetId, targetState);
+        return {
+            shouldCreateRisk: false,
+            shouldClearRisk: false,
+            eventInput: null,
+            observation: observation.toJSON(),
+            reason: 'TILT_MINIMUM_DURATION_PENDING'
+        };
+    }
+
+    tiltRiskStates.delete(observation.targetId);
+    return {
+        shouldCreateRisk: false,
+        shouldClearRisk: false,
+        eventInput: null,
+        observation: observation.toJSON(),
+        reason: 'TILT_BELOW_ENTRY_THRESHOLD'
+    };
+}
+
+function createTiltRiskSignal(observation, reason) {
+    return {
+        shouldCreateRisk: true,
+        shouldClearRisk: false,
+        eventInput: {
+            eventType: 'DANGEROUS_TILT',
+            targetId: observation.targetId,
+            severity: 'HIGH'
+        },
+        observation: observation.toJSON(),
+        reason
+    };
+}
+
+// ========================================
+// RISK EVENT STATE MACHINE
+// ========================================
+
+const EventState = Object.freeze({
+    NEW: 'NEW',
+    ACTIVE: 'ACTIVE',
+    ACKNOWLEDGED: 'ACKNOWLEDGED',
+    CLEARED: 'CLEARED'
+});
+
+class RiskEvent {
+    constructor({ eventId, eventType, targetId, severity, timestamp }) {
+        this.eventId = eventId;
+        this.eventType = eventType;
+        this.targetId = targetId;
+        this.createdTime = timestamp;
+        this.updatedTime = timestamp;
+        this.state = EventState.NEW;
+        this.severity = severity;
+        this.lastSpeechTime = null;
+        this.acknowledgedTime = null;
+        this.clearedTime = null;
+    }
+
+    toJSON() {
+        return {
+            eventId: this.eventId,
+            eventType: this.eventType,
+            targetId: this.targetId,
+            createdTime: this.createdTime,
+            updatedTime: this.updatedTime,
+            state: this.state,
+            severity: this.severity,
+            lastSpeechTime: this.lastSpeechTime,
+            acknowledgedTime: this.acknowledgedTime,
+            clearedTime: this.clearedTime
+        };
+    }
+}
+
+class EventStateMachine {
+    constructor({ activeSpeechInterval = 10000, maxHistorySize = 1000 } = {}) {
+        this.activeSpeechInterval = activeSpeechInterval;
+        this.maxHistorySize = maxHistorySize;
+        this.activeEvents = new Map();
+        this.eventHistory = [];
+        this.speechMetadata = new Map();
+        this.sequence = 0;
+    }
+
+    createEventId(eventType, targetId, now) {
+        this.sequence += 1;
+        const safeType = String(eventType).replace(/[^a-zA-Z0-9_-]/g, '-');
+        const safeTarget = String(targetId).replace(/[^a-zA-Z0-9_-]/g, '-');
+        return `${safeType}-${safeTarget}-${now}-${this.sequence}`;
+    }
+
+    getEventKey(eventType, targetId) {
+        return `${eventType}::${targetId}`;
+    }
+
+    observe({ eventType, targetId, severity, speechMessage, speechPriority = 'high' }) {
+        const now = Date.now();
+        const timestamp = new Date(now).toISOString();
+        const key = this.getEventKey(eventType, targetId);
+        let event = this.activeEvents.get(key);
+
+        if (!event) {
+            event = new RiskEvent({
+                eventId: this.createEventId(eventType, targetId, now),
+                eventType,
+                targetId,
+                severity,
+                timestamp
+            });
+            this.activeEvents.set(key, event);
+            this.eventHistory.push(event);
+            this.trimHistory();
+            this.speechMetadata.set(event.eventId, {
+                message: speechMessage,
+                priority: speechPriority
+            });
+            return {
+                event,
+                didSpeak: this.speakForEvent(event, now)
+            };
+        }
+
+        event.updatedTime = timestamp;
+        event.severity = severity;
+        this.speechMetadata.set(event.eventId, {
+            message: speechMessage,
+            priority: speechPriority
+        });
+
+        if (event.state === EventState.NEW) {
+            event.state = EventState.ACTIVE;
+        }
+
+        let didSpeak = false;
+        if (
+            event.state === EventState.ACTIVE &&
+            now - this.getTimestamp(event.lastSpeechTime) >= this.activeSpeechInterval
+        ) {
+            didSpeak = this.speakForEvent(event, now);
+        }
+
+        return { event, didSpeak };
+    }
+
+    acknowledge(eventId) {
+        const event = this.eventHistory.find(item => item.eventId === eventId);
+        if (!event || event.state === EventState.CLEARED) return null;
+
+        const timestamp = new Date().toISOString();
+        event.state = EventState.ACKNOWLEDGED;
+        event.updatedTime = timestamp;
+        event.acknowledgedTime = timestamp;
+
+        if (window.speechSynthesis) {
+            window.speechSynthesis.cancel();
+        }
+
+        return event;
+    }
+
+    clear(eventType, targetId) {
+        const key = this.getEventKey(eventType, targetId);
+        const event = this.activeEvents.get(key);
+        if (!event) return null;
+
+        const timestamp = new Date().toISOString();
+        event.state = EventState.CLEARED;
+        event.updatedTime = timestamp;
+        event.clearedTime = timestamp;
+        this.activeEvents.delete(key);
+        this.speechMetadata.delete(event.eventId);
+        this.trimHistory();
+        return event;
+    }
+
+    trimHistory() {
+        while (this.eventHistory.length > this.maxHistorySize) {
+            const removableIndex = this.eventHistory.findIndex(event => {
+                const key = this.getEventKey(event.eventType, event.targetId);
+                return this.activeEvents.get(key) !== event;
+            });
+
+            if (removableIndex === -1) {
+                break;
+            }
+
+            this.eventHistory.splice(removableIndex, 1);
+        }
+    }
+
+    clearUnobserved(eventType, observedTargetIds) {
+        const targets = new Set(observedTargetIds);
+        Array.from(this.activeEvents.values()).forEach(event => {
+            if (event.eventType === eventType && !targets.has(event.targetId)) {
+                this.clear(event.eventType, event.targetId);
+            }
+        });
+    }
+
+    clearAll() {
+        Array.from(this.activeEvents.values()).forEach(event => {
+            this.clear(event.eventType, event.targetId);
+        });
+    }
+
+    speakForEvent(event, now) {
+        if (event.state === EventState.ACKNOWLEDGED || event.state === EventState.CLEARED) {
+            return false;
+        }
+
+        const speech = this.speechMetadata.get(event.eventId);
+        if (!speech || !speech.message) return false;
+
+        speak(speech.message, speech.priority);
+        event.lastSpeechTime = new Date(now).toISOString();
+        return true;
+    }
+
+    getTimestamp(timestamp) {
+        if (!timestamp) return 0;
+        const value = Date.parse(timestamp);
+        return Number.isNaN(value) ? 0 : value;
+    }
+
+    toJSON() {
+        return this.eventHistory.map(event => event.toJSON());
+    }
+}
+
+const riskEventStateMachine = new EventStateMachine({
+    activeSpeechInterval: 10000,
+    maxHistorySize: 1000
+});
+
+function acknowledgeRiskEvent(eventId) {
+    return riskEventStateMachine.acknowledge(eventId);
+}
+
+function getActiveRiskEvents() {
+    return Array.from(riskEventStateMachine.activeEvents.values())
+        .filter(event => event.state !== EventState.CLEARED)
+        .map(event => event.toJSON());
+}
+
+function getRiskEventHistory() {
+    return riskEventStateMachine.toJSON();
+}
+
+function getRiskEvents() {
+    return getRiskEventHistory();
+}
+
+// ========================================
 // DIGITAL TWIN ANIMATION SYSTEM
 // ========================================
 
@@ -850,8 +1455,61 @@ function moveForklifts() {
     detectCollisions();
 }
 
+let humanProximityObservationSequence = 0;
+const humanProximityTestStates = new Map();
+const HUMAN_PROXIMITY_TEST_DURATION_MS = 300;
+const HUMAN_PROXIMITY_TEST_DISTANCE = 60;
+const HUMAN_PROXIMITY_TEST_CLEAR_DISTANCE = 140;
+const HUMAN_PROXIMITY_SENSOR_ID = 'CCTV-07';
+const HUMAN_POSITIONS = Object.freeze([
+    Object.freeze({ x: 520, y: 230, id: 'P02' })
+]);
+
+function getHumanProximityTargetId(forkliftId, personId) {
+    const normalizedForkliftId = String(forkliftId).replace(/[^a-zA-Z0-9]/g, '');
+    const normalizedPersonId = String(personId).replace(/[^a-zA-Z0-9]/g, '');
+    return `${normalizedForkliftId}|${normalizedPersonId}`;
+}
+
+function createHumanProximityObservation(forklift, humanPosition, observedAtMs = Date.now()) {
+    humanProximityObservationSequence += 1;
+    const pedestrianDetected = Boolean(document.getElementById(`pedestrian-${humanPosition.id}`));
+    const targetId = getHumanProximityTargetId(forklift.id, humanPosition.id);
+    const calculatedDistance = pedestrianDetected
+        ? Math.hypot(forklift.x - humanPosition.x, forklift.y - humanPosition.y)
+        : HUMAN_PROXIMITY_TEST_CLEAR_DISTANCE;
+    const testState = humanProximityTestStates.get(targetId);
+    const testElapsedMs = testState ? observedAtMs - testState.startedAt : 0;
+    const distance = testState
+        ? (testElapsedMs < HUMAN_PROXIMITY_TEST_DURATION_MS
+            ? HUMAN_PROXIMITY_TEST_DISTANCE
+            : HUMAN_PROXIMITY_TEST_CLEAR_DISTANCE)
+        : calculatedDistance;
+
+    return new SensorObservation({
+        observationId: `human-proximity-${forklift.id}-${observedAtMs}-${humanProximityObservationSequence}`,
+        observationType: ObservationType.HUMAN_PROXIMITY,
+        sensorId: HUMAN_PROXIMITY_SENSOR_ID,
+        targetId,
+        value: distance,
+        unit: 'map-unit',
+        confidence: pedestrianDetected || testState ? 1 : 0,
+        observedAt: new Date(observedAtMs).toISOString(),
+        metadata: {
+            source: testState ? 'human-proximity-test' : 'cctv-simulation',
+            forkliftId: forklift.id,
+            personId: humanPosition.id,
+            humanDetected: pedestrianDetected || Boolean(testState),
+            forkliftPosition: { x: forklift.x, y: forklift.y },
+            humanPosition: { x: humanPosition.x, y: humanPosition.y }
+        }
+    });
+}
+
 // Detect Collisions
 function detectCollisions() {
+    const observedCollisions = new Set();
+
     for (let i = 0; i < animationState.forklifts.length; i++) {
         for (let j = i + 1; j < animationState.forklifts.length; j++) {
             const f1 = animationState.forklifts[i];
@@ -863,30 +1521,41 @@ function detectCollisions() {
             
             // Show danger zone and voice warning
             if (distance < 80) {
+                const collisionTargetId = getCollisionTargetId(f1.id, f2.id);
+                observedCollisions.add(collisionTargetId);
                 showDangerZone(f1, f2, distance);
                 // Automatic voice warning
                 speakCollisionWarning(f1, f2);
             }
         }
     }
+    riskEventStateMachine.clearUnobserved('COLLISION_RISK', observedCollisions);
     
-    // Check pedestrian proximity
-    const pedestrian = document.getElementById('pedestrian-P02');
-    if (pedestrian) {
-        animationState.forklifts.forEach(f => {
-            const dist = Math.sqrt(Math.pow(f.x - 520, 2) + Math.pow(f.y - 230, 2));
-            if (dist < 100) {
-                speakPedestrianWarning(f.id);
+    // Human Proximity Observations
+    const observedAtMs = Date.now();
+    animationState.forklifts.forEach(f => {
+        HUMAN_POSITIONS.forEach(humanPosition => {
+            const observation = createHumanProximityObservation(f, humanPosition, observedAtMs);
+            const riskSignal = observationToRiskSignal(observation);
+            if (riskSignal.shouldCreateRisk) {
+                const result = handleHumanProximity(f, riskSignal.eventInput);
+                notifyHumanProximityTestActive(observation.targetId, result);
+            } else if (riskSignal.shouldClearRisk) {
+                const clearedEvent = riskEventStateMachine.clear('HUMAN_PROXIMITY', observation.targetId);
+                finishHumanProximityTest(observation.targetId, clearedEvent);
             }
         });
-    }
+    });
     
     // Check speed violations in pedestrian zone
+    const observedSpeedRisks = new Set();
     animationState.forklifts.forEach(f => {
         if (f.x >= 50 && f.x <= 150 && f.y >= 250 && f.y <= 350 && f.speed > 2.0) {
+            observedSpeedRisks.add(f.id);
             speakSpeedWarning(f.id, '보행자 구역');
         }
     });
+    riskEventStateMachine.clearUnobserved('SPEED_VIOLATION', observedSpeedRisks);
 }
 
 // Show Danger Zone
@@ -911,9 +1580,6 @@ function showDangerZone(f1, f2, distance) {
     `;
     svg.appendChild(g);
     
-    // 🔊 Automatic voice warning
-    speakCollisionWarning(f1, f2);
-    
     // Remove after 2 seconds
     setTimeout(() => {
         const zone = document.getElementById('danger-zone');
@@ -925,6 +1591,7 @@ function showDangerZone(f1, f2, distance) {
 function resetDigitalTwinView() {
     // Reset forklift positions
     stopAnimation();
+    riskEventStateMachine.clearAll();
     initializeAnimatedForklifts();
     startAnimation();
 }
@@ -1370,9 +2037,7 @@ function showNotificationPopup(message, type = 'info') {
 
 // Global TTS State
 const ttsState = {
-    enabled: true,
-    lastWarningTime: {},
-    warningCooldown: 3000 // 3 seconds between same warnings
+    enabled: true
 };
 
 // Initialize TTS
@@ -1410,19 +2075,6 @@ function speak(text, priority = 'normal') {
     window.speechSynthesis.speak(utterance);
 }
 
-// Check Warning Cooldown
-function canSpeak(warningId) {
-    const now = Date.now();
-    const lastTime = ttsState.lastWarningTime[warningId] || 0;
-    
-    if (now - lastTime < ttsState.warningCooldown) {
-        return false;
-    }
-    
-    ttsState.lastWarningTime[warningId] = now;
-    return true;
-}
-
 // Convert Forklift ID to natural speech
 function formatForkliftIdForSpeech(id) {
     // Convert "F-07" to "에프공칠"
@@ -1453,41 +2105,92 @@ function formatForkliftIdForSpeech(id) {
     return `에프${spokenNumber}`;
 }
 
-// Collision Warning Voice
-function speakCollisionWarning(forklift1, forklift2) {
-    const warningId = `collision_${forklift1.id}_${forklift2.id}`;
-    
-    if (!canSpeak(warningId)) return;
-    
-    const f1Name = formatForkliftIdForSpeech(forklift1.id);
-    const f2Name = formatForkliftIdForSpeech(forklift2.id);
-    
-    const message = `경고! ${f1Name}과 ${f2Name} 충돌 위험! 속도를 줄이세요!`;
-    speak(message, 'high');
+function getCollisionTargetId(forkliftId1, forkliftId2) {
+    return [forkliftId1, forkliftId2].sort().join('|');
 }
 
-// Pedestrian Warning Voice
-function speakPedestrianWarning(forkliftId) {
-    const warningId = `pedestrian_${forkliftId}`;
-    
-    if (!canSpeak(warningId)) return;
-    
-    const forkliftName = formatForkliftIdForSpeech(forkliftId);
-    
+// Collision Warning Voice
+function speakCollisionWarning(forklift1, forklift2) {
+    const f1Name = formatForkliftIdForSpeech(forklift1.id);
+    const f2Name = formatForkliftIdForSpeech(forklift2.id);
+    const message = `경고! ${f1Name}과 ${f2Name} 충돌 위험! 속도를 줄이세요!`;
+    const result = riskEventStateMachine.observe({
+        eventType: 'COLLISION_RISK',
+        targetId: getCollisionTargetId(forklift1.id, forklift2.id),
+        severity: 'HIGH',
+        speechMessage: message,
+        speechPriority: 'high'
+    });
+    return result.didSpeak;
+}
+
+// Human Proximity Warning
+function handleHumanProximity(forklift, eventInput = {}) {
+    const forkliftName = formatForkliftIdForSpeech(forklift.id);
     const message = `${forkliftName} 정지! 보행자 접근 중입니다!`;
-    speak(message, 'high');
+    const result = riskEventStateMachine.observe({
+        eventType: eventInput.eventType || 'HUMAN_PROXIMITY',
+        targetId: eventInput.targetId || getHumanProximityTargetId(forklift.id, HUMAN_POSITIONS[0].id),
+        severity: eventInput.severity || 'CRITICAL',
+        speechMessage: message,
+        speechPriority: 'high'
+    });
+    if (result.didSpeak) {
+        showWarningIndicator(forklift, 'HUMAN PROXIMITY', '#ef4444');
+    }
+    return result;
+}
+
+function triggerHumanProximityTest() {
+    const forklift = animationState.forklifts.find(item => item.id === 'F-03');
+    if (!forklift) {
+        showNotificationPopup('HUMAN_PROXIMITY test target F-03 was not found.', 'error');
+        return;
+    }
+
+    const targetId = getHumanProximityTargetId(forklift.id, HUMAN_POSITIONS[0].id);
+    if (humanProximityTestStates.has(targetId)) {
+        showNotificationPopup('HUMAN_PROXIMITY test is already running.', 'warning');
+        return;
+    }
+
+    humanProximityTestStates.set(targetId, {
+        startedAt: Date.now(),
+        activeNotified: false
+    });
+    showNotificationPopup('F-03 HUMAN_PROXIMITY TEST started (60 map-unit, 300ms)', 'info');
+    startAnimation();
+}
+
+function notifyHumanProximityTestActive(targetId, result) {
+    const testState = humanProximityTestStates.get(targetId);
+    if (!testState || testState.activeNotified || !result || result.event.state !== EventState.ACTIVE) {
+        return;
+    }
+
+    testState.activeNotified = true;
+    showNotificationPopup(`HUMAN_PROXIMITY ACTIVE · ${result.event.eventId}`, 'warning');
+}
+
+function finishHumanProximityTest(targetId, clearedEvent) {
+    if (!humanProximityTestStates.has(targetId) || !clearedEvent) return;
+
+    humanProximityTestStates.delete(targetId);
+    showNotificationPopup(`HUMAN_PROXIMITY CLEARED · ${clearedEvent.eventId}`, 'success');
 }
 
 // Speed Violation Warning Voice
 function speakSpeedWarning(forkliftId, zone) {
-    const warningId = `speed_${forkliftId}`;
-    
-    if (!canSpeak(warningId)) return;
-    
     const forkliftName = formatForkliftIdForSpeech(forkliftId);
-    
     const message = `${forkliftName} 과속! ${zone} 구역에서 속도를 줄이세요!`;
-    speak(message, 'high');
+    const result = riskEventStateMachine.observe({
+        eventType: 'SPEED_VIOLATION',
+        targetId: forkliftId,
+        severity: 'HIGH',
+        speechMessage: message,
+        speechPriority: 'high'
+    });
+    return result.didSpeak;
 }
 
 // Scenario Announcement
@@ -1537,12 +2240,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // IMU Detection Thresholds
 const IMU_THRESHOLDS = {
-    HARD_ACCEL: 3.0,      // m/s² - 급가속
-    HARD_BRAKE: -3.0,     // m/s² - 급감속
-    SHARP_TURN: 45,       // °/s - 급회전
-    TILT_WARNING: 15,     // ° - 기울기 경고
-    TILT_DANGER: 25       // ° - 기울기 위험
+    TILT_WARNING: 15      // ° - 기울기 경고
 };
+
+let imuObservationSequence = 0;
+const accelerationTestStates = new Map();
+const ACCELERATION_TEST_DURATION_MS = 300;
+const ACCELERATION_TEST_VALUE_MPS2 = 3.5;
+const brakingTestStates = new Map();
+const BRAKING_TEST_DURATION_MS = 300;
+const BRAKING_TEST_VALUE_MPS2 = -3.5;
+const turnRateTestStates = new Map();
+const TURN_RATE_TEST_DURATION_MS = 300;
+const TURN_RATE_TEST_VALUE_DPS = 60;
+const TURN_RATE_TEST_MINIMUM_SPEED = 1.2;
 
 // Update IMU Data for Forklifts
 function updateIMUData() {
@@ -1553,82 +2264,387 @@ function updateIMUData() {
         const deltaTime = (now - f.lastAccelTime) / 1000; // seconds
         const deltaSpeed = f.speed - f.prevSpeed;
         f.accel = deltaSpeed / (deltaTime || 0.05); // m/s²
+
+        const accelerationTestState = accelerationTestStates.get(f.id);
+        if (accelerationTestState) {
+            const elapsedMs = now - accelerationTestState.startedAt;
+            f.accel = elapsedMs < ACCELERATION_TEST_DURATION_MS
+                ? ACCELERATION_TEST_VALUE_MPS2
+                : 0;
+        }
+
+        const brakingTestState = brakingTestStates.get(f.id);
+        if (brakingTestState) {
+            const elapsedMs = now - brakingTestState.startedAt;
+            f.accel = elapsedMs < BRAKING_TEST_DURATION_MS
+                ? BRAKING_TEST_VALUE_MPS2
+                : 0;
+        }
         
         // Update previous values
         f.prevSpeed = f.speed;
         f.lastAccelTime = now;
         
-        // Calculate gyro (angular velocity) - simplified
-        f.gyro = Math.abs(deltaSpeed) * 10; // Simplified rotation rate
+        calculateTurnRate(f, now);
         
         // Simulate tilt based on speed (higher speed = more tilt in turns)
         f.tilt = Math.min(Math.abs(f.speed) * 2, 20);
         
+        const tiltObservation = createTiltObservation(f, now);
+        const accelerationObservation = createAccelerationObservation(f, now);
+        const brakingObservation = createBrakingObservation(f, now);
+        const turnRateObservation = createTurnRateObservation(f, now);
+        f.gyro = turnRateObservation.value;
+
         // Detect anomalies
-        detectIMUAnomalies(f);
+        detectIMUAnomalies(
+            f,
+            tiltObservation,
+            accelerationObservation,
+            brakingObservation,
+            turnRateObservation
+        );
+    });
+}
+
+function calculateTurnRate(forklift, observedAtMs = Date.now()) {
+    const currentDirection = Number(forklift.direction);
+    const previousDirection = Number(forklift.previousDirection);
+    const previousTimestamp = Number(forklift.previousTurnTimestamp);
+
+    forklift.turnRatePreviousDirection = Number.isFinite(previousDirection)
+        ? previousDirection
+        : currentDirection;
+
+    if (
+        !Number.isFinite(currentDirection) ||
+        !Number.isFinite(previousDirection) ||
+        !Number.isFinite(previousTimestamp)
+    ) {
+        forklift.calculatedTurnRate = 0;
+    } else {
+        const elapsedSeconds = (observedAtMs - previousTimestamp) / 1000;
+        const rawDelta = currentDirection - previousDirection;
+        const normalizedDelta = ((rawDelta + 540) % 360) - 180;
+        forklift.calculatedTurnRate = elapsedSeconds >= 0.001
+            ? normalizedDelta / elapsedSeconds
+            : 0;
+    }
+
+    forklift.previousDirection = currentDirection;
+    forklift.previousTurnTimestamp = observedAtMs;
+    return forklift.calculatedTurnRate;
+}
+
+function createTiltObservation(forklift, observedAtMs = Date.now()) {
+    imuObservationSequence += 1;
+    const imuSensor = sensorData.imu.find(sensor => sensor.forklift === forklift.id);
+
+    return new SensorObservation({
+        observationId: `tilt-${forklift.id}-${observedAtMs}-${imuObservationSequence}`,
+        observationType: ObservationType.TILT,
+        sensorId: imuSensor ? imuSensor.id : `imu-sim-${forklift.id}`,
+        targetId: forklift.id,
+        value: forklift.tilt,
+        unit: 'degree',
+        confidence: 1,
+        observedAt: new Date(observedAtMs).toISOString(),
+        metadata: { source: 'imu-simulation' }
+    });
+}
+
+function createAccelerationObservation(forklift, observedAtMs = Date.now()) {
+    imuObservationSequence += 1;
+    const imuSensor = sensorData.imu.find(sensor => sensor.forklift === forklift.id);
+
+    return new SensorObservation({
+        observationId: `acceleration-${forklift.id}-${observedAtMs}-${imuObservationSequence}`,
+        observationType: ObservationType.ACCELERATION,
+        sensorId: imuSensor ? imuSensor.id : `imu-sim-${forklift.id}`,
+        targetId: forklift.id,
+        value: forklift.accel,
+        unit: 'm/s²',
+        confidence: 1,
+        observedAt: new Date(observedAtMs).toISOString(),
+        metadata: { source: 'imu-simulation' }
+    });
+}
+
+function createBrakingObservation(forklift, observedAtMs = Date.now()) {
+    imuObservationSequence += 1;
+    const imuSensor = sensorData.imu.find(sensor => sensor.forklift === forklift.id);
+
+    return new SensorObservation({
+        observationId: `braking-${forklift.id}-${observedAtMs}-${imuObservationSequence}`,
+        observationType: ObservationType.BRAKING,
+        sensorId: imuSensor ? imuSensor.id : `imu-sim-${forklift.id}`,
+        targetId: forklift.id,
+        value: forklift.accel,
+        unit: 'm/s²',
+        confidence: 1,
+        observedAt: new Date(observedAtMs).toISOString(),
+        metadata: { source: 'imu-simulation' }
+    });
+}
+
+function createTurnRateObservation(forklift, observedAtMs = Date.now()) {
+    imuObservationSequence += 1;
+    const imuSensor = sensorData.imu.find(sensor => sensor.forklift === forklift.id);
+    const testState = turnRateTestStates.get(forklift.id);
+    const testElapsedMs = testState ? observedAtMs - testState.startedAt : 0;
+    const turnRate = testState
+        ? (testElapsedMs < TURN_RATE_TEST_DURATION_MS ? TURN_RATE_TEST_VALUE_DPS : 0)
+        : forklift.calculatedTurnRate;
+    const evaluationSpeed = testState && forklift.speed < TURN_RATE_RISK_RULE.MINIMUM_SPEED
+        ? TURN_RATE_TEST_MINIMUM_SPEED
+        : forklift.speed;
+    const turnDirection = turnRate > 0 ? 'RIGHT' : turnRate < 0 ? 'LEFT' : 'STRAIGHT';
+
+    return new SensorObservation({
+        observationId: `turn-rate-${forklift.id}-${observedAtMs}-${imuObservationSequence}`,
+        observationType: ObservationType.TURN_RATE,
+        sensorId: imuSensor ? imuSensor.id : `imu-sim-${forklift.id}`,
+        targetId: forklift.id,
+        value: turnRate,
+        unit: 'degree/second',
+        confidence: 1,
+        observedAt: new Date(observedAtMs).toISOString(),
+        metadata: {
+            source: 'imu-simulation',
+            speed: evaluationSpeed,
+            direction: forklift.direction,
+            previousDirection: forklift.turnRatePreviousDirection,
+            turnDirection
+        }
     });
 }
 
 // Detect IMU Anomalies
-function detectIMUAnomalies(forklift) {
-    // Hard Acceleration
-    if (forklift.accel > IMU_THRESHOLDS.HARD_ACCEL) {
-        handleHardAcceleration(forklift);
+function detectIMUAnomalies(
+    forklift,
+    tiltObservation,
+    accelerationObservation,
+    brakingObservation,
+    turnRateObservation
+) {
+    // Hard Acceleration Observation
+    const accelerationRiskSignal = observationToRiskSignal(accelerationObservation);
+    if (accelerationRiskSignal.shouldCreateRisk) {
+        const result = handleHardAcceleration(forklift, accelerationRiskSignal.eventInput);
+        notifyAccelerationTestActive(forklift.id, result);
+    } else if (accelerationRiskSignal.shouldClearRisk) {
+        const clearedEvent = riskEventStateMachine.clear('HARD_ACCELERATION', forklift.id);
+        finishAccelerationTest(forklift.id, clearedEvent);
     }
     
-    // Hard Braking
-    if (forklift.accel < IMU_THRESHOLDS.HARD_BRAKE) {
-        handleHardBraking(forklift);
+    // Hard Braking Observation
+    const brakingRiskSignal = observationToRiskSignal(brakingObservation);
+    if (brakingRiskSignal.shouldCreateRisk) {
+        const result = handleHardBraking(forklift, brakingRiskSignal.eventInput);
+        notifyBrakingTestActive(forklift.id, result);
+    } else if (brakingRiskSignal.shouldClearRisk) {
+        const clearedEvent = riskEventStateMachine.clear('HARD_BRAKING', forklift.id);
+        finishBrakingTest(forklift.id, clearedEvent);
     }
     
-    // Sharp Turn
-    if (forklift.gyro > IMU_THRESHOLDS.SHARP_TURN) {
-        handleSharpTurn(forklift);
+    // Sharp Turn Observation
+    const turnRateRiskSignal = observationToRiskSignal(turnRateObservation);
+    if (turnRateRiskSignal.shouldCreateRisk) {
+        const result = handleSharpTurn(forklift, turnRateRiskSignal.eventInput);
+        notifyTurnRateTestActive(forklift.id, result);
+    } else if (turnRateRiskSignal.shouldClearRisk) {
+        const clearedEvent = riskEventStateMachine.clear('SHARP_TURN', forklift.id);
+        finishTurnRateTest(forklift.id, clearedEvent);
     }
     
-    // Dangerous Tilt
-    if (forklift.tilt > IMU_THRESHOLDS.TILT_DANGER) {
-        handleDangerousTilt(forklift);
+    // Dangerous Tilt Observation
+    const tiltRiskSignal = observationToRiskSignal(tiltObservation);
+    if (tiltRiskSignal.shouldCreateRisk) {
+        handleDangerousTilt(forklift, tiltRiskSignal.eventInput);
+    } else if (tiltRiskSignal.shouldClearRisk) {
+        riskEventStateMachine.clear('DANGEROUS_TILT', forklift.id);
     }
 }
 
 // Handle Hard Acceleration
-function handleHardAcceleration(forklift) {
-    const warningId = `accel_${forklift.id}`;
-    if (!canSpeak(warningId)) return;
-    
+function handleHardAcceleration(forklift, eventInput = {}) {
     const name = formatForkliftIdForSpeech(forklift.id);
-    speak(`${name} 급가속 감지! 속도를 조절하세요!`, 'high');
-    showWarningIndicator(forklift, '⚡ 급가속', '#FF9800');
+    const result = riskEventStateMachine.observe({
+        eventType: eventInput.eventType || 'HARD_ACCELERATION',
+        targetId: eventInput.targetId || forklift.id,
+        severity: eventInput.severity || 'MEDIUM',
+        speechMessage: `${name} 급가속 감지! 속도를 조절하세요!`,
+        speechPriority: 'high'
+    });
+    if (result.didSpeak) {
+        showWarningIndicator(forklift, '⚡ 급가속', '#FF9800');
+    }
+    return result;
+}
+
+function triggerAccelerationTest() {
+    const forklift = animationState.forklifts.find(item => item.id === 'F-07');
+    if (!forklift) {
+        showNotificationPopup('급가속 테스트 대상 F-07을 찾을 수 없습니다.', 'error');
+        return;
+    }
+
+    if (accelerationTestStates.has(forklift.id)) {
+        showNotificationPopup('급가속 테스트가 이미 실행 중입니다.', 'warning');
+        return;
+    }
+
+    accelerationTestStates.set(forklift.id, {
+        startedAt: Date.now(),
+        activeNotified: false
+    });
+    showNotificationPopup('F-07 급가속 테스트 시작 (3.5m/s², 300ms)', 'info');
+    startAnimation();
+}
+
+function notifyAccelerationTestActive(targetId, result) {
+    const testState = accelerationTestStates.get(targetId);
+    if (!testState || testState.activeNotified || !result || result.event.state !== EventState.ACTIVE) {
+        return;
+    }
+
+    testState.activeNotified = true;
+    showNotificationPopup(`HARD_ACCELERATION ACTIVE · ${result.event.eventId}`, 'warning');
+}
+
+function finishAccelerationTest(targetId, clearedEvent) {
+    if (!accelerationTestStates.has(targetId) || !clearedEvent) return;
+
+    accelerationTestStates.delete(targetId);
+    showNotificationPopup(`HARD_ACCELERATION CLEARED · ${clearedEvent.eventId}`, 'success');
+}
+
+function triggerBrakingTest() {
+    const forklift = animationState.forklifts.find(item => item.id === 'F-07');
+    if (!forklift) {
+        showNotificationPopup('급제동 테스트 대상 F-07을 찾을 수 없습니다.', 'error');
+        return;
+    }
+
+    startBrakingTest(forklift, true);
+}
+
+function startBrakingTest(forklift, showStartNotification) {
+    if (brakingTestStates.has(forklift.id)) {
+        if (showStartNotification) {
+            showNotificationPopup('급제동 테스트가 이미 실행 중입니다.', 'warning');
+        }
+        return false;
+    }
+
+    brakingTestStates.set(forklift.id, {
+        startedAt: Date.now(),
+        activeNotified: false
+    });
+    if (showStartNotification) {
+        showNotificationPopup('F-07 급제동 테스트 시작 (-3.5m/s², 300ms)', 'info');
+    }
+    startAnimation();
+    return true;
+}
+
+function notifyBrakingTestActive(targetId, result) {
+    const testState = brakingTestStates.get(targetId);
+    if (!testState || testState.activeNotified || !result || result.event.state !== EventState.ACTIVE) {
+        return;
+    }
+
+    testState.activeNotified = true;
+    showNotificationPopup(`HARD_BRAKING ACTIVE · ${result.event.eventId}`, 'warning');
+}
+
+function finishBrakingTest(targetId, clearedEvent) {
+    if (!brakingTestStates.has(targetId) || !clearedEvent) return;
+
+    brakingTestStates.delete(targetId);
+    showNotificationPopup(`HARD_BRAKING CLEARED · ${clearedEvent.eventId}`, 'success');
 }
 
 // Handle Hard Braking
-function handleHardBraking(forklift) {
-    const warningId = `brake_${forklift.id}`;
-    if (!canSpeak(warningId)) return;
-    
+function handleHardBraking(forklift, eventInput = {}) {
     const name = formatForkliftIdForSpeech(forklift.id);
-    speak(`${name} 급브레이크! 충격 감지!`, 'high');
-    showWarningIndicator(forklift, '🛑 급정지', '#ef4444');
+    const result = riskEventStateMachine.observe({
+        eventType: eventInput.eventType || 'HARD_BRAKING',
+        targetId: eventInput.targetId || forklift.id,
+        severity: eventInput.severity || 'HIGH',
+        speechMessage: `${name} 급브레이크! 충격 감지!`,
+        speechPriority: 'high'
+    });
+    if (result.didSpeak) {
+        showWarningIndicator(forklift, '🛑 급정지', '#ef4444');
+    }
+    return result;
+}
+
+function triggerTurnRateTest() {
+    const forklift = animationState.forklifts.find(item => item.id === 'F-12');
+    if (!forklift) {
+        showNotificationPopup('급회전 테스트 대상 F-12를 찾을 수 없습니다.', 'error');
+        return;
+    }
+
+    if (turnRateTestStates.has(forklift.id)) {
+        showNotificationPopup('급회전 테스트가 이미 실행 중입니다.', 'warning');
+        return;
+    }
+
+    turnRateTestStates.set(forklift.id, {
+        startedAt: Date.now(),
+        activeNotified: false
+    });
+    showNotificationPopup('F-12 급회전 테스트 시작 (+60°/s, 300ms)', 'info');
+    startAnimation();
+}
+
+function notifyTurnRateTestActive(targetId, result) {
+    const testState = turnRateTestStates.get(targetId);
+    if (!testState || testState.activeNotified || !result || result.event.state !== EventState.ACTIVE) {
+        return;
+    }
+
+    testState.activeNotified = true;
+    showNotificationPopup(`SHARP_TURN ACTIVE · ${result.event.eventId}`, 'warning');
+}
+
+function finishTurnRateTest(targetId, clearedEvent) {
+    if (!turnRateTestStates.has(targetId) || !clearedEvent) return;
+
+    turnRateTestStates.delete(targetId);
+    showNotificationPopup(`SHARP_TURN CLEARED · ${clearedEvent.eventId}`, 'success');
 }
 
 // Handle Sharp Turn
-function handleSharpTurn(forklift) {
-    const warningId = `turn_${forklift.id}`;
-    if (!canSpeak(warningId)) return;
-    
+function handleSharpTurn(forklift, eventInput = {}) {
     const name = formatForkliftIdForSpeech(forklift.id);
-    speak(`${name} 급회전 주의!`, 'normal');
-    showWarningIndicator(forklift, '🔄 급회전', '#3b82f6');
+    const result = riskEventStateMachine.observe({
+        eventType: eventInput.eventType || 'SHARP_TURN',
+        targetId: eventInput.targetId || forklift.id,
+        severity: eventInput.severity || 'MEDIUM',
+        speechMessage: `${name} 급회전 주의!`,
+        speechPriority: 'normal'
+    });
+    if (result.didSpeak) {
+        showWarningIndicator(forklift, '🔄 급회전', '#3b82f6');
+    }
+    return result;
 }
 
 // Handle Dangerous Tilt
-function handleDangerousTilt(forklift) {
-    const warningId = `tilt_${forklift.id}`;
-    if (!canSpeak(warningId)) return;
-    
+function handleDangerousTilt(forklift, eventInput = {}) {
     const name = formatForkliftIdForSpeech(forklift.id);
-    speak(`${name} 기울기 위험! 과적재 확인하세요!`, 'high');
+    const result = riskEventStateMachine.observe({
+        eventType: eventInput.eventType || 'DANGEROUS_TILT',
+        targetId: eventInput.targetId || forklift.id,
+        severity: eventInput.severity || 'HIGH',
+        speechMessage: `${name} 기울기 위험! 과적재 확인하세요!`,
+        speechPriority: 'high'
+    });
+    if (!result.didSpeak) return;
     showWarningIndicator(forklift, '⚠️ 기울기 위험', '#f59e0b');
 }
 
@@ -1703,7 +2719,7 @@ function triggerScenario4() {
     setTimeout(() => {
         if (f07) {
             f07.speed = 0; // Emergency stop
-            handleHardBraking(f07);
+            startBrakingTest(f07, false);
         }
     }, 2000);
     

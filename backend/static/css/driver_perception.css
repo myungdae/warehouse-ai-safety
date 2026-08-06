@@ -1,0 +1,61 @@
+.driver-perception {
+    margin: 26px 0;
+    padding: 24px;
+    border: 1px solid rgba(0, 212, 255, .28);
+    border-radius: 16px;
+    background: rgba(7, 11, 20, .72);
+}
+.driver-perception__header,
+.driver-perception__controls,
+.driver-perception__status,
+.driver-perception__notices { display: flex; gap: 12px; flex-wrap: wrap; }
+.driver-perception__header { justify-content: space-between; align-items: start; }
+.driver-perception__title { margin: 0 0 8px; }
+.driver-perception__copy { margin: 0; color: #8b949e; line-height: 1.6; }
+.driver-perception__controls { margin: 20px 0; align-items: end; }
+.driver-perception__field { display: grid; gap: 7px; min-width: 260px; color: #aab6c5; font-size: 13px; }
+.driver-perception select,
+.driver-perception button { padding: 10px 14px; border: 1px solid rgba(148,163,184,.25); border-radius: 8px; color: #e6edf3; background: #111a2d; }
+.driver-perception button { cursor: pointer; font-weight: 700; }
+.driver-perception button:disabled { cursor: not-allowed; opacity: .45; }
+.driver-perception__preview { position: relative; width: min(100%, 640px); aspect-ratio: 4 / 3; }
+.driver-perception__video { display: block; width: 100%; height: 100%; border-radius: 12px; background: #020409; object-fit: cover; }
+.driver-perception__overlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.driver-perception__status { margin-top: 16px; }
+.driver-perception__metric { min-width: 145px; padding: 12px; border: 1px solid rgba(148,163,184,.18); border-radius: 9px; }
+.driver-perception__metric span { display: block; margin-bottom: 5px; color: #8b949e; font-size: 11px; }
+.driver-perception__metric strong { color: #00d4ff; font-size: 13px; }
+.driver-perception__notices { margin-top: 18px; }
+.driver-perception__metric-groups { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 18px; }
+.driver-perception__group { padding: 16px; border: 1px solid rgba(148,163,184,.18); border-radius: 10px; background: rgba(2,4,9,.45); }
+.driver-perception__group h3 { margin: 0 0 12px; font-size: 15px; }
+.driver-perception__group h3 small, .driver-perception__group > small { color: #facc15; font-size: 10px; }
+.driver-perception__group dl { display: grid; gap: 7px; margin: 0; }
+.driver-perception__group dl div { display: flex; justify-content: space-between; gap: 12px; }
+.driver-perception__group dt { color: #8b949e; font-size: 12px; }
+.driver-perception__group dd { margin: 0; color: #00d4ff; font: 12px ui-monospace, monospace; }
+.driver-perception__snapshot { margin-top: 16px; color: #aab6c5; }
+.driver-perception__snapshot pre { max-height: 320px; overflow: auto; padding: 12px; color: #9feaf9; background: #020409; }
+.driver-perception__bridge { margin-top: 20px; padding: 18px; border: 1px solid rgba(34,197,94,.35); border-radius: 12px; background: rgba(5,46,22,.16); }
+.driver-perception__bridge h3 { margin: 0 0 8px; color: #4ade80; }
+.driver-perception__mouth { border-color: rgba(245,158,11,.35); }
+.driver-perception__mouth h3, .driver-perception__mouth dd { color: #fbbf24; }
+.driver-perception__debug { margin-top: 16px; padding: 14px; border: 1px dashed rgba(148,163,184,.35); color: #aab6c5; }
+.driver-perception__debug summary { cursor: pointer; color: #facc15; font-weight: 800; }
+.driver-perception__debug-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin-top: 14px; }
+.driver-perception__debug-grid section { padding: 12px; background: rgba(2,4,9,.45); }
+.driver-perception__debug-grid h3 { color: #94a3b8; }
+.driver-perception__debug-grid dl div { display: flex; justify-content: space-between; gap: 12px; font-size: 11px; }
+@media (max-width: 900px) { .driver-perception__debug-grid { grid-template-columns: 1fr; } }
+.driver-perception__recorder { margin-top: 20px; padding: 18px; border: 1px solid rgba(168,85,247,.4); border-radius: 12px; background: rgba(59,7,100,.12); }
+.driver-perception__recorder h3 { color: #c084fc; }.driver-perception__recorder h3 small { color: #facc15; }
+.driver-perception__recorder-fields { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 10px; }
+.driver-perception__recorder-fields label { display: grid; gap: 5px; color: #aab6c5; font-size: 11px; }
+.driver-perception__recorder-fields input,.driver-perception__recorder-fields select { min-width: 0; padding: 8px; color: #e6edf3; background: #111a2d; border: 1px solid rgba(148,163,184,.25); }
+.driver-perception__markers { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; align-items: center; }.driver-perception__markers span { color: #facc15; font-size: 11px; }
+@media (max-width: 900px) { .driver-perception__recorder-fields { grid-template-columns: 1fr 1fr; } }
+.driver-perception__notice { padding: 7px 10px; border: 1px solid rgba(250,204,21,.3); border-radius: 999px; color: #fde68a; font-size: 11px; font-weight: 800; }
+@media (max-width: 900px) { .driver-perception__metric-groups { grid-template-columns: 1fr; } }
+@media (max-width: 760px) { .driver-perception { padding: 18px; } .driver-perception__field { min-width: 100%; } }
+.guided-tuning{margin:.8rem 0;padding:.8rem;border:1px solid #0ea5e9;border-radius:.65rem;background:rgba(14,165,233,.08)}
+.guided-tuning__heading,.guided-tuning__status{display:flex;align-items:center;justify-content:space-between;gap:.75rem}.guided-tuning p{margin:.55rem 0}.guided-tuning__progress{height:.45rem;overflow:hidden;border-radius:999px;background:#1e293b}.guided-tuning__progress span{display:block;width:0;height:100%;background:#38bdf8;transition:width .2s}.guided-tuning__status{margin-top:.45rem;color:#94a3b8}.guided-tuning__status strong{font-size:1.15rem;color:#f8fafc}.guided-tuning__results{margin-top:.8rem;padding-top:.8rem;border-top:1px solid #334155}.guided-tuning__results dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.45rem}.guided-tuning__results dl div{padding:.45rem;background:#0f172a;border-radius:.4rem}.guided-tuning__results dt{color:#94a3b8;font-size:.72rem}.guided-tuning__results dd{margin:.2rem 0 0;overflow-wrap:anywhere}.guided-tuning__results pre{white-space:pre-wrap;overflow:auto}@media(max-width:700px){.guided-tuning__results dl{grid-template-columns:1fr}}

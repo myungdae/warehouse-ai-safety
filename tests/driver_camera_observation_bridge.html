@@ -1,0 +1,85 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>RUNNING - Driver Camera Observation Bridge</title></head>
+<body><pre id="result">RUNNING</pre>
+<script src="../backend/static/js/sensor_observation.js"></script>
+<script src="../backend/static/js/driver_state_config.js"></script>
+<script src="../backend/static/js/driver_state.js"></script>
+<script src="../backend/static/js/driver_perception/driver_perception_config.js"></script>
+<script src="../backend/static/js/driver_perception/driver_perception_runtime.js"></script>
+<script src="../backend/static/js/driver_input_mode_controller.js"></script>
+<script src="../backend/static/js/driver_risk_runtime.js"></script>
+<script src="../backend/static/js/driver_perception/driver_camera_observation_bridge.js"></script>
+<script>
+(() => {
+  const checks = [];
+  const check = (condition, name) => { if (!condition) throw new Error(name); checks.push(name); };
+  let now = Date.parse('2026-08-02T00:00:00.000Z');
+  let callback = null, unsubscribeCount = 0, cancelled = 0, releases = 0;
+  const runtime = {
+    state: DriverPerception.States.RUNNING,
+    onMetricSnapshot(fn) { callback = fn; return () => { unsubscribeCount += 1; callback = null; }; },
+    getLatestMetricSnapshot() { return null; }
+  };
+  const controller = new DriverInputModeController.DriverInputModeController({ cancelDeterministicRun() { cancelled += 1; } });
+  const observations = [];
+  const page = {
+    getInputModeController: () => controller,
+    ingestObservation(observation) { observations.push(observation); return { observation: observation.toJSON(), riskSignal: DriverRiskRuntime.observationToRiskSignal(observation), riskEvent: null, policyDecision: null, actionRequests: [], actionExecutions: [] }; },
+    resetTarget(targetId) { releases += 1; return { targetId }; }
+  };
+  const bridge = new DriverPerception.DriverCameraObservationBridge({ perceptionRuntime: runtime, runtimePage: page, now: () => now });
+  const context = { vehicleType: 'FORKLIFT', vehicleId: 'F03', driverId: 'DRIVER001', driverAssignmentId: 'ASSIGNMENT001' };
+  bridge.start(context);
+  check(bridge.getState().status === 'SENSOR_WAITING', 'STOPPED_TO_LIVE');
+  check(cancelled === 1, 'DETERMINISTIC_CANCELLATION');
+  check(controller.getMode('DROWSINESS', 'F03|DRIVER001|ASSIGNMENT001') === 'LIVE_WEBCAM', 'LIVE_OWNERSHIP');
+  const base = () => ({ driverMetricSnapshotId: `snapshot-${now}`, timestamp: new Date(now).toISOString(), cameraId: 'camera-1',
+    faceDetected: true, calibrated: true, calibrationState: 'READY',
+    metrics: { leftEAR:.3,rightEAR:.3,ear:.3,earBaseline:.3,earThreshold:.225,eyeClosed:false,eyeClosureDurationMs:0,blinkCount:1,blinkRate:1,lastBlinkDurationMs:120,perclos:5,pitch:0,roll:0,yaw:0,headPoseState:'CENTER' },
+    quality: { earValid:true,perclosValid:true,headPoseValid:true,landmarkAvailable:true,sampleAgeMs:0,marValid:true,mouthCalibrationAvailable:true,yawnMetricAvailable:true },
+    runtime: { processingTimeMs:2,frameTimestamp:new Date(now).toISOString() }, privacy:{imageStored:false,imageTransmitted:false,browserLocalProcessing:true}, operationalUseAllowed:false });
+  callback(base());
+  const json = observations[0].toJSON();
+  check(json.confidence === null && json.metadata.quality.confidenceAvailable === false, 'NULL_CONFIDENCE');
+  check(json.metadata.simulation === false && json.metadata.sensorConnected === true && json.metadata.operationalUseAllowed === false, 'LIVE_SAFETY_FLAGS');
+  check(json.targetId === 'F03|DRIVER001|ASSIGNMENT001' && json.metadata.targetId === json.targetId, 'TARGET_ID');
+  check(json.metadata.driverMetricSnapshotId.startsWith('snapshot-'), 'SNAPSHOT_ID');
+  check(json.metadata.imageStored === false && json.metadata.imageTransmitted === false && json.metadata.browserLocalProcessing === true, 'PRIVACY_FLAGS');
+  check(!JSON.stringify(json).includes('landmarks') && !JSON.stringify(json).includes('video') && !JSON.stringify(json).includes('base64'), 'NO_RAW_MEDIA');
+  check(json.value === 'live-driver-state' && json.unit === 'composite-driver-state', 'OBSERVATION_CONTRACT');
+  check(json.metadata.quality.marValid === true && json.metadata.quality.yawnMetricAvailable === true, 'YAWN_QUALITY_PRESERVED');
+  runtime.state = DriverPerception.States.FACE_NOT_DETECTED; const noFace = base(); noFace.faceDetected=false; noFace.quality.landmarkAvailable=false; callback(noFace);
+  check(observations.length === 1 && bridge.getState().status === 'FACE_NOT_DETECTED', 'FACE_QUALITY_GATE');
+  runtime.state = DriverPerception.States.RUNNING; const stale=base(); stale.timestamp=new Date(now-2000).toISOString(); callback(stale);
+  check(observations.length === 1 && bridge.getState().status === 'STALE_SAMPLE', 'STALE_GATE');
+  const uncalibrated=base(); uncalibrated.calibrated=false; uncalibrated.calibrationState='COLLECTING'; callback(uncalibrated);
+  check(observations.length === 1 && bridge.getState().status === 'CALIBRATION_REQUIRED', 'CALIBRATION_GATE');
+  const oldCallback = callback; bridge.stop(); oldCallback(base());
+  check(observations.length === 1 && unsubscribeCount === 1, 'STALE_CALLBACK_BLOCKED');
+  check(controller.getMode('DROWSINESS','F03|DRIVER001|ASSIGNMENT001') === 'STOPPED', 'OWNERSHIP_RELEASED');
+  bridge.start(context); controller.registerSource({sourceId:'simulation',mode:'DETERMINISTIC_SIMULATION'});
+  controller.activateMode({observationType:'DROWSINESS',targetId:'F03|DRIVER001|ASSIGNMENT001',mode:'DETERMINISTIC_SIMULATION',sourceId:'simulation'});
+  check(bridge.getState().status === 'STOPPED', 'LIVE_TO_SIMULATION_RELEASE');
+  const makeObservation = (time, closed, duration, perclos=5) => DriverState.createDriverObservation({ context,
+    observationType:'DROWSINESS', value:'live-driver-state', unit:'composite-driver-state', confidence:null, observedAt:new Date(time),
+    metadata:{sensorId:'driver-camera-camera-1',sensorType:'DRIVER_CAMERA',source:'live-webcam',simulation:false,sensorConnected:true,
+      measurementStatus:'VALID',sampleWindowMs:0,algorithmVersion:'v1',configurationVersion:'v1',operationalUseAllowed:false,
+      metrics:{ear:closed?.15:.3,earThreshold:.225,eyeClosed:closed,eyeClosureDurationMs:duration,perclos},
+      quality:{confidenceAvailable:false,faceDetected:true,calibrated:true,calibrationState:'READY',earValid:true,perclosValid:true,headPoseValid:true,landmarkAvailable:true,sampleAgeMs:0}} });
+  DriverRiskRuntime.resetDrowsinessRiskState('F03|DRIVER001|ASSIGNMENT001');
+  const t=Date.parse('2026-08-02T01:00:00Z');
+  check(DriverRiskRuntime.observationToRiskSignal(makeObservation(t,false,0)).reason==='LIVE_DROWSINESS_NORMAL','NORMAL_NO_EVENT');
+  check(DriverRiskRuntime.observationToRiskSignal(makeObservation(t+100,true,200)).reason==='LIVE_DROWSINESS_NORMAL','BLINK_NO_EVENT');
+  check(DriverRiskRuntime.observationToRiskSignal(makeObservation(t+1000,true,1300,50)).reason==='LIVE_DROWSINESS_ENTRY_PENDING','ENTRY_PENDING');
+  check(DriverRiskRuntime.observationToRiskSignal(makeObservation(t+2600,true,2900,50)).shouldCreateRisk===true,'SUSTAIN_NEW');
+  check(DriverRiskRuntime.observationToRiskSignal(makeObservation(t+2700,true,3000,50)).shouldCreateRisk===true,'NEXT_ACTIVE_SIGNAL');
+  const bad=makeObservation(t+2800,false,0); bad.metadata.quality.faceDetected=false;
+  check(DriverRiskRuntime.observationToRiskSignal(bad).reason==='LIVE_DROWSINESS_QUALITY_LOSS_RISK_PRESERVED','QUALITY_LOSS_NO_CLEAR');
+  check(DriverRiskRuntime.observationToRiskSignal(makeObservation(t+3000,false,0)).reason==='LIVE_DROWSINESS_CLEAR_PENDING','CLEAR_PENDING');
+  check(DriverRiskRuntime.observationToRiskSignal(makeObservation(t+5100,false,0)).shouldClearRisk===true,'CLEAR_SUSTAIN');
+  const source = document.documentElement.innerHTML;
+  check(!/fetch\s*\(|XMLHttpRequest|WebSocket|sendBeacon/.test(DriverPerception.DriverCameraObservationBridge.toString()), 'NO_NETWORK_API');
+  document.title = `PASS - Driver Camera Observation Bridge (${checks.length})`;
+  document.getElementById('result').textContent = checks.join('\n');
+})()
+</script></body></html>

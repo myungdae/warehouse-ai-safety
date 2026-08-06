@@ -5,7 +5,7 @@ Real-time sensor monitoring dashboard + Drone Inventory Intelligence
 + Agentic AI Orchestrator (완전 자동화 재고 파이프라인)
 """
 
-from flask import Flask, render_template, send_from_directory, request, jsonify, send_file
+from flask import Flask, render_template, send_from_directory, request, jsonify, send_file, redirect, url_for
 import os
 import smtplib
 import json
@@ -226,6 +226,26 @@ REPORT_TO     = os.getenv('REPORT_TO',     '')
 @app.route('/')
 def index():
     return render_template('warehouse_digital_twin.html')
+
+@app.route('/warehouse')
+def warehouse():
+    return redirect(url_for('index'))
+
+@app.route('/driver-safety')
+def driver_safety():
+    return render_template('driver_safety.html')
+
+@app.route('/runtime-safety-scenarios')
+def runtime_safety_scenarios():
+    return render_template('runtime_safety_scenarios.html')
+
+@app.route('/driver-safety.html')
+def driver_safety_legacy():
+    return redirect(url_for('driver_safety'))
+
+@app.route('/truck-ontology')
+def truck_ontology():
+    return redirect(url_for('landing', _anchor='truck-ontology'))
 
 @app.route('/drone')
 def drone_inventory():
@@ -630,14 +650,14 @@ def build_html_email(d, recipient):
       <td style="background:#1e293b;padding:20px 32px;border:1px solid #334155;border-top:none;border-bottom:none;">
         <table width="100%" cellpadding="0" cellspacing="0">
           <tr>
-            {''.join(f"""
+            {''.join(f'''
             <td width="25%" style="padding:0 6px;">
               <div style="background:#0f172a;border:1px solid #334155;border-radius:10px;
                           padding:14px;text-align:center;">
                 <div style="font-size:1.8rem;font-weight:900;color:{kc};">{kv}</div>
                 <div style="font-size:0.7rem;color:#64748b;margin-top:4px;">{kl}</div>
               </div>
-            </td>""" for kv, kl, kc in [
+            </td>''' for kv, kl, kc in [
                 (total_scan, '총 스캔 선반', '#a5b4fc'),
                 (f"{accuracy}%", '재고 정확도', '#34d399'),
                 (total_chg, '변화 감지', '#fbbf24'),

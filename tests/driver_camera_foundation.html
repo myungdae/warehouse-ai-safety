@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Driver Camera Foundation Tests</title></head>
+<body><pre id="results"></pre>
+<script src="../backend/static/js/driver_perception/driver_perception_config.js"></script>
+<script src="../backend/static/js/driver_perception/camera_manager.js"></script>
+<script src="../backend/static/js/driver_perception/face_landmark_adapter.js"></script>
+<script src="../backend/static/js/driver_perception/driver_perception_runtime.js"></script>
+<script>
+(async function run() {
+  'use strict';
+  const results = [];
+  const test = async (name, fn) => { try { await fn(); results.push({name, pass:true}); } catch (e) { results.push({name, pass:false, error:e.message}); } };
+  const assert = (value, message) => { if (!value) throw new Error(message); };
+  const track = () => ({readyState:'live', stopped:0, stop(){this.stopped++;this.readyState='ended';}, addEventListener(){}});
+  const stream = tracks => ({getTracks:()=>tracks, getVideoTracks:()=>tracks});
+
+  await test('CameraManager creation', () => {
+    const manager = new DriverPerception.CameraManager({mediaDevices:{}});
+    assert(manager.getState().activeRoles.length === 0, 'new manager must be inactive');
+  });
+  await test('enumerateDevices failure', async () => {
+    const manager = new DriverPerception.CameraManager({mediaDevices:{enumerateDevices:async()=>{throw new Error('failed');}}});
+    let rejected=false; try{await manager.enumerateDevices();}catch(_){rejected=true;} assert(rejected, 'must reject');
+  });
+  await test('permission denial', async () => {
+    const denied=Object.assign(new Error('denied'),{name:'NotAllowedError'});
+    const manager=new DriverPerception.CameraManager({mediaDevices:{getUserMedia:async()=>{throw denied;}}});
+    try{await manager.start();}catch(_){} assert(manager.permissionState === 'DENIED','must record denial');
+  });
+  await test('supported browser errors preserve exact diagnostics', async () => {
+    for (const name of ['NotReadableError','NotAllowedError','OverconstrainedError','NotFoundError','AbortError','SecurityError']) {
+      const failure=Object.assign(new Error(`${name}-message`),{name,constraint:name==='OverconstrainedError'?'deviceId':undefined,stack:`${name}-stack`});
+      const manager=new DriverPerception.CameraManager({mediaDevices:{getUserMedia:async()=>{throw failure;}}});
+      try{await manager.start({deviceId:'camera-error'});}catch(_){}
+      const diagnostic=manager.getDiagnostics();
+      assert(diagnostic.cameraOpenState==='ERROR'&&diagnostic.lastCameraError.name===name,`${name} name lost`);
+      assert(diagnostic.lastCameraError.message===`${name}-message`&&diagnostic.lastCameraError.stack===`${name}-stack`,`${name} detail lost`);
+    }
+  });
+  await test('getUserMedia request and opened settings instrumented', async () => {
+    let constraints;const openedTrack=track();openedTrack.id='track-1';openedTrack.label='C922';openedTrack.enabled=true;openedTrack.muted=false;
+    openedTrack.getSettings=()=>({deviceId:'actual-c922',facingMode:'user',width:1280,height:720,frameRate:30});
+    const openedStream=stream([openedTrack]);openedStream.id='stream-1';
+    const manager=new DriverPerception.CameraManager({mediaDevices:{getUserMedia:async input=>{constraints=input;return openedStream;}}});
+    await manager.start({deviceId:'requested-c922'});const d=manager.getDiagnostics();
+    assert(constraints.video.deviceId.exact==='requested-c922'&&constraints.audio===false,'constraints not logged');
+    assert(d.requestedDeviceId==='requested-c922'&&d.openedDeviceId==='actual-c922','device ids missing');
+    assert(d.cameraLabel==='C922'&&d.streamId==='stream-1'&&d.videoTrackState==='live','stream identity missing');
+    assert(d.facingMode==='user'&&d.width===1280&&d.height===720&&d.frameRate===30,'settings missing');
+  });
+  await test('alive stream reports STREAM_ALREADY_OPEN without a second call', async () => {
+    let calls=0;const source=stream([track()]);source.id='existing-stream';
+    const manager=new DriverPerception.CameraManager({mediaDevices:{getUserMedia:async()=>{calls++;return source;}}});
+    await manager.start();await manager.start();
+    assert(calls===1&&manager.getDiagnostics().cameraOpenState==='STREAM_ALREADY_OPEN','alive stream reopened');
+  });
+  await test('dead existing tracks verified before replacement open', async () => {
+    const oldTrack=track();oldTrack.readyState='ended';const oldStream=stream([oldTrack]);
+    const newTrack=track();const newStream=stream([newTrack]);let calls=0;
+    const manager=new DriverPerception.CameraManager({mediaDevices:{getUserMedia:async()=>{calls++;return newStream;}}});
+    manager.streams.set('primary',oldStream);await manager.start();const verification=manager.getDiagnostics().trackStopVerification;
+    assert(calls===1&&oldTrack.stopped===1,'old track not stopped');
+    assert(verification[0].before==='ended'&&verification[0].after==='ended','readyState verification missing');
+  });
+  await test('duplicate start blocked', async () => {
+    let calls=0; const source=stream([track()]);
+    const manager=new DriverPerception.CameraManager({mediaDevices:{getUserMedia:async()=>{calls++;return source;}}});
+    await Promise.all([manager.start(),manager.start()]); assert(calls===1,'duplicate getUserMedia'); await manager.stop();
+  });
+  await test('stop ends every track', async () => {
+    const tracks=[track(),track()]; const manager=new DriverPerception.CameraManager({mediaDevices:{getUserMedia:async()=>stream(tracks)}});
+    await manager.start(); const count=await manager.stop(); assert(count===2 && tracks.every(t=>t.stopped===1),'tracks not stopped');
+  });
+  await test('same device cannot serve conflicting roles', async () => {
+    const makeStream=()=>{const t=track();t.getSettings=()=>({deviceId:'camera-1'});return stream([t]);};
+    const manager=new DriverPerception.CameraManager({mediaDevices:{getUserMedia:async()=>makeStream()}});
+    await manager.start({role:'primary',deviceId:'camera-1'}); let rejected=false;
+    try{await manager.start({role:'secondary',deviceId:'camera-1'});}catch(_){rejected=true;}
+    assert(rejected,'conflicting role must reject'); await manager.stopAll();
+  });
+  await test('faceDetected false preserved', async () => {
+    let handler, delivered; const mesh={setOptions(){},onResults(fn){handler=fn;},async initialize(){},async send(){handler({multiFaceLandmarks:[]});}};
+    const adapter=new DriverPerception.FaceLandmarkAdapter({faceMeshFactory:()=>mesh});
+    await adapter.initialize(); adapter.start({cameraId:'cam',onLandmarkFrame:f=>{delivered=f;}}); await adapter.process({});
+    assert(delivered.faceDetected===false && delivered.landmarks===null,'false face created data');
+  });
+  await test('landmark callback delivered', async () => {
+    let handler, delivered; const points=[{x:.1,y:.2,z:0}];
+    const mesh={setOptions(){},onResults(fn){handler=fn;},async initialize(){},async send(){handler({multiFaceLandmarks:[points]});}};
+    const adapter=new DriverPerception.FaceLandmarkAdapter({faceMeshFactory:()=>mesh});
+    await adapter.initialize(); adapter.start({cameraId:'cam-1',imageWidth:640,imageHeight:480,onLandmarkFrame:f=>{delivered=f;}}); await adapter.process({});
+    assert(delivered.faceDetected && delivered.landmarks===points && delivered.cameraId==='cam-1','callback mismatch');
+  });
+  await test('adapter emits monotonic video-frame timing contract', async () => {
+    let handler,delivered,mono=100;const mesh={setOptions(){},onResults(fn){handler=fn},async initialize(){},async send(){mono+=20;handler({multiFaceLandmarks:[]})}};
+    const adapter=new DriverPerception.FaceLandmarkAdapter({faceMeshFactory:()=>mesh,monotonicClock:()=>mono,timeOrigin:1000});
+    await adapter.initialize();adapter.start({cameraId:'c922',imageWidth:640,imageHeight:480,onLandmarkFrame:x=>delivered=x});
+    await adapter.process({}, {expectedDisplayTime:90,mediaTime:2});
+    assert(delivered.captureTimestampMs===90&&delivered.submissionTimestampMs===100&&delivered.resultCallbackTimestampMs===120,'timing values');
+    assert(delivered.timestamp==='1970-01-01T00:00:01.090Z'&&delivered.timestampSource==='VIDEO_FRAME_EXPECTED_DISPLAY_TIME','authoritative timestamp');
+    assert(delivered.callbackLatencyMs===20&&delivered.frameSequence===1&&!delivered.duplicateResult&&delivered.droppedResultEstimate===0,'timing diagnostics');
+  });
+  await test('stale callback invalidated', async () => {
+    let handler,count=0; const mesh={setOptions(){},onResults(fn){handler=fn;},async initialize(){},async send(){}};
+    const adapter=new DriverPerception.FaceLandmarkAdapter({faceMeshFactory:()=>mesh});
+    await adapter.initialize(); adapter.start({onLandmarkFrame:()=>count++}); adapter.process({}); adapter.stop(); handler({multiFaceLandmarks:[[]]});
+    assert(count===0,'stale callback delivered');
+  });
+  await test('start stop repeats', async () => {
+    const tracks=[]; const manager=new DriverPerception.CameraManager({mediaDevices:{getUserMedia:async()=>{const t=track();tracks.push(t);return stream([t]);}}});
+    await manager.start();await manager.stop();await manager.start();await manager.stop(); assert(tracks.length===2&&tracks.every(t=>t.stopped===1),'repeat failed');
+  });
+  await test('authoritative managed stream readiness', async () => {
+    const t=track();t.enabled=true;t.muted=false;const source=stream([t]);source.id='managed-stream';
+    const manager=new DriverPerception.CameraManager({mediaDevices:{getUserMedia:async()=>source}});
+    await manager.start();const ready=manager.getLiveReadiness();
+    assert(ready.cameraReady&&ready.streamSource==='CAMERA_MANAGER_PRIMARY_STREAM'&&ready.videoTrackState==='live','managed readiness mismatch');
+  });
+  await test('authoritative video srcObject survives stale empty map', async () => {
+    const t=track();t.enabled=true;t.muted=false;const source=stream([t]);source.id='attached-stream';
+    const manager=new DriverPerception.CameraManager({mediaDevices:{getUserMedia:async()=>source}}),video={srcObject:null,play:async()=>{}};
+    await manager.start({videoElement:video});manager.streams.clear();const ready=manager.getLiveReadiness({videoElement:video});
+    assert(ready.cameraReady&&ready.streamPresent&&!ready.managedStreamPresent&&ready.streamSource==='VIDEO_ELEMENT_SRC_OBJECT','attached readiness mismatch');
+  });
+  await test('disabled and ended tracks are not camera ready', () => {
+    const t=track();t.enabled=false;const source=stream([t]);source.id='blocked-stream';
+    const manager=new DriverPerception.CameraManager({mediaDevices:{}});manager.permissionState='GRANTED';manager.streams.set('primary',source);
+    assert(!manager.getLiveReadiness().cameraReady,'disabled track accepted');t.enabled=true;t.readyState='ended';
+    assert(!manager.getLiveReadiness().cameraReady,'ended track accepted');
+  });
+  await test('runtime readiness exposes explicit blocked reasons', () => {
+    const t=track();t.enabled=true;const source=stream([t]);source.id='runtime-stream';
+    const manager=new DriverPerception.CameraManager({mediaDevices:{}}),runtime=new DriverPerception.DriverPerceptionRuntime({cameraManager:manager,landmarkAdapter:{},metricCalculator:{},calibration:{},snapshotFactory:()=>{},scheduler:()=>0,cancelScheduler:()=>{}});
+    let ready=runtime.getLiveBridgeReadiness();assert(ready.blockedReason==='RUNTIME_NOT_RUNNING','idle reason missing');
+    runtime.state=DriverPerception.States.RUNNING;ready=runtime.getLiveBridgeReadiness();assert(ready.blockedReason==='CAMERA_STREAM_UNAVAILABLE','stream reason missing');
+    manager.permissionState='GRANTED';manager.streams.set('primary',source);ready=runtime.getLiveBridgeReadiness();assert(ready.readyForLiveBridge&&ready.runtimeGeneration===0,'runtime readiness mismatch');
+    ready=runtime.getLiveBridgeReadiness(1);assert(ready.blockedReason==='GENERATION_MISMATCH','generation reason missing');
+  });
+  await test('runtime detects camera preview outside viewport', () => {
+    const runtime=new DriverPerception.DriverPerceptionRuntime({cameraManager:{permissionState:'GRANTED'},landmarkAdapter:{},metricCalculator:{},calibration:{},snapshotFactory:()=>{},scheduler:()=>0,cancelScheduler:()=>{}});
+    runtime.videoElement={currentTime:12,readyState:4,getBoundingClientRect:()=>({top:-600,bottom:-120,left:0,right:640,width:640,height:480})};
+    const health=runtime.getSchedulerHealth();
+    assert(health.videoOutsideViewport===true&&health.videoCurrentTime===12&&health.videoReadyState===4,'offscreen preview not detected');
+    runtime.videoElement.getBoundingClientRect=()=>({top:10,bottom:490,left:10,right:650,width:640,height:480});
+    assert(runtime.getSchedulerHealth().videoOutsideViewport===false,'visible preview rejected');
+  });
+  await test('privacy configuration', () => {
+    assert(DriverPerception.Config.imageStorageAllowed===false,'storage enabled');
+    assert(DriverPerception.Config.imageTransmissionAllowed===false,'transmission enabled');
+  });
+  const passCount=results.filter(r=>r.pass).length;
+  document.getElementById('results').textContent=JSON.stringify({pass:passCount===results.length,passCount,total:results.length,results},null,2);
+  document.title=`${passCount}/${results.length} Driver Camera Foundation Tests`;
+})();
+</script></body></html>

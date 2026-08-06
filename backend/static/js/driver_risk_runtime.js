@@ -1,0 +1,595 @@
+(function initializeDriverRiskRuntime(global) {
+    'use strict';
+
+    if (!global.SafetyObservation || !global.DriverStateConfig) {
+        throw new Error('DriverRiskRuntime requires SafetyObservation and DriverStateConfig');
+    }
+
+    const { ObservationType, SensorObservation } = global.SafetyObservation;
+    const EventState = Object.freeze({
+        NEW: 'NEW',
+        ACTIVE: 'ACTIVE',
+        ACKNOWLEDGED: 'ACKNOWLEDGED',
+        CLEARED: 'CLEARED'
+    });
+    const drowsinessRiskStates = new Map();
+    const liveDrowsinessRiskStates = new Map();
+    const incapacitationRiskStates = new Map();
+    const alcoholRiskStates = new Map();
+    const pedestrianProximityRiskStates = new Map();
+    const vehicleProximityRiskStates = new Map();
+    const driverAttentionRiskStates = new Map();
+    const VEHICLE_PROXIMITY_RULE = Object.freeze({
+        configurationVersion: 'DEVELOPMENT_UNVALIDATED_VEHICLE_PROXIMITY_CANDIDATE-v1',
+        entryDistanceMeters: 10, closeDistanceMeters: 4, clearDistanceMeters: 12,
+        highClosingSpeedMps: 1, lowTtcSeconds: 8, entrySustainMs: 500, clearSustainMs: 500
+    });
+    const INCAPACITATION_COMPOSITE_SIGNALS = Object.freeze([
+        'prolongedEyeClosure',
+        'headDrop',
+        'upperBodyCollapse',
+        'noResponse',
+        'noVehicleControlInput'
+    ]);
+
+    class RiskEvent {
+        constructor({ eventId, eventType, targetId, severity, timestamp }) {
+            this.eventId = eventId;
+            this.eventType = eventType;
+            this.targetId = targetId;
+            this.createdTime = timestamp;
+            this.updatedTime = timestamp;
+            this.state = EventState.NEW;
+            this.severity = severity;
+            this.acknowledgedTime = null;
+            this.clearedTime = null;
+        }
+
+        toJSON() {
+            return {
+                eventId: this.eventId,
+                eventType: this.eventType,
+                targetId: this.targetId,
+                createdTime: this.createdTime,
+                updatedTime: this.updatedTime,
+                state: this.state,
+                severity: this.severity,
+                acknowledgedTime: this.acknowledgedTime,
+                clearedTime: this.clearedTime
+            };
+        }
+    }
+
+    class RiskEventStateMachine {
+        constructor() {
+            this.activeEvents = new Map();
+            this.eventHistory = [];
+            this.sequence = 0;
+        }
+
+        getEventKey(eventType, targetId) {
+            return `${eventType}::${targetId}`;
+        }
+
+        observe({ eventType, targetId, severity }, observedAt) {
+            const timestamp = new Date(observedAt).toISOString();
+            const key = this.getEventKey(eventType, targetId);
+            let event = this.activeEvents.get(key);
+            if (!event) {
+                this.sequence += 1;
+                event = new RiskEvent({
+                    eventId: `${eventType}-${targetId.replace(/[^a-zA-Z0-9_-]/g, '-')}-${Date.parse(timestamp)}-${this.sequence}`,
+                    eventType,
+                    targetId,
+                    severity,
+                    timestamp
+                });
+                this.activeEvents.set(key, event);
+                this.eventHistory.push(event);
+                return event;
+            }
+            event.updatedTime = timestamp;
+            event.severity = severity;
+            if (event.state === EventState.NEW) event.state = EventState.ACTIVE;
+            return event;
+        }
+
+        acknowledge(eventId, observedAt = new Date()) {
+            const event = this.eventHistory.find(item => item.eventId === eventId);
+            if (!event || event.state === EventState.CLEARED) return null;
+            const timestamp = new Date(observedAt).toISOString();
+            event.state = EventState.ACKNOWLEDGED;
+            event.updatedTime = timestamp;
+            event.acknowledgedTime = timestamp;
+            return event;
+        }
+
+        clear(eventType, targetId, observedAt = new Date()) {
+            const key = this.getEventKey(eventType, targetId);
+            const event = this.activeEvents.get(key);
+            if (!event) return null;
+            const timestamp = new Date(observedAt).toISOString();
+            event.state = EventState.CLEARED;
+            event.updatedTime = timestamp;
+            event.clearedTime = timestamp;
+            this.activeEvents.delete(key);
+            return event;
+        }
+
+        toJSON() {
+            return this.eventHistory.map(event => event.toJSON());
+        }
+    }
+
+    function noRisk(observation, reason) {
+        return {
+            shouldCreateRisk: false,
+            shouldClearRisk: false,
+            eventInput: null,
+            observation: observation instanceof SensorObservation ? observation.toJSON() : null,
+            reason
+        };
+    }
+
+    function createDrowsinessRiskSignal(observation, reason) {
+        return {
+            shouldCreateRisk: true,
+            shouldClearRisk: false,
+            eventInput: {
+                eventType: 'DROWSINESS',
+                targetId: observation.targetId,
+                severity: 'HIGH'
+            },
+            observation: observation.toJSON(),
+            reason
+        };
+    }
+
+    function drowsinessObservationToRiskSignal(observation) {
+        if (observation.metadata?.source === 'live-webcam') {
+            return liveDrowsinessObservationToRiskSignal(observation);
+        }
+        const rule = global.DriverStateConfig.drowsiness;
+        const observedAtMs = Date.parse(observation.observedAt);
+        const state = drowsinessRiskStates.get(observation.targetId) || {
+            enterStartedAt: null,
+            clearStartedAt: null,
+            riskActive: false
+        };
+
+        if (observation.value !== rule.enterState && observation.value !== rule.clearState) {
+            return noRisk(observation, 'INVALID_DROWSINESS_STATE');
+        }
+
+        if (!state.riskActive) {
+            if (observation.value === rule.clearState) {
+                drowsinessRiskStates.delete(observation.targetId);
+                return noRisk(observation, 'DROWSINESS_NORMAL');
+            }
+            if (state.enterStartedAt === null || observedAtMs < state.enterStartedAt) {
+                state.enterStartedAt = observedAtMs;
+            }
+            if (observedAtMs - state.enterStartedAt < rule.sustainMs) {
+                drowsinessRiskStates.set(observation.targetId, state);
+                return noRisk(observation, 'DROWSINESS_ENTRY_PENDING');
+            }
+            state.riskActive = true;
+            state.clearStartedAt = null;
+            drowsinessRiskStates.set(observation.targetId, state);
+            return createDrowsinessRiskSignal(observation, 'DROWSINESS_RISK_CONFIRMED');
+        }
+
+        if (observation.value === rule.enterState) {
+            state.clearStartedAt = null;
+            drowsinessRiskStates.set(observation.targetId, state);
+            return createDrowsinessRiskSignal(observation, 'DROWSINESS_RISK_MAINTAINED');
+        }
+        if (state.clearStartedAt === null || observedAtMs < state.clearStartedAt) {
+            state.clearStartedAt = observedAtMs;
+        }
+        if (observedAtMs - state.clearStartedAt < rule.clearSustainMs) {
+            drowsinessRiskStates.set(observation.targetId, state);
+            return noRisk(observation, 'DROWSINESS_CLEAR_PENDING');
+        }
+        drowsinessRiskStates.delete(observation.targetId);
+        return {
+            ...noRisk(observation, 'DROWSINESS_CLEARED'),
+            shouldClearRisk: true
+        };
+    }
+
+    function liveDrowsinessObservationToRiskSignal(observation) {
+        const config = global.DriverPerception?.Config?.liveDrowsinessConfig;
+        const metadata = observation.metadata || {};
+        const metrics = metadata.metrics || {};
+        const quality = metadata.quality || {};
+        const observedAtMs = Date.parse(observation.observedAt);
+        const state = liveDrowsinessRiskStates.get(observation.targetId) || {
+            enterStartedAt: null, clearStartedAt: null, riskActive: false
+        };
+        const evidence = [];
+        if (quality.marValid !== true) evidence.push('MAR_UNAVAILABLE');
+        else if (quality.mouthCalibrationAvailable !== true) evidence.push('MOUTH_CALIBRATION_UNAVAILABLE');
+        else if (metrics.yawnConfirmed === true) evidence.push(metrics.yawnCount >= 2
+            ? 'REPEATED_YAWN_SUPPORTING_SIGNAL' : 'YAWN_CONFIRMED_SUPPORTING_SIGNAL');
+        else if (metrics.yawnCandidate === true) evidence.push('YAWN_CANDIDATE_OBSERVED');
+        const withEvidence = signal => ({ ...signal, supportingEvidence: evidence });
+        const qualityValid = metadata.simulation === false && metadata.sensorConnected === true &&
+            quality.faceDetected === true && quality.landmarkAvailable === true &&
+            quality.calibrated === true && quality.calibrationState === 'READY' &&
+            quality.earValid === true && Number.isFinite(metrics.ear) &&
+            Number.isFinite(metrics.earThreshold) && Number.isFinite(quality.sampleAgeMs) &&
+            quality.sampleAgeMs <= config.maximumSampleAgeMs;
+        if (!qualityValid) {
+            liveDrowsinessRiskStates.set(observation.targetId, state);
+            return withEvidence(noRisk(observation, state.riskActive
+                ? 'LIVE_DROWSINESS_QUALITY_LOSS_RISK_PRESERVED'
+                : 'LIVE_DROWSINESS_QUALITY_INSUFFICIENT'));
+        }
+        const primary = metrics.eyeClosed === true && metrics.ear < metrics.earThreshold;
+        const accumulated = quality.perclosValid === true && Number.isFinite(metrics.perclos) &&
+            metrics.perclos >= config.perclosEntryPercent;
+        const entry = primary && (metrics.eyeClosureDurationMs >= config.prolongedEyeClosureMs || accumulated);
+        if (!state.riskActive) {
+            if (!entry) {
+                liveDrowsinessRiskStates.delete(observation.targetId);
+                return withEvidence(noRisk(observation, 'LIVE_DROWSINESS_NORMAL'));
+            }
+            if (state.enterStartedAt === null || observedAtMs < state.enterStartedAt) state.enterStartedAt = observedAtMs;
+            if (observedAtMs - state.enterStartedAt < config.entrySustainMs) {
+                liveDrowsinessRiskStates.set(observation.targetId, state);
+                return withEvidence(noRisk(observation, 'LIVE_DROWSINESS_ENTRY_PENDING'));
+            }
+            state.riskActive = true;
+            state.clearStartedAt = null;
+            liveDrowsinessRiskStates.set(observation.targetId, state);
+            return withEvidence(createDrowsinessRiskSignal(observation, 'LIVE_DROWSINESS_RISK_CONFIRMED'));
+        }
+        if (entry) {
+            state.clearStartedAt = null;
+            liveDrowsinessRiskStates.set(observation.targetId, state);
+            return withEvidence(createDrowsinessRiskSignal(observation, 'LIVE_DROWSINESS_RISK_MAINTAINED'));
+        }
+        if (state.clearStartedAt === null || observedAtMs < state.clearStartedAt) state.clearStartedAt = observedAtMs;
+        if (observedAtMs - state.clearStartedAt < config.clearSustainMs) {
+            liveDrowsinessRiskStates.set(observation.targetId, state);
+            return withEvidence(noRisk(observation, 'LIVE_DROWSINESS_CLEAR_PENDING'));
+        }
+        liveDrowsinessRiskStates.delete(observation.targetId);
+        return withEvidence({ ...noRisk(observation, 'LIVE_DROWSINESS_CLEARED'), shouldClearRisk: true });
+    }
+
+    function createIncapacitationRiskSignal(observation, reason, compositeSignalCount) {
+        return {
+            shouldCreateRisk: true,
+            shouldClearRisk: false,
+            eventInput: {
+                eventType: 'DRIVER_INCAPACITATION',
+                targetId: observation.targetId,
+                severity: 'CRITICAL',
+                policyHint: 'COEXIST_WITH_DROWSINESS_PENDING_POLICY_ENGINE'
+            },
+            observation: observation.toJSON(),
+            compositeSignalCount,
+            reason
+        };
+    }
+
+    function incapacitationObservationToRiskSignal(observation) {
+        const rule = global.DriverStateConfig.incapacitation;
+        const value = observation.value;
+        if (!value || typeof value !== 'object' || Array.isArray(value)) {
+            return noRisk(observation, 'INVALID_INCAPACITATION_COMPOSITE');
+        }
+        const requiredFields = [...INCAPACITATION_COMPOSITE_SIGNALS, 'vehicleMoving', 'qualityValid'];
+        if (requiredFields.some(field => typeof value[field] !== 'boolean')) {
+            return noRisk(observation, 'INVALID_INCAPACITATION_COMPOSITE');
+        }
+
+        const observedAtMs = Date.parse(observation.observedAt);
+        const compositeSignalCount = INCAPACITATION_COMPOSITE_SIGNALS
+            .filter(field => value[field]).length;
+        const state = incapacitationRiskStates.get(observation.targetId) || {
+            enterStartedAt: null,
+            clearStartedAt: null,
+            riskActive: false
+        };
+
+        if (rule.requireQualityValid && !value.qualityValid) {
+            incapacitationRiskStates.set(observation.targetId, state);
+            return {
+                ...noRisk(observation, state.riskActive
+                    ? 'INCAPACITATION_SENSOR_UNAVAILABLE_RISK_PRESERVED'
+                    : 'INCAPACITATION_NO_DECISION_QUALITY_INVALID'),
+                compositeSignalCount
+            };
+        }
+
+        if (!state.riskActive) {
+            const entryCondition = (
+                (!rule.requireVehicleMoving || value.vehicleMoving) &&
+                compositeSignalCount >= rule.minimumCompositeSignalCount
+            );
+            if (!entryCondition) {
+                incapacitationRiskStates.delete(observation.targetId);
+                return {
+                    ...noRisk(observation, value.vehicleMoving
+                        ? 'INCAPACITATION_COMPOSITE_BELOW_ENTRY'
+                        : 'INCAPACITATION_VEHICLE_NOT_MOVING'),
+                    compositeSignalCount
+                };
+            }
+            if (state.enterStartedAt === null || observedAtMs < state.enterStartedAt) {
+                state.enterStartedAt = observedAtMs;
+            }
+            if (observedAtMs - state.enterStartedAt < rule.sustainMs) {
+                incapacitationRiskStates.set(observation.targetId, state);
+                return {
+                    ...noRisk(observation, 'INCAPACITATION_COMPOSITE_PENDING'),
+                    compositeSignalCount
+                };
+            }
+            state.riskActive = true;
+            state.clearStartedAt = null;
+            incapacitationRiskStates.set(observation.targetId, state);
+            return createIncapacitationRiskSignal(
+                observation,
+                'INCAPACITATION_RISK_CONFIRMED',
+                compositeSignalCount
+            );
+        }
+
+        const recoveryCondition = (
+            value.noResponse === false &&
+            value.upperBodyCollapse === false &&
+            value.headDrop === false
+        );
+        if (!recoveryCondition) {
+            state.clearStartedAt = null;
+            incapacitationRiskStates.set(observation.targetId, state);
+            return createIncapacitationRiskSignal(
+                observation,
+                'INCAPACITATION_RISK_MAINTAINED',
+                compositeSignalCount
+            );
+        }
+        if (state.clearStartedAt === null || observedAtMs < state.clearStartedAt) {
+            state.clearStartedAt = observedAtMs;
+        }
+        if (observedAtMs - state.clearStartedAt < rule.clearSustainMs) {
+            incapacitationRiskStates.set(observation.targetId, state);
+            return {
+                ...noRisk(observation, 'INCAPACITATION_RECOVERY_PENDING'),
+                compositeSignalCount
+            };
+        }
+        incapacitationRiskStates.delete(observation.targetId);
+        return {
+            ...noRisk(observation, 'INCAPACITATION_CLEARED'),
+            shouldClearRisk: true,
+            compositeSignalCount
+        };
+    }
+
+    function alcoholPolicySignal(observation, reason, policyDecision, policyStatus, overrides = {}) {
+        return {
+            ...noRisk(observation, reason),
+            policyDecision,
+            policyStatus,
+            ...overrides
+        };
+    }
+
+    function createAlcoholRiskSignal(observation, reason, policyDecision) {
+        return {
+            shouldCreateRisk: true,
+            shouldClearRisk: false,
+            eventInput: {
+                eventType: 'ALCOHOL_POLICY_VIOLATION',
+                targetId: observation.targetId,
+                severity: 'CRITICAL'
+            },
+            observation: observation.toJSON(),
+            policyDecision,
+            policyStatus: 'POLICY_VIOLATION',
+            reason
+        };
+    }
+
+    function alcoholObservationToRiskSignal(observation) {
+        const rule = global.DriverStateConfig.alcohol;
+        const value = observation.value;
+        if (!value || typeof value !== 'object' || Array.isArray(value)) {
+            return alcoholPolicySignal(observation, 'INVALID_ALCOHOL_MEASUREMENT', 'NO_DECISION', 'INVALID_MEASUREMENT');
+        }
+        const validStatuses = ['READY', 'WARMING_UP', 'MEASURING', 'VALID', 'FAILED'];
+        const validModes = ['PRE_START', 'IN_OPERATION'];
+        if (!validStatuses.includes(value.measurementStatus) || !validModes.includes(value.measurementMode)) {
+            return alcoholPolicySignal(observation, 'INVALID_ALCOHOL_MEASUREMENT', 'NO_DECISION', 'INVALID_MEASUREMENT');
+        }
+
+        const observedAtMs = Date.parse(observation.observedAt);
+        const state = alcoholRiskStates.get(observation.targetId) || {
+            enterStartedAt: null,
+            clearStartedAt: null,
+            riskActive: false
+        };
+        const preserveState = (reason, decision, status) => {
+            alcoholRiskStates.set(observation.targetId, state);
+            return alcoholPolicySignal(observation, reason, decision, status);
+        };
+
+        if (value.measurementStatus === 'FAILED') {
+            return preserveState('ALCOHOL_MEASUREMENT_FAILED', 'RETEST', 'ALCOHOL_MEASUREMENT_FAILED');
+        }
+        if (['READY', 'WARMING_UP', 'MEASURING'].includes(value.measurementStatus)) {
+            return preserveState(
+                `ALCOHOL_${value.measurementStatus}_NO_DECISION`,
+                'NO_DECISION',
+                value.measurementStatus
+            );
+        }
+        if (value.bypassSuspected === true) {
+            return preserveState('ALCOHOL_TEST_BYPASS_SUSPECTED', 'NO_DECISION', 'ALCOHOL_TEST_BYPASS_SUSPECTED');
+        }
+        if (rule.requireIdentityVerified && value.identityVerified !== true) {
+            return preserveState('DRIVER_IDENTITY_UNVERIFIED', 'NO_DECISION', 'DRIVER_IDENTITY_UNVERIFIED');
+        }
+        if (rule.requireCalibrationValid && value.calibrationStatus !== 'VALID') {
+            return preserveState('ALCOHOL_CALIBRATION_INVALID', 'RETEST', 'CALIBRATION_INVALID');
+        }
+        if (!Number.isFinite(Number(value.sampleQuality)) || Number(value.sampleQuality) < rule.minimumSampleQuality) {
+            return preserveState('ALCOHOL_SAMPLE_QUALITY_INSUFFICIENT', 'RETEST', 'SAMPLE_QUALITY_INSUFFICIENT');
+        }
+        const rawValue = Number(value.rawValue);
+        if (!Number.isFinite(rawValue) || value.unit !== rule.unit) {
+            return preserveState('INVALID_ALCOHOL_MEASUREMENT', 'NO_DECISION', 'INVALID_MEASUREMENT');
+        }
+
+        const violationDecision = rule.modePolicies[value.measurementMode];
+        if (!state.riskActive) {
+            if (rawValue < rule.entryThreshold) {
+                alcoholRiskStates.delete(observation.targetId);
+                return alcoholPolicySignal(observation, 'ALCOHOL_POLICY_ALLOW', 'ALLOW', 'VALID_CLEAR');
+            }
+            if (state.enterStartedAt === null || observedAtMs < state.enterStartedAt) {
+                state.enterStartedAt = observedAtMs;
+            }
+            if (observedAtMs - state.enterStartedAt < rule.sustainMs) {
+                alcoholRiskStates.set(observation.targetId, state);
+                return alcoholPolicySignal(
+                    observation,
+                    'ALCOHOL_POLICY_ENTRY_PENDING',
+                    violationDecision,
+                    'ENTRY_PENDING'
+                );
+            }
+            state.riskActive = true;
+            state.clearStartedAt = null;
+            alcoholRiskStates.set(observation.targetId, state);
+            return createAlcoholRiskSignal(observation, 'ALCOHOL_POLICY_RISK_CONFIRMED', violationDecision);
+        }
+
+        if (rawValue > rule.clearThreshold) {
+            state.clearStartedAt = null;
+            alcoholRiskStates.set(observation.targetId, state);
+            return createAlcoholRiskSignal(observation, 'ALCOHOL_POLICY_RISK_MAINTAINED', violationDecision);
+        }
+        if (state.clearStartedAt === null || observedAtMs < state.clearStartedAt) {
+            state.clearStartedAt = observedAtMs;
+        }
+        if (observedAtMs - state.clearStartedAt < rule.clearSustainMs) {
+            alcoholRiskStates.set(observation.targetId, state);
+            return alcoholPolicySignal(observation, 'ALCOHOL_POLICY_CLEAR_PENDING', 'ALLOW', 'CLEAR_PENDING');
+        }
+        alcoholRiskStates.delete(observation.targetId);
+        return alcoholPolicySignal(observation, 'ALCOHOL_POLICY_CLEARED', 'ALLOW', 'CLEARED', {
+            shouldClearRisk: true
+        });
+    }
+
+    function observationToRiskSignal(observation) {
+        if (!(observation instanceof SensorObservation)) return noRisk(null, 'INVALID_OBSERVATION');
+        if (observation.observationType === ObservationType.DROWSINESS) {
+            return drowsinessObservationToRiskSignal(observation);
+        }
+        if (observation.observationType === ObservationType.INCAPACITATION) {
+            return incapacitationObservationToRiskSignal(observation);
+        }
+        if (observation.observationType === ObservationType.ALCOHOL_LEVEL) {
+            return alcoholObservationToRiskSignal(observation);
+        }
+        if (observation.observationType === ObservationType.DRIVER_ATTENTION) {
+            const metadata=observation.metadata||{},state=metadata.attentionState,quality=metadata.quality||{};
+            const previous=driverAttentionRiskStates.get(observation.targetId)||{active:false};
+            if(!metadata.sensorConnected||quality.sampleFresh===false||state==='UNKNOWN'||state==='INVALID'){
+                driverAttentionRiskStates.set(observation.targetId,previous);
+                return {...noRisk(observation,state==='UNKNOWN'?'ATTENTION_SAMPLE_STALE':'ATTENTION_QUALITY_DEGRADED'),phase:state,reasonCodes:metadata.reasonCodes||[],preserveActiveRisk:previous.active};
+            }
+            if(state==='DISTRACTED'){
+                previous.active=true;driverAttentionRiskStates.set(observation.targetId,previous);
+                return{shouldCreateRisk:true,shouldClearRisk:false,eventInput:{eventType:'DRIVER_DISTRACTION',targetId:observation.targetId,severity:metadata.offRoadDurationMs>=5000?'HIGH':'MEDIUM'},observation:observation.toJSON(),reason:'PROLONGED_OFF_ROAD_GLANCE',reasonCodes:metadata.reasonCodes||[],phase:'ACTIVE'};
+            }
+            if(state==='RECOVERING'||state==='DISTRACTION_PENDING'||state==='BRIEF_GLANCE_AWAY'){
+                driverAttentionRiskStates.set(observation.targetId,previous);
+                return{...noRisk(observation,state==='RECOVERING'?'FORWARD_ATTENTION_RECOVERING':'DRIVER_DISTRACTION_ENTRY_PENDING'),phase:state,reasonCodes:metadata.reasonCodes||[],preserveActiveRisk:previous.active};
+            }
+            if(state==='ATTENTIVE'&&previous.active){driverAttentionRiskStates.delete(observation.targetId);return{shouldCreateRisk:false,shouldClearRisk:true,clearEventType:'DRIVER_DISTRACTION',eventInput:null,observation:observation.toJSON(),reason:'FORWARD_ATTENTION_RECOVERED',reasonCodes:metadata.reasonCodes||[],phase:'CLEARED'};}
+            return{...noRisk(observation,'DRIVER_ATTENTION_NORMAL'),phase:'NORMAL',reasonCodes:metadata.reasonCodes||[]};
+        }
+        if (observation.observationType === ObservationType.PEDESTRIAN_PROXIMITY) {
+            const value=observation.value||{},distance=value.distanceMeters,motion=value.motion;
+            if(distance===null||!Number.isFinite(distance)||observation.metadata?.quality?.measurementAvailable===false)return noRisk(observation,'PEDESTRIAN_PROXIMITY_QUALITY_UNAVAILABLE');
+            const state=pedestrianProximityRiskStates.get(observation.targetId)||{active:false};
+            if((distance<=3)||(motion==='MOVING_TOWARD'&&distance<=5)){state.active=true;pedestrianProximityRiskStates.set(observation.targetId,state);return{shouldCreateRisk:true,shouldClearRisk:false,eventInput:{eventType:'HUMAN_PROXIMITY',targetId:observation.targetId,severity:distance<=1.5?'CRITICAL':'HIGH'},observation:observation.toJSON(),reason:'PEDESTRIAN_PROXIMITY_RISK_CONFIRMED'};}
+            if(state.active&&motion==='MOVING_AWAY'&&distance>=4){pedestrianProximityRiskStates.delete(observation.targetId);return{shouldCreateRisk:false,shouldClearRisk:true,clearEventType:'HUMAN_PROXIMITY',eventInput:null,observation:observation.toJSON(),reason:'PEDESTRIAN_PROXIMITY_CLEARED'};}
+            return noRisk(observation,state.active?'PEDESTRIAN_PROXIMITY_RISK_RETAINED':'PEDESTRIAN_PROXIMITY_OUTSIDE_THRESHOLD');
+        }
+        if (observation.observationType === ObservationType.VEHICLE_PROXIMITY) {
+            const metadata=observation.metadata||{},quality=metadata.quality||{},distance=observation.value,motion=metadata.relativeMotion,closing=metadata.closingSpeedMps,ttc=metadata.timeToCollisionSeconds,at=Date.parse(observation.observedAt);
+            const state=vehicleProximityRiskStates.get(observation.targetId)||{entryStartedAt:null,clearStartedAt:null,riskActive:false};
+            if(!metadata.sensorConnected||!quality.detectionValid||!quality.distanceValid||!Number.isFinite(distance)){
+                vehicleProximityRiskStates.set(observation.targetId,state);
+                return {...noRisk(observation,'VEHICLE_TRACKING_DEGRADED'),phase:'QUALITY_DEGRADED',reasonCodes:['VEHICLE_DISTANCE_UNKNOWN','VEHICLE_TRACKING_DEGRADED'],configurationVersion:VEHICLE_PROXIMITY_RULE.configurationVersion};
+            }
+            const reasons=[];if(motion==='MOVING_TOWARD')reasons.push('VEHICLE_APPROACH_DETECTED');if(distance<=VEHICLE_PROXIMITY_RULE.closeDistanceMeters)reasons.push('VEHICLE_CLOSE_RANGE');if(Number.isFinite(closing)&&closing>=VEHICLE_PROXIMITY_RULE.highClosingSpeedMps)reasons.push('VEHICLE_HIGH_CLOSING_SPEED');if(Number.isFinite(ttc)&&ttc<=VEHICLE_PROXIMITY_RULE.lowTtcSeconds)reasons.push('VEHICLE_LOW_TTC');if(metadata.relativeDirection==='REAR'||metadata.relativeDirection==='REAR_LEFT'||metadata.relativeDirection==='REAR_RIGHT')reasons.push('VEHICLE_REAR_APPROACH');if(['LEFT','RIGHT','FRONT_LEFT','FRONT_RIGHT'].includes(metadata.relativeDirection))reasons.push('VEHICLE_SIDE_APPROACH');if(String(motion).startsWith('CROSSING_'))reasons.push('VEHICLE_CROSSING_PATH');
+            const candidate=motion==='MOVING_TOWARD'&&distance<=VEHICLE_PROXIMITY_RULE.entryDistanceMeters&&(distance<=VEHICLE_PROXIMITY_RULE.closeDistanceMeters||(Number.isFinite(closing)&&closing>=VEHICLE_PROXIMITY_RULE.highClosingSpeedMps)||(Number.isFinite(ttc)&&ttc<=VEHICLE_PROXIMITY_RULE.lowTtcSeconds));
+            if(state.riskActive){
+                const clearing=motion==='MOVING_AWAY'||distance>=VEHICLE_PROXIMITY_RULE.clearDistanceMeters;
+                if(!clearing){state.clearStartedAt=null;vehicleProximityRiskStates.set(observation.targetId,state);return{shouldCreateRisk:true,shouldClearRisk:false,eventInput:{eventType:'VEHICLE_PROXIMITY',targetId:observation.targetId,severity:distance<=2||ttc!==null&&ttc<=3?'CRITICAL':'HIGH'},observation:observation.toJSON(),reason:'VEHICLE_PROXIMITY_ACTIVE',reasonCodes:reasons,phase:'ACTIVE',configurationVersion:VEHICLE_PROXIMITY_RULE.configurationVersion}}
+                if(state.clearStartedAt===null||at<state.clearStartedAt)state.clearStartedAt=at;
+                if(at-state.clearStartedAt<VEHICLE_PROXIMITY_RULE.clearSustainMs){vehicleProximityRiskStates.set(observation.targetId,state);return{...noRisk(observation,'VEHICLE_PROXIMITY_CLEAR_PENDING'),phase:'CLEAR_PENDING',reasonCodes:reasons,configurationVersion:VEHICLE_PROXIMITY_RULE.configurationVersion}}
+                vehicleProximityRiskStates.delete(observation.targetId);return{shouldCreateRisk:false,shouldClearRisk:true,clearEventType:'VEHICLE_PROXIMITY',eventInput:null,observation:observation.toJSON(),reason:'VEHICLE_PROXIMITY_CLEARED',reasonCodes:reasons,phase:'CLEARED',configurationVersion:VEHICLE_PROXIMITY_RULE.configurationVersion};
+            }
+            if(!candidate){state.entryStartedAt=null;vehicleProximityRiskStates.set(observation.targetId,state);return{...noRisk(observation,'VEHICLE_PROXIMITY_NORMAL'),phase:'NORMAL',reasonCodes:reasons,configurationVersion:VEHICLE_PROXIMITY_RULE.configurationVersion}}
+            if(state.entryStartedAt===null||at<state.entryStartedAt)state.entryStartedAt=at;
+            if(at-state.entryStartedAt<VEHICLE_PROXIMITY_RULE.entrySustainMs){vehicleProximityRiskStates.set(observation.targetId,state);return{...noRisk(observation,'VEHICLE_PROXIMITY_ENTRY_PENDING'),phase:'ENTRY_PENDING',reasonCodes:reasons,configurationVersion:VEHICLE_PROXIMITY_RULE.configurationVersion}}
+            state.riskActive=true;state.clearStartedAt=null;vehicleProximityRiskStates.set(observation.targetId,state);return{shouldCreateRisk:true,shouldClearRisk:false,eventInput:{eventType:'VEHICLE_PROXIMITY',targetId:observation.targetId,severity:distance<=2||ttc!==null&&ttc<=3?'CRITICAL':'HIGH'},observation:observation.toJSON(),reason:'VEHICLE_PROXIMITY_RISK_CONFIRMED',reasonCodes:reasons,phase:'ACTIVATED',configurationVersion:VEHICLE_PROXIMITY_RULE.configurationVersion};
+        }
+        return noRisk(observation, 'NO_RISK_RULE_CONFIGURED');
+    }
+
+    function resetDrowsinessRiskState(targetId) {
+        if (targetId) { drowsinessRiskStates.delete(targetId); liveDrowsinessRiskStates.delete(targetId); }
+        else { drowsinessRiskStates.clear(); liveDrowsinessRiskStates.clear(); }
+    }
+
+    function resetIncapacitationRiskState(targetId) {
+        if (targetId) incapacitationRiskStates.delete(targetId);
+        else incapacitationRiskStates.clear();
+    }
+
+    function resetAlcoholRiskState(targetId) {
+        if (targetId) alcoholRiskStates.delete(targetId);
+        else alcoholRiskStates.clear();
+    }
+
+    function resetPedestrianProximityRiskState(targetId) {
+        if (targetId) pedestrianProximityRiskStates.delete(targetId);
+        else pedestrianProximityRiskStates.clear();
+    }
+
+    function resetVehicleProximityRiskState(targetId) {
+        if (targetId) vehicleProximityRiskStates.delete(targetId);
+        else vehicleProximityRiskStates.clear();
+    }
+
+    function resetDriverAttentionRiskState(targetId) {
+        if (targetId) driverAttentionRiskStates.delete(targetId);
+        else driverAttentionRiskStates.clear();
+    }
+
+    global.DriverRiskRuntime = Object.freeze({
+        EventState,
+        RiskEvent,
+        RiskEventStateMachine,
+        observationToRiskSignal,
+        resetDrowsinessRiskState,
+        resetIncapacitationRiskState,
+        resetAlcoholRiskState,
+        resetPedestrianProximityRiskState,
+        resetVehicleProximityRiskState,
+        resetDriverAttentionRiskState,
+        vehicleProximityRule: VEHICLE_PROXIMITY_RULE
+    });
+}(window));

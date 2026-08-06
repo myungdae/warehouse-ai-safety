@@ -1,0 +1,33 @@
+<!doctype html><html><head><meta charset="utf-8"><title>RUNNING - Driver Yawn Metrics</title></head><body><pre id="result">RUNNING</pre>
+<script>window.addEventListener('error',e=>{document.title='FAIL - Driver Yawn Metrics';result.textContent=e.error?.stack||e.message})</script>
+<script src="../backend/static/js/sensor_observation.js"></script><script src="../backend/static/js/driver_state_config.js"></script><script src="../backend/static/js/driver_state.js"></script>
+<script src="../backend/static/js/driver_perception/driver_perception_config.js"></script><script src="../backend/static/js/driver_perception/driver_calibration.js"></script><script src="../backend/static/js/driver_perception/driver_metric_calculator.js"></script><script src="../backend/static/js/driver_perception/driver_metric_snapshot.js"></script><script src="../backend/static/js/driver_risk_runtime.js"></script>
+<script>
+(()=>{'use strict';
+ const pass=[],ok=(v,n)=>{if(!v)throw Error(n);pass.push(n)},M=DriverPerception.Config.metrics.mouthIndices;
+ function points(mar){
+  const p=Array.from({length:468},()=>({x:.5,y:.5,z:0}));p[61]={x:.3,y:.5,z:0};p[291]={x:.7,y:.5,z:0};
+  M.verticalPairs.forEach(([u,l])=>{p[u]={x:.5,y:.5-mar*.2,z:0};p[l]={x:.5,y:.5+mar*.2,z:0}});
+  p[1]={x:.5,y:.4,z:0};
+  const eye=(ids,x)=>{p[ids[0]]={x:x-.05,y:.4,z:0};p[ids[3]]={x:x+.05,y:.4,z:0};p[ids[1]]={x:x-.025,y:.385,z:0};p[ids[5]]={x:x-.025,y:.415,z:0};p[ids[2]]={x:x+.025,y:.385,z:0};p[ids[4]]={x:x+.025,y:.415,z:0}};
+  eye(DriverPerception.Config.metrics.leftEyeIndices,.4);eye(DriverPerception.Config.metrics.rightEyeIndices,.6);return p;
+ }
+ const mar=x=>DriverPerception.DriverMetricCalculator.computeMouthMAR(x,M);
+ const closed=mar(points(.1)),moderate=mar(points(.3)),wide=mar(points(.6));
+ ok(Math.abs(closed-.1)<1e-9,'CLOSED_MAR');ok(closed<moderate&&moderate<wide,'MAR_OPEN_ORDER');
+ const zero=points(.2);zero[291]={...zero[61]};ok(mar(zero)===null,'ZERO_WIDTH');const missing=points(.2);delete missing[14];ok(mar(missing)===null,'MISSING');const invalid=points(.2);invalid[13].x=Infinity;ok(mar(invalid)===null,'NONFINITE');
+ const c=new DriverPerception.DriverCalibration({durationMs:3,minimumSamples:3,minimumOpenEar:.1,minimumBaseline:.1,thresholdRatio:.75,minimumMouthSamples:3,maximumNeutralMar:.28,mouthOpenThresholdRatio:1.8,mouthOpenThresholdOffset:.08});
+ c.start(0);c.addSample(.3,{mar:.1,marValid:true,timestamp:1});c.addSample(.3,{mar:.11,marValid:true,timestamp:2});let cs=c.addSample(.3,{mar:.6,marValid:true,timestamp:3});ok(cs.calibrated&&!cs.mouthCalibrationAvailable,'OPEN_EXCLUDED');
+ c.reset(true,'TEST_EXPLICIT_RECALIBRATION');c.start(10);c.addSample(.3,{mar:.1,marValid:true,timestamp:11});c.addSample(.3,{mar:.11,marValid:true,timestamp:12});cs=c.addSample(.3,{mar:.12,marValid:true,timestamp:13});ok(cs.mouthCalibrationAvailable&&Math.abs(cs.mouthBaseline-.11)<1e-9,'MOUTH_BASELINE');ok(cs.mouthOpenThreshold>cs.mouthBaseline,'MOUTH_THRESHOLD');c.reset();ok(!c.getState().mouthCalibrationAvailable,'CALIBRATION_RESET');
+ const config={...DriverPerception.Config.metrics,marSmoothingAlpha:.8,yawn:{...DriverPerception.Config.yawn,mouthOpenMinimumMs:500,yawnConfirmationMs:1000,yawnClearMs:0,maximumValidYawnMs:5000,staleSampleMs:1200}};
+ const calc=new DriverPerception.DriverMetricCalculator(config),cal={calibrated:true,threshold:.2,mouthCalibrationAvailable:true,mouthBaseline:.1,mouthOpenThreshold:.2};
+ const frame=(t,v,face=true)=>({timestamp:new Date(t).toISOString(),faceDetected:face,landmarks:face?points(v):null});
+ let x=calc.processFrame(frame(1000,.1),cal);ok(Number.isFinite(x.marRaw)&&Number.isFinite(x.marSmoothed),'RAW_SMOOTHED_FIELDS');x=calc.processFrame(frame(1100,.6),cal);ok(x.marRaw!==x.marSmoothed&&!x.yawnConfirmed,'ONE_FRAME_NO_YAWN');x=calc.processFrame(frame(1300,.1),cal);ok(x.yawnCount===0,'SHORT_NO_YAWN');
+ x=calc.processFrame(frame(2000,.6),cal);x=calc.processFrame(frame(2600,.6),cal);ok(x.yawnCandidate&&!x.yawnConfirmed,'YAWN_CANDIDATE');x=calc.processFrame(frame(3100,.6),cal);ok(x.yawnConfirmed&&x.yawnCount===0,'YAWN_CONFIRMED');x=calc.processFrame(frame(3200,.6),cal);ok(x.yawnCount===0,'NO_DUPLICATE');x=calc.processFrame(frame(3300,.1),cal);x=calc.processFrame(frame(3650,.1),cal);ok(x.yawnCount===1,'CLOSE_COUNTS_ONE');
+ x=calc.processFrame(frame(4000,.6),cal);x=calc.processFrame(frame(5100,.6),cal);x=calc.processFrame(frame(5200,.1),cal);x=calc.processFrame(frame(5550,.1),cal);ok(x.yawnCount===2,'TWO_EPISODES');const count=x.yawnCount;x=calc.processFrame(frame(5700,.6,false),cal);ok(x.yawnState==='INVALID'&&x.yawnCount===count,'FACE_LOSS');x=calc.processFrame(frame(7000,.6),cal);ok(x.yawnState==='INVALID','STALE_RESET');calc.reset();x=calc.processFrame(frame(7100,.1),cal);ok(x.yawnCount===0,'RESET');
+ const snap=DriverPerception.createDriverMetricSnapshot({frame:frame(7100,.1),metrics:x,calibration:{state:'READY',calibrated:true,baseline:.3,threshold:.2,mouthCalibrationAvailable:true,mouthBaseline:.1,mouthOpenThreshold:.2},now:7100});ok('mar'in snap.metrics&&'yawnState'in snap.metrics&&snap.quality.yawnMetricAvailable,'SNAPSHOT_FIELDS');ok(Object.isFrozen(snap)&&Object.isFrozen(snap.metrics),'IMMUTABLE');const json=JSON.stringify(snap);ok(!json.includes('landmarks')&&!json.includes('mouthImage'),'NO_RAW_MEDIA');ok(!snap.privacy.imageStored&&!snap.privacy.imageTransmitted,'PRIVACY');
+ const context={vehicleType:'FORKLIFT',vehicleId:'F03',driverId:'D1',driverAssignmentId:'A1'},obs=DriverState.createDriverObservation({context,observationType:'DROWSINESS',value:'live-driver-state',unit:'composite-driver-state',confidence:null,observedAt:new Date(8000),metadata:{sensorId:'cam',sensorType:'DRIVER_CAMERA',source:'live-webcam',simulation:false,sensorConnected:true,measurementStatus:'VALID',sampleWindowMs:0,algorithmVersion:'v',configurationVersion:'v',operationalUseAllowed:false,metrics:{ear:.3,earThreshold:.2,eyeClosed:false,eyeClosureDurationMs:0,perclos:10,yawnConfirmed:true,yawnCount:1},quality:{confidenceAvailable:false,faceDetected:true,landmarkAvailable:true,calibrated:true,calibrationState:'READY',earValid:true,perclosValid:true,sampleAgeMs:0,marValid:true,mouthCalibrationAvailable:true,yawnMetricAvailable:true}}});
+ const signal=DriverRiskRuntime.observationToRiskSignal(obs);ok(!signal.shouldCreateRisk&&signal.supportingEvidence.includes('YAWN_CONFIRMED_SUPPORTING_SIGNAL'),'YAWN_SUPPORT_ONLY');
+ document.title=`PASS - Driver Yawn Metrics (${pass.length})`;result.textContent=pass.join('\n');
+})()
+</script></body></html>

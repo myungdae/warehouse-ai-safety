@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><title>Driver alcohol runtime regression</title></head>
+<body>
+  <form id="driverStateTestForm">
+    <select id="driverVehicleType"><option>FORKLIFT</option></select>
+    <input id="driverVehicleId" value="F-03"><input id="driverId" value="DRIVER001">
+    <input id="driverAssignmentId" value="ASSIGNMENT001">
+    <select id="driverObservationType"><option>ALCOHOL_LEVEL</option></select>
+    <button id="drowsinessTestButton" type="submit">DROWSINESS</button>
+    <button id="incapacitationTestButton" type="submit">INCAPACITATION</button>
+    <button id="alcoholTestButton" type="submit">ALCOHOL</button>
+  </form>
+  <span id="driverTargetId"></span><pre id="vehicleContextOutput"></pre>
+  <pre id="lastDriverObservation"></pre><pre id="driverSequenceStatus"></pre><pre id="driverAdapterStatus"></pre>
+  <pre id="lastDriverRiskSignal"></pre><pre id="driverRiskEventHistory"></pre>
+  <pre id="driverCurrentEventId"></pre><pre id="driverCurrentEventState"></pre>
+  <pre id="driverCompositeSignalCount"></pre><pre id="driverQualityValid"></pre><pre id="driverVehicleMoving"></pre>
+  <pre id="driverAlcoholMeasurementMode"></pre><pre id="driverAlcoholMeasurementStatus"></pre>
+  <pre id="driverAlcoholRawValue"></pre><pre id="driverAlcoholUnit"></pre>
+  <pre id="driverAlcoholPolicyDecision"></pre><pre id="driverAlcoholRetryCount"></pre>
+  <pre id="driverAlcoholIdentityVerified"></pre><pre id="driverAlcoholCalibrationStatus"></pre>
+  <pre id="driverAlcoholSampleQuality"></pre><pre id="result">RUNNING</pre>
+  <script src="../backend/static/js/sensor_observation.js"></script>
+  <script src="../backend/static/js/driver_state_config.js"></script>
+  <script src="../backend/static/js/driver_state.js"></script>
+  <script src="../backend/static/js/driver_sensor_adapters.js"></script>
+  <script src="../backend/static/js/driver_risk_runtime.js"></script>
+  <script>
+    (function runRegression() {
+      'use strict';
+      const result = document.getElementById('result');
+      const assert = (condition, message) => { if (!condition) throw new Error(message); };
+      const timers = new Map();
+      let timerId = 0;
+      window.setTimeout = callback => { timerId += 1; timers.set(timerId, { callback, cleared: false }); return timerId; };
+      window.clearTimeout = id => { if (timers.has(id)) timers.get(id).cleared = true; };
+      const runNext = () => {
+        const item = Array.from(timers.entries()).find(([, timer]) => !timer.cleared);
+        if (!item) throw new Error('Expected pending timer');
+        timers.delete(item[0]); item[1].callback(); return item[1];
+      };
+      const finish = () => { while (Array.from(timers.values()).some(timer => !timer.cleared)) runNext(); };
+      const submit = () => document.getElementById('driverStateTestForm')
+        .requestSubmit(document.getElementById('alcoholTestButton'));
+
+      try {
+        const D = window.DriverState;
+        const R = window.DriverRiskRuntime;
+        const O = window.SafetyObservation.ObservationType;
+        const rule = window.DriverStateConfig.alcohol;
+        const context = (assignment = 'ASSIGNMENT001') => new D.VehicleContext({
+          vehicleType: 'FORKLIFT', vehicleId: 'F-03', driverId: 'DRIVER001', driverAssignmentId: assignment
+        });
+        const ctx = context();
+        const create = (overrides, observedAt) => {
+          const value = {
+            rawValue: 0,
+            unit: rule.unit,
+            measurementMode: 'PRE_START',
+            measurementStatus: 'VALID',
+            sampleId: `sample-${observedAt}`,
+            attemptNumber: 1,
+            retryCount: 0,
+            identityVerified: true,
+            sampleQuality: 1,
+            calibrationStatus: 'VALID',
+            bypassSuspected: false,
+            ...overrides
+          };
+          return D.createDriverObservation({
+            context: ctx, observationType: O.ALCOHOL_LEVEL, value,
+            unit: rule.unit, confidence: 1, observedAt: new Date(observedAt),
+            metadata: {
+              cameraId: null, sensorId: 'deterministic-alcohol-test', sensorType: 'DETERMINISTIC_TEST',
+              source: 'deterministic-test', simulation: true, sensorConnected: false,
+              measurementMode: value.measurementMode, measurementStatus: value.measurementStatus,
+              sampleId: value.sampleId, attemptNumber: value.attemptNumber,
+              identityVerified: value.identityVerified, sampleQuality: value.sampleQuality,
+              calibrationStatus: value.calibrationStatus, bypassSuspected: value.bypassSuspected,
+              sampleWindowMs: 0, algorithmVersion: 'deterministic-alcohol-v1',
+              configurationVersion: rule.configurationVersion, policyVersion: rule.policyVersion,
+              operationalUseAllowed: false, metrics: {}, quality: { deterministic: true },
+              policy: { operationalUseAllowed: false, notice: 'NOT_FOR_OPERATIONAL_DECISION' }
+            }
+          });
+        };
+        const signal = (overrides, time) => R.observationToRiskSignal(create(overrides, time));
+
+        assert(!signal({ measurementStatus: 'WARMING_UP' }, 0).shouldCreateRisk, 'WARMING_UP must not create event');
+        assert(!signal({ measurementStatus: 'MEASURING' }, 10).shouldCreateRisk, 'MEASURING must not create event');
+        assert(signal({ measurementStatus: 'FAILED' }, 20).policyDecision === 'RETEST', 'FAILED must require RETEST');
+        assert(!signal({ identityVerified: false, rawValue: rule.entryThreshold }, 30).shouldCreateRisk,
+          'Unverified identity must not create event');
+        assert(!signal({ calibrationStatus: 'INVALID', rawValue: rule.entryThreshold }, 40).shouldCreateRisk,
+          'Invalid calibration must not create event');
+        assert(!signal({ sampleQuality: rule.minimumSampleQuality - 0.1, rawValue: rule.entryThreshold }, 50).shouldCreateRisk,
+          'Insufficient sample quality must not create event');
+        assert(signal({ bypassSuspected: true, rawValue: rule.entryThreshold }, 60).policyStatus === 'ALCOHOL_TEST_BYPASS_SUSPECTED',
+          'Bypass must have separate policy status');
+
+        R.resetAlcoholRiskState(ctx.targetId);
+        let pending = signal({ rawValue: rule.entryThreshold, measurementMode: 'PRE_START' }, 1000);
+        assert(pending.policyDecision === 'BLOCK_START' && !pending.shouldCreateRisk, 'PRE_START must enter BLOCK_START pending');
+        let confirmed = signal({ rawValue: rule.entryThreshold, measurementMode: 'PRE_START' }, 1300);
+        assert(confirmed.shouldCreateRisk && confirmed.policyDecision === 'BLOCK_START', '300ms PRE_START must confirm');
+        const machine = new R.RiskEventStateMachine();
+        let event = machine.observe(confirmed.eventInput, confirmed.observation.observedAt);
+        assert(event.state === 'NEW', 'Confirmed policy violation must create NEW');
+        const firstId = event.eventId;
+        let maintained = signal({ rawValue: rule.entryThreshold }, 1450);
+        event = machine.observe(maintained.eventInput, maintained.observation.observedAt);
+        assert(event.state === 'ACTIVE', 'Next valid violation must activate');
+        machine.acknowledge(event.eventId, new Date(1450));
+        event = machine.observe(maintained.eventInput, new Date(1600));
+        assert(event.state === 'ACKNOWLEDGED', 'Maintained violation must preserve ACK');
+        const failedWhileActive = signal({ measurementStatus: 'FAILED' }, 1700);
+        assert(!failedWhileActive.shouldClearRisk && machine.activeEvents.size === 1,
+          'Failure/disconnect semantics must preserve active event');
+        assert(signal({ rawValue: rule.clearThreshold }, 1800).reason === 'ALCOHOL_POLICY_CLEAR_PENDING',
+          'Valid clear measurement must enter pending');
+        const clearSignal = signal({ rawValue: rule.clearThreshold }, 2100);
+        assert(clearSignal.shouldClearRisk, '300ms valid clear must clear');
+        event = machine.clear('ALCOHOL_POLICY_VIOLATION', ctx.targetId, clearSignal.observation.observedAt);
+        assert(event.state === 'CLEARED', 'Acknowledged event must clear');
+
+        R.resetAlcoholRiskState(ctx.targetId);
+        const operationPending = signal({ rawValue: rule.entryThreshold, measurementMode: 'IN_OPERATION' }, 3000);
+        assert(operationPending.policyDecision === 'SAFE_STOP_REQUEST', 'IN_OPERATION must request safe stop');
+        const operationConfirmed = signal({ rawValue: rule.entryThreshold, measurementMode: 'IN_OPERATION' }, 3300);
+        assert(operationConfirmed.shouldCreateRisk && operationConfirmed.policyDecision === 'SAFE_STOP_REQUEST',
+          'IN_OPERATION sustain must create policy violation');
+
+        window.DriverStatePage = D.initializeDriverStatePage();
+        submit(); finish();
+        let history = JSON.parse(document.getElementById('driverRiskEventHistory').textContent);
+        assert(history.length === 1 && history[0].state === 'CLEARED', 'UI sequence must clear');
+        const completedId = history[0].eventId;
+        submit(); finish();
+        history = JSON.parse(document.getElementById('driverRiskEventHistory').textContent);
+        assert(history.length === 1 && history[0].eventId !== completedId, 'Completed rerun must use new eventId');
+
+        submit(); runNext(); runNext(); runNext(); runNext();
+        const interruptedId = document.getElementById('driverCurrentEventId').textContent;
+        const stale = Array.from(timers.values()).find(timer => !timer.cleared);
+        submit();
+        assert(stale.cleared, 'Restart must cancel prior timer');
+        const before = window.DriverStatePage.getSequenceRunState().observationHistory.length;
+        stale.callback();
+        assert(window.DriverStatePage.getSequenceRunState().observationHistory.length === before,
+          'Stale callback must not affect new run');
+        finish();
+        history = JSON.parse(document.getElementById('driverRiskEventHistory').textContent);
+        assert(history.length === 1 && history[0].eventId !== interruptedId, 'Interrupted rerun must isolate eventId/history');
+        assert(window.DriverStatePage.getRiskEventHistory().find(item => item.eventId === interruptedId).state === 'CLEARED',
+          'Interrupted event must be explicitly cleared');
+
+        const assignmentTwo = context('ASSIGNMENT002');
+        assert(ctx.targetId !== assignmentTwo.targetId, 'Assignments must be isolated');
+        const isolationMachine = new R.RiskEventStateMachine();
+        const other = isolationMachine.observe({
+          eventType: 'ALCOHOL_POLICY_VIOLATION', targetId: assignmentTwo.targetId, severity: 'CRITICAL'
+        }, new Date(4000));
+        isolationMachine.clear('ALCOHOL_POLICY_VIOLATION', ctx.targetId, new Date(4100));
+        assert(isolationMachine.activeEvents.has(isolationMachine.getEventKey('ALCOHOL_POLICY_VIOLATION', other.targetId)),
+          'Clearing one target must preserve another target');
+        assert(firstId !== history[0].eventId, 'Separate runs must use new ids');
+        result.textContent = 'PASS'; document.title = 'PASS';
+      } catch (error) {
+        result.textContent = `FAIL\n${error.stack || error.message}`; document.title = 'FAIL';
+      }
+    }());
+  </script>
+</body>
+</html>

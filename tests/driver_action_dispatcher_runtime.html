@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>Driver action dispatcher regression</title></head>
+<body><pre id="result">RUNNING</pre>
+  <script src="../backend/static/js/driver_policy_config.js"></script>
+  <script src="../backend/static/js/driver_policy_engine.js"></script>
+  <script src="../backend/static/js/driver_action_config.js"></script>
+  <script src="../backend/static/js/driver_action_dispatcher.js"></script>
+  <script>
+    (function runTests() {
+      'use strict';
+      const assert = (condition, message) => { if (!condition) throw new Error(message); };
+      const A = window.DriverActions;
+      const P = window.DriverPolicy;
+      const config = window.DriverActionConfig;
+      const timers = new Map(); let timerId = 0;
+      window.setTimeout = callback => { timerId += 1; timers.set(timerId, { callback, cleared: false }); return timerId; };
+      window.clearTimeout = id => { if (timers.has(id)) timers.get(id).cleared = true; };
+      const runNext = () => { const item = Array.from(timers.entries()).find(([, timer]) => !timer.cleared);
+        if (!item) throw new Error('Expected timer'); timers.delete(item[0]); item[1].callback(); return item[1]; };
+      const runAll = () => { while (Array.from(timers.values()).some(timer => !timer.cleared)) runNext(); };
+      const ctx = (assignment = 'ASSIGNMENT001', vehicle = 'F-03') => ({ vehicleId: vehicle,
+        vehicleType: 'FORKLIFT', driverId: 'DRIVER001', driverAssignmentId: assignment,
+        targetId: `${vehicle.replace('-', '')}|DRIVER001|${assignment}` });
+      const action = (id, type, target, priority = 100, created = 0, state = 'REQUESTED', source = 'event-1') => ({
+        actionId: id, actionType: type, targetId: target, sourceEventId: source,
+        sourceDecisionId: `decision-${source}`, createdTime: new Date(created).toISOString(),
+        updatedTime: new Date(created).toISOString(), state, priority, channel: 'SIMULATION_REQUEST_ONLY',
+        message: 'Request generated only', requiresAcknowledgement: true, acknowledgedTime: null,
+        completedTime: null, cancelledTime: null, metadata: { simulation: true,
+          operationalUseAllowed: false, policyReasonCodes: ['TEST_POLICY_REASON'] }
+      });
+
+      try {
+        const model = new A.ActionExecution({ executionId: 'x', actionId: 'a', sourceDecisionId: 'd',
+          sourceEventId: 'e', targetId: 't', actionType: 'VOICE_WARNING', adapterType: 'DeterministicActionTestAdapter',
+          requestedTime: new Date(0).toISOString(), startedTime: null, completedTime: null, failedTime: null,
+          cancelledTime: null, state: 'QUEUED', result: 'NO_OPERATIONAL_EXECUTION', reasonCode: 'QUEUED',
+          attemptNumber: 0, simulation: true, actuatorConnected: false, operationalUseAllowed: false,
+          metadata: { relationships: { actionExecutionHasState: 'QUEUED' } } });
+        const serialized = JSON.parse(JSON.stringify(model));
+        assert(serialized.executionId === 'x' && serialized.simulation === true &&
+          serialized.actuatorConnected === false && serialized.operationalUseAllowed === false,
+          'ActionExecution serialization and safety flags');
+
+        const dispatcher = new A.DriverActionDispatcher(config); const c1 = ctx();
+        Object.entries(config.adapterRouting).forEach(([type, adapterType], index) => {
+          const selected = dispatcher.selectAdapter(action(`route-${index}`, type, c1.targetId));
+          assert(selected.adapterType === adapterType && selected.adapter.supports({ actionType: type }), `Route ${type}`);
+        });
+        const realAdapters = [new A.VoiceWarningAdapter(), new A.VisualWarningAdapter(),
+          new A.SeatVibrationAdapter(), new A.BeaconAdapter(), new A.SupervisorNotificationAdapter(),
+          new A.RetestAdapter(), new A.VehicleControlRequestAdapter(), new A.EmergencyResponseRequestAdapter()];
+        realAdapters.forEach(adapter => {
+          assert(adapter.isConnected() === false && adapter.dispatch().result === 'ADAPTER_UNAVAILABLE',
+            `${adapter.adapterType} must remain unavailable`);
+        });
+        const deterministic = new A.DeterministicActionTestAdapter();
+        assert(deterministic.dispatch({ actionType: 'VOICE_WARNING' }).state === 'SIMULATED',
+          'Only deterministic adapter simulates');
+
+        const high = action('high', 'EMERGENCY_RESPONSE_REQUEST', c1.targetId, 900, 20);
+        const low = action('low', 'VISUAL_WARNING', c1.targetId, 100, 0);
+        dispatcher.enqueue(low, c1, new Date(0)); dispatcher.enqueue(high, c1, new Date(1));
+        const duplicate = dispatcher.enqueue(high, c1, new Date(2));
+        assert(dispatcher.getDriverActionExecutions().length === 2 && duplicate.actionId === 'high',
+          'Duplicate actionId must reuse execution');
+        dispatcher.dispatchPending(c1.targetId); runAll();
+        const dispatchOrder = dispatcher.getDriverActionAuditTrail()
+          .filter(item => item.type === 'EXECUTION_DISPATCHING').map(item => item.execution.actionId);
+        assert(dispatchOrder.join('|') === 'high|low', 'Priority queue order');
+        const highExecution = dispatcher.executionByActionId.get('high');
+        assert(highExecution.state === 'SIMULATED' && highExecution.attemptNumber === 1,
+          'QUEUED -> DISPATCHING -> SIMULATED');
+        dispatcher.acknowledge(highExecution.executionId, new Date(10));
+        assert(highExecution.state === 'ACKNOWLEDGED', 'ACKNOWLEDGED transition');
+        dispatcher.complete(highExecution.executionId, new Date(11));
+        assert(highExecution.state === 'COMPLETED', 'COMPLETED transition');
+        const afterComplete = dispatcher.enqueue(high, c1, new Date(12));
+        assert(afterComplete.executionId === highExecution.executionId && afterComplete.state === 'COMPLETED',
+          'Completed action cannot re-execute');
+
+        const equal = new A.DriverActionDispatcher(config);
+        equal.enqueue(action('later', 'VOICE_WARNING', c1.targetId, 400, 20), c1);
+        equal.enqueue(action('earlier', 'VISUAL_WARNING', c1.targetId, 400, 10), c1);
+        equal.dispatchPending(c1.targetId); runAll();
+        assert(equal.getDriverActionAuditTrail().filter(i => i.type === 'EXECUTION_DISPATCHING')
+          .map(i => i.execution.actionId).join('|') === 'earlier|later', 'Equal priority createdTime order');
+
+        const unsupportedDispatcher = new A.DriverActionDispatcher(config);
+        unsupportedDispatcher.enqueue(action('unsupported', 'UNKNOWN_ACTION', c1.targetId), c1);
+        unsupportedDispatcher.dispatchPending(c1.targetId); runAll();
+        assert(unsupportedDispatcher.getFailedActionExecutions()[0].result === 'UNSUPPORTED_ACTION',
+          'Unsupported action produces failed execution without throwing');
+
+        const failure = new A.DriverActionDispatcher(config);
+        const failed = failure.enqueue(action('failed', 'VOICE_WARNING', c1.targetId), c1);
+        failure.dispatchPending(c1.targetId); runNext();
+        failure.fail(failed.executionId, 'DETERMINISTIC_ADAPTER_FAILURE'); runAll();
+        assert(failed.state === 'FAILED' && failed.reasonCode === 'DETERMINISTIC_ADAPTER_FAILURE', 'Failure reason preserved');
+        const cancelled = failure.enqueue(action('cancelled', 'BEACON_REQUEST', c1.targetId), c1);
+        failure.cancel(cancelled.executionId, 'CANCELLED_BY_POLICY_TEST');
+        assert(cancelled.state === 'CANCELLED' && cancelled.reasonCode === 'CANCELLED_BY_POLICY_TEST', 'Cancel reason preserved');
+        const terminal = failure.enqueue(action('terminal', 'VOICE_WARNING', c1.targetId, 100, 0, 'COMPLETED'), c1);
+        assert(terminal.state === 'CANCELLED' && terminal.reasonCode === 'ACTION_REQUEST_ALREADY_TERMINAL',
+          'Terminal ActionRequest cannot execute');
+
+        const isolation = new A.DriverActionDispatcher(config); const c2 = ctx('ASSIGNMENT002');
+        const one = isolation.enqueue(action('one', 'VOICE_WARNING', c1.targetId), c1);
+        const two = isolation.enqueue(action('two', 'VOICE_WARNING', c2.targetId), c2);
+        isolation.dispatchPending(c1.targetId); const stale = Array.from(timers.values()).find(t => !t.cleared);
+        isolation.resetTarget(c1.targetId, new Date(20));
+        assert(stale.cleared && one.state === 'CANCELLED' && two.state === 'QUEUED',
+          'Reset cancels only current target and timer');
+        const auditBefore = isolation.getDriverActionAuditTrail().length; stale.callback();
+        assert(isolation.getDriverActionAuditTrail().length === auditBefore, 'Stale callback isolated');
+
+        const policyEngine = new P.DriverPolicyEngine(window.DriverPolicyConfig);
+        const event = (id, type, state, created = 100) => ({ eventId: id, eventType: type,
+          targetId: c1.targetId, state, severity: 'CRITICAL', createdTime: new Date(created).toISOString() });
+        const policyActions = [];
+        policyActions.push(...policyEngine.evaluate(event('pd', 'DROWSINESS', 'ACTIVE'), c1, new Date(350)).actions);
+        policyActions.push(...policyEngine.evaluate(event('pi', 'DRIVER_INCAPACITATION', 'NEW'), c1, new Date(100)).actions);
+        policyActions.push(...new P.DriverPolicyEngine(window.DriverPolicyConfig).evaluate(
+          event('pa', 'ALCOHOL_POLICY_VIOLATION', 'NEW'), c1, new Date(100), { policyDecision: 'BLOCK_START' }).actions);
+        const integrated = new A.DriverActionDispatcher(config);
+        policyActions.forEach(item => integrated.enqueue(item, c1));
+        assert(integrated.getDriverActionExecutions().every(item => item.sourceEventId && item.sourceDecisionId),
+          'Policy source relationships preserved');
+        assert(integrated.getDriverActionExecutions().every(item => item.metadata.policyReasonCodes.length > 0),
+          'Policy reasonCodes preserved in execution metadata');
+        const pendingSource = integrated.getDriverActionExecutions()[0].sourceEventId;
+        integrated.cancelBySourceEvent(pendingSource, new Date(30));
+        assert(integrated.getDriverActionExecutions().filter(item => item.sourceEventId === pendingSource)
+          .every(item => item.state === 'CANCELLED'), 'Policy close cancellation boundary');
+
+        const metadata = integrated.getDriverActionExecutions()[0].metadata.relationships;
+        ['policyDecisionRequestedActionRequest', 'actionRequestDispatchedBy',
+          'driverActionDispatcherSelectedActionAdapter', 'actionAdapterProducedActionExecution',
+          'actionExecutionAppliesToVehicleContext', 'actionExecutionConcernsDriver',
+          'actionExecutionHasState', 'actionExecutionDerivedFromSourceEventId',
+          'actionExecutionReportsExecutionFeedback', 'actionExecutionDerivedFromSourceDecisionId']
+          .forEach(key => assert(key in metadata, `Ontology ${key}`));
+
+        document.getElementById('result').textContent = 'PASS'; document.title = 'PASS';
+      } catch (error) {
+        document.getElementById('result').textContent = `FAIL\n${error.stack || error.message}`;
+        document.title = 'FAIL';
+      }
+    }());
+  </script>
+</body></html>
