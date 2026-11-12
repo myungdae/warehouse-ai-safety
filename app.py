@@ -262,6 +262,11 @@ def drone_inventory_multi():
     """Multi-drone system (battery, 3 docks, 9 drones)"""
     return render_template('drone_inventory_multi.html')
 
+@app.route('/drone/single-rest')
+def drone_inventory_single_rest():
+    return render_template('drone_inventory_multilayer_test.html')
+
+
 @app.route('/drone/single-test')
 def drone_inventory_multilayer_test():
     return render_template('drone_inventory_multilayer_test.html')
