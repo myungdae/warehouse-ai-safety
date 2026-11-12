@@ -71,7 +71,7 @@ const DRONE = { size: 12, speed: 8.0, scanRadius: 40, batteryDrainRate: 0.005 };
 // DJI M30: 최대 41분, 안전 비행 ~30분
 // 15 Aisle / 30분 → 1 Aisle당 ~2분 → 배터리 1개당 8 Aisle 커버
 // Battery-1: Aisle 1~8 (DRONE-01), Battery-2: Aisle 9~15 (DRONE-02)
-const BATTERY_SWAP_AISLE = 8;   // 이 Aisle 완료 후 Dock 귀환 → 배터리 교체 → DRONE-02 출발
+const BATTERY_SWAP_AISLE = 8;   // 이 Aisle 완료 후 Dock 귀환 → DRONE-02 임무 인계 및 출발
 
 // ── Shelves 자동 생성 (15 aisles × 20 racks × 15 levels × 2 sides) ──────────────────────
 WAREHOUSE.aisles.forEach(aisle => {
@@ -843,6 +843,24 @@ function createSVG(tag, attrs) {
 //   DRONE-01 (청록) : Dock 출발 → A1~A8 sweep → Dock 귀환
 //   DRONE-02 (오렌지): Dock 대기 → DRONE-01 귀환 순간 자동 출발 → A9~A15 sweep → Dock 귀환
 //   각 Aisle당 waypoint 3개 (move→sweep_down→sweep_up), 랙별 멈춤 없음
+
+function patrolDistance(start, path) {
+    let total = 0;
+    let previous = start;
+    for (const point of path) {
+        const dx = point.x - previous.x;
+        const dy = point.y - previous.y;
+        total += Math.hypot(dx, dy);
+        previous = point;
+    }
+    return total;
+}
+
+function batteryDrainPerPixel(start, path, targetRemaining) {
+    const distance = patrolDistance(start, path);
+    return distance > 0 ? (100 - targetRemaining) / distance : 0;
+}
+
 function buildPatrolPath() {
     // DRONE-01 전용: A1 ~ BATTERY_SWAP_AISLE
     const path = [];
@@ -1058,7 +1076,14 @@ function drone01Loop() {
         state.drone.x += (dx / dist) * DRONE.speed;
         state.drone.y += (dy / dist) * DRONE.speed;
         state.drone.angle = Math.atan2(dy, dx) * 180 / Math.PI;
-        state.drone.battery = Math.max(0, state.drone.battery - DRONE.batteryDrainRate);
+        state.drone.battery = Math.max(0,
+            state.drone.battery -
+            Math.min(DRONE.speed, dist) *
+            batteryDrainPerPixel(
+                {x: DOCK_X, y: DOCK_Y + 24},
+                state.patrolPath, 30
+            )
+        );
 
         if ((target.type === 'sweep_down' || target.type === 'sweep_up') && target.aisle) {
             if (state.scanBeamEl) state.scanBeamEl.setAttribute('opacity', '0.55');
@@ -1140,7 +1165,14 @@ function drone02Loop() {
         state.drone2.x += (dx / dist) * DRONE.speed;
         state.drone2.y += (dy / dist) * DRONE.speed;
         state.drone2.angle = Math.atan2(dy, dx) * 180 / Math.PI;
-        state.drone2.battery = Math.max(0, state.drone2.battery - DRONE.batteryDrainRate);
+        state.drone2.battery = Math.max(0,
+            state.drone2.battery -
+            Math.min(DRONE.speed, dist) *
+            batteryDrainPerPixel(
+                {x: DOCK_X + 22, y: DOCK_Y + 24},
+                state.patrol2Path, 35
+            )
+        );
 
         if ((target.type === 'sweep_down' || target.type === 'sweep_up') && target.aisle) {
             if (state.scanBeam2El) state.scanBeam2El.setAttribute('opacity', '0.45');
@@ -1587,8 +1619,8 @@ function finishPatrol() {
            ✅ 전체 15 Aisle 촬영 완료 — 사람 개입 0회
          </div>
          <div style="display:flex;gap:12px;font-size:0.76rem;margin-top:4px">
-           <span style="color:#22d3ee">🔵 DRONE-01: A1~A${BATTERY_SWAP_AISLE} 완료·충전중</span>
-           <span style="color:#f97316">🟠 DRONE-02: A${BATTERY_SWAP_AISLE+1}~A15 완료·충전중</span>
+           <span style="color:#22d3ee">🔵 DRONE-01: A1~A${BATTERY_SWAP_AISLE} 임무 완료·Dock 대기</span>
+           <span style="color:#f97316">🟠 DRONE-02: A${BATTERY_SWAP_AISLE+1}~A15 임무 완료·Dock 대기</span>
          </div>
          <div style="color:#64748b;font-size:0.72rem;margin-top:4px">
            ${state.scannedShelves.size}개 선반 스캔 · ${totalLayers}개 Layer · ${modeStr}
